@@ -1,0 +1,686 @@
+import 'package:flutter/material.dart';
+import 'package:onecharge/core/storage/vehicle_storage.dart';
+import 'package:onecharge/screen/home/issue_reporting_bottom_sheet.dart';
+import 'package:onecharge/screen/home/widgets/service_notification.dart';
+import 'package:onecharge/screen/home/widgets/service_summary_bottom_sheet.dart';
+import 'package:onecharge/screen/home/settings_screen.dart';
+import 'package:onecharge/screen/home/tracking_map_screen.dart';
+import 'dart:async';
+import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:onecharge/logic/blocs/issue_category/issue_category_bloc.dart';
+import 'package:onecharge/logic/blocs/issue_category/issue_category_state.dart';
+
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => HomeScreenState();
+}
+
+class HomeScreenState extends State<HomeScreen> {
+  static HomeScreenState? activeState;
+  int selectedIndex = -1;
+  int selectedVehicleIndex = 0;
+  List<UserVehicle> vehicles = [];
+  bool isLoadingVehicles = true;
+  String currentAddress = "Fetching location...";
+  String _currentServiceStage = 'none';
+  double _serviceProgress = 0.0;
+  Timer? _serviceTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    activeState = this;
+    _loadUserVehicles();
+    _getCurrentLocation();
+  }
+
+  Future<void> _getCurrentLocation() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      setState(() {
+        currentAddress = "Location services disabled";
+      });
+      return;
+    }
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        setState(() {
+          currentAddress = "Location permission denied";
+        });
+        return;
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      setState(() {
+        currentAddress = "Location permission permanently denied";
+      });
+      return;
+    }
+
+    try {
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      List<Placemark> placemarks = await placemarkFromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
+
+      if (placemarks.isNotEmpty) {
+        Placemark place = placemarks[0];
+        setState(() {
+          // Construct a readable address
+          List<String> addressParts = [];
+          if (place.name != null && place.name!.isNotEmpty) {
+            addressParts.add(place.name!);
+          }
+          if (place.subLocality != null && place.subLocality!.isNotEmpty) {
+            addressParts.add(place.subLocality!);
+          }
+          if (place.locality != null && place.locality!.isNotEmpty) {
+            addressParts.add(place.locality!);
+          }
+
+          currentAddress = addressParts.join(", ");
+          if (currentAddress.isEmpty) {
+            currentAddress =
+                "${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}";
+          }
+        });
+      }
+    } catch (e) {
+      setState(() {
+        currentAddress = "Failed to get location";
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    activeState = null;
+    _serviceTimer?.cancel();
+    super.dispose();
+  }
+
+  void startServiceFlow() {
+    setState(() {
+      _currentServiceStage = 'finding';
+      _serviceProgress = 0.0;
+    });
+
+    _serviceTimer?.cancel();
+
+    // Step 1: Finding (3s)
+    _serviceTimer = Timer(const Duration(seconds: 3), () {
+      setState(() {
+        _currentServiceStage = 'assigned';
+      });
+
+      // Start the 10-second fast progression synchronized with map
+      _serviceTimer = Timer.periodic(const Duration(milliseconds: 100), (
+        timer,
+      ) {
+        if (!mounted) return;
+
+        setState(() {
+          if (_serviceProgress < 1.0) {
+            _serviceProgress += 0.01; // 1.0 total over 10 seconds
+
+            if (_serviceProgress >= 0.3 && _currentServiceStage == 'assigned') {
+              _currentServiceStage = 'reaching';
+            }
+            if (_serviceProgress >= 0.7 && _currentServiceStage == 'reaching') {
+              _currentServiceStage = 'solving';
+            }
+          } else {
+            _serviceProgress = 1.0;
+            timer.cancel();
+
+            // Wait 2 seconds at 'solving' then show 'resolved'
+            Future.delayed(const Duration(seconds: 2), () {
+              if (mounted) {
+                setState(() {
+                  _currentServiceStage = 'resolved';
+                });
+              }
+            });
+          }
+        });
+      });
+    });
+  }
+
+  Future<void> _loadUserVehicles() async {
+    final loadedVehicles = await VehicleStorage.getAllVehicles();
+    setState(() {
+      vehicles = loadedVehicles;
+      isLoadingVehicles = false;
+    });
+  }
+
+  void _showVehicleSelectionBottomSheet(String category) {
+    if (isLoadingVehicles) return;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              padding: const EdgeInsets.all(20.00),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (vehicles.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 20),
+                      child: Text(
+                        'No vehicles found. Please add a vehicle.',
+                        style: TextStyle(fontFamily: 'Lufga'),
+                      ),
+                    )
+                  else
+                    ...List.generate(vehicles.length, (index) {
+                      final vehicle = vehicles[index];
+                      final isSelected = selectedVehicleIndex == index;
+                      return GestureDetector(
+                        onTap: () {
+                          setSheetState(() {
+                            selectedVehicleIndex = index;
+                          });
+                          setState(() {});
+                          VehicleStorage.selectVehicle(vehicle);
+
+                          // Close current sheet and open Issue Reporting
+                          Navigator.pop(context);
+                          showModalBottomSheet(
+                            context: context,
+                            backgroundColor: Colors.transparent,
+                            isScrollControlled: true,
+                            builder: (context) => IssueReportingBottomSheet(
+                              vehicleName: vehicle.name,
+                              vehiclePlate: vehicle.number,
+                              currentAddress: currentAddress,
+                              initialCategory: category,
+                            ),
+                          );
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: _buildCarItem(
+                            title: vehicle.name,
+                            subtitle: vehicle.number,
+                            imagePath: vehicle.image ?? '',
+                            isSelected: isSelected,
+                          ),
+                        ),
+                      );
+                    }),
+                  const SizedBox(height: 10),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildCarItem({
+    required String title,
+    required String subtitle,
+    required String imagePath,
+    bool isSelected = false,
+  }) {
+    return Container(
+      height: 80,
+      padding: const EdgeInsets.only(left: 16),
+      decoration: BoxDecoration(
+        color: const Color(0xffF5F5F5),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isSelected ? Colors.black : Colors.transparent,
+          width: 1.2,
+        ),
+      ),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    fontFamily: 'Lufga',
+                    color: Colors.black,
+                  ),
+                ),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF757575),
+                    fontFamily: 'Lufga',
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (imagePath.isNotEmpty)
+            Positioned(
+              right: 0,
+              top: 5,
+              bottom: 5,
+              child: Image.asset(
+                imagePath,
+                fit: BoxFit.fitHeight,
+                alignment: Alignment.centerRight,
+                errorBuilder: (context, error, stackTrace) =>
+                    const SizedBox(width: 100),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        bottom: false,
+        child: Stack(
+          children: [
+            SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 10),
+                  // Top Header
+                  Row(
+                    children: [
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const SettingsScreen(),
+                            ),
+                          );
+                        },
+                        child: const CircleAvatar(
+                          radius: 25,
+                          backgroundImage: NetworkImage(
+                            'https://plus.unsplash.com/premium_photo-1689568126014-06fea9d5d341?fm=jpg&q=60&w=3000&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MXx8cHJvZmlsZXxlbnwwfHwwfHx8MA%3D%3D',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text(
+                              'Hi Mishal',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                                fontFamily: 'Lufga',
+                                color: Colors.black,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Row(
+                              children: [
+                                Container(
+                                  width: 10,
+                                  height: 10,
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xff4CAF50),
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    currentAddress,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: const Color(
+                                        0xFF1D1B20,
+                                      ).withOpacity(0.6),
+                                      fontFamily: 'Lufga',
+                                      fontWeight: FontWeight.w400,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: const BoxDecoration(
+                          color: Color(0xffF5F5F5),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.notifications_none_outlined,
+                          size: 28,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  // Search Bar
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xffF5F5F5),
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    child: const TextField(
+                      decoration: InputDecoration(
+                        hintText: 'Search for any services',
+                        hintStyle: TextStyle(
+                          color: Color(0xffB8B9BD),
+                          fontSize: 14,
+                          fontFamily: 'Lufga',
+                        ),
+                        icon: Icon(Icons.search, color: Colors.grey),
+                        border: InputBorder.none,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Banner
+                  Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.asset(
+                          'assets/home/bannerBG.png',
+                          width: double.infinity,
+                          height: 180,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      Positioned(
+                        top: 20,
+                        left: 20,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Save 30% off\nfirst 2 booking',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w500,
+                                fontFamily: 'Lufga',
+                                height: 1.2,
+                              ),
+                            ),
+                            const SizedBox(height: 5),
+                            const Text(
+                              'USECODE 125MND',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontFamily: 'Lufga',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Our Services',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Lufga',
+                      color: Colors.black,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Services Grid
+                  BlocBuilder<IssueCategoryBloc, IssueCategoryState>(
+                    builder: (context, state) {
+                      if (state is IssueCategoryLoading) {
+                        return const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(20.0),
+                            child: CircularProgressIndicator(
+                              color: Colors.black,
+                            ),
+                          ),
+                        );
+                      } else if (state is IssueCategoryError) {
+                        return Center(child: Text('Error: ${state.message}'));
+                      } else if (state is IssueCategoryLoaded) {
+                        // Filter out 'Other' if it exists in the API list to avoid duplication
+                        // Also filter out categories with null names
+                        final categories = state.categories
+                            .where((c) => c.name != null && c.name!.toLowerCase() != 'other')
+                            .toList();
+
+                        return LayoutBuilder(
+                          builder: (context, constraints) {
+                            final double cardWidth =
+                                (constraints.maxWidth - 13) / 2;
+                            return Wrap(
+                              spacing: 13,
+                              runSpacing: 13,
+                              children: [
+                                ...List.generate(categories.length, (index) {
+                                  final category = categories[index];
+                                  final categoryName = category.name ?? 'Unknown';
+                                  return _buildServiceCard(
+                                    index,
+                                    categoryName,
+                                    _getCategoryIcon(categoryName),
+                                    cardWidth,
+                                  );
+                                }),
+                                _buildServiceCard(
+                                  categories.length,
+                                  'Other',
+                                  '',
+                                  cardWidth,
+                                ),
+                              ],
+                            );
+                          },
+                        );
+                      }
+                      return const SizedBox();
+                    },
+                  ),
+                  const SizedBox(height: 20),
+                ],
+              ),
+            ),
+            if (_currentServiceStage != 'none')
+              ServiceNotificationOverlay(
+                stage: _currentServiceStage,
+                progress: _serviceProgress,
+                onDismiss: () {
+                  setState(() {
+                    _currentServiceStage = 'none';
+                    _serviceTimer?.cancel();
+                  });
+                },
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => TrackingMapScreen(
+                        stage: _currentServiceStage,
+                        progress: _serviceProgress,
+                      ),
+                    ),
+                  );
+                },
+                onSolved: () {
+                  setState(() {
+                    _currentServiceStage = 'none';
+                    _serviceTimer?.cancel();
+                  });
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    backgroundColor: Colors.transparent,
+                    builder: (context) => const ServiceSummaryBottomSheet(),
+                  );
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _getCategoryIcon(String name) {
+    final lowerName = name.toLowerCase();
+    // Prioritize charging/station to distinguish from low battery
+    if (lowerName.contains('station') || lowerName.contains('charge')) {
+      return 'assets/home/chargingsation.png';
+    }
+    if (lowerName.contains('battery')) return 'assets/home/lowbattery.png';
+    if (lowerName.contains('mechanical') || lowerName.contains('engine')) {
+      return 'assets/home/mechanicalisuue.png';
+    }
+    if (lowerName.contains('tire') || lowerName.contains('tyre')) {
+      return 'assets/home/falttyre.png';
+    }
+    if (lowerName.contains('tow') || lowerName.contains('pickup')) {
+      return 'assets/home/pickupreqiure.png';
+    }
+    return '';
+  }
+
+  Widget _buildServiceCard(
+    int index,
+    String title,
+    String imagePath,
+    double width,
+  ) {
+    bool isSelected = selectedIndex == index;
+    bool isOther = title == 'Other';
+
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          selectedIndex = index;
+        });
+        _showVehicleSelectionBottomSheet(title);
+      },
+      child: Container(
+        width: width,
+        height: 150,
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.black : const Color(0xffF5F5F5),
+          borderRadius: BorderRadius.circular(15),
+        ),
+        child: Stack(
+          children: [
+            if (!isOther)
+              Padding(
+                padding: const EdgeInsets.all(15),
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    color: isSelected ? Colors.white : Colors.black,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    fontFamily: 'Lufga',
+                    height: 1.2,
+                  ),
+                ),
+              ),
+            if (!isOther && imagePath.isNotEmpty)
+              (title.contains('Tow') || title.contains('Pickup'))
+                  ? Positioned(
+                      right: -10,
+                      top: 40,
+                      bottom: 0,
+                      child: Image.asset(
+                        imagePath,
+                        width: 110,
+                        fit: BoxFit.contain,
+                        color: isSelected
+                            ? Colors.white.withOpacity(0.9)
+                            : null,
+                        colorBlendMode: isSelected ? BlendMode.modulate : null,
+                      ),
+                    )
+                  : Positioned.fill(
+                      top: 30,
+                      child: Center(
+                        child: Image.asset(
+                          imagePath,
+                          width: title.contains('Station') ? 60 : 120,
+                          height: title.contains('Station') ? 90 : 80,
+                          fit: BoxFit.contain,
+                          color: isSelected
+                              ? Colors.white.withOpacity(0.9)
+                              : null,
+                          colorBlendMode: isSelected
+                              ? BlendMode.modulate
+                              : null,
+                        ),
+                      ),
+                    ),
+            if (isOther)
+              Center(
+                child: Text(
+                  'Other',
+                  style: TextStyle(
+                    color: isSelected ? Colors.white : Colors.black,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    fontFamily: 'Lufga',
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
