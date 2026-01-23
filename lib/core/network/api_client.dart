@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:onecharge/core/storage/token_storage.dart';
 
 class ApiClient {
   late Dio _dio;
@@ -17,7 +18,32 @@ class ApiClient {
       ),
     );
 
-    // Add logging or other interceptors here if needed
+    // Add auth interceptor to include token in requests
+    _dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) async {
+          // Skip adding token for login endpoint
+          if (options.path != '/customer/login') {
+            final token = await TokenStorage.readToken();
+            if (token != null && token.isNotEmpty) {
+              options.headers['Authorization'] = 'Bearer $token';
+              print('🔑 [ApiClient] Token added to request: ${options.path}');
+            } else {
+              print('⚠️ [ApiClient] No token found for request: ${options.path}');
+            }
+          }
+          return handler.next(options);
+        },
+        onError: (error, handler) {
+          if (error.response?.statusCode == 401) {
+            print('❌ [ApiClient] Unauthenticated - Token may be invalid or expired');
+          }
+          return handler.next(error);
+        },
+      ),
+    );
+
+    // Add logging interceptor
     _dio.interceptors.add(
       LogInterceptor(requestBody: true, responseBody: true),
     );
@@ -80,6 +106,34 @@ class ApiClient {
         ),
       );
       final response = await dio.get(path, queryParameters: queryParameters);
+      return response;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<Response> postMultipart(
+    String path, {
+    required FormData formData,
+  }) async {
+    try {
+      // Get token for multipart request
+      final token = await TokenStorage.readToken();
+      final headers = <String, dynamic>{
+        'Accept': 'application/json',
+      };
+      if (token != null && token.isNotEmpty) {
+        headers['Authorization'] = 'Bearer $token';
+      }
+
+      final response = await _dio.post(
+        path,
+        data: formData,
+        options: Options(
+          headers: headers,
+          contentType: 'multipart/form-data',
+        ),
+      );
       return response;
     } on DioException catch (e) {
       throw _handleError(e);

@@ -1,10 +1,39 @@
 import 'package:flutter/material.dart';
+import 'package:onecharge/models/ticket_model.dart';
 
 class BookingDetailScreen extends StatelessWidget {
-  const BookingDetailScreen({super.key});
+  final Ticket ticket;
+
+  const BookingDetailScreen({super.key, required this.ticket});
 
   @override
   Widget build(BuildContext context) {
+    final invoice = ticket.invoice;
+    final driverName = ticket.driver?.name ?? '-';
+    final orderId = ticket.ticketId;
+    final serviceName = ticket.issueCategory?.name ?? '-';
+    final location = ticket.location ?? '-';
+
+    String bookingTime = '-';
+    if (ticket.createdAt != null && ticket.createdAt!.isNotEmpty) {
+      try {
+        final dt = DateTime.parse(ticket.createdAt!);
+        bookingTime =
+            '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+      } catch (_) {
+        bookingTime = ticket.createdAt!;
+      }
+    }
+
+    final totalAmount = invoice != null
+        ? '${invoice.currency} ${invoice.totalAmount.toStringAsFixed(2)}'
+        : '-';
+    final trnNumber = invoice?.invoiceNumber != null
+        ? '#${invoice!.invoiceNumber}'
+        : '-';
+    final paymentMethod = ticket.paymentMethod ?? '-';
+    final paymentStatus = (ticket.status ?? 'Pending');
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -34,30 +63,30 @@ class BookingDetailScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildSectionHeader('Details'),
-            _buildDetailRow('Agent Name', 'Muhammed'),
-            _buildDetailRow('Order ID', '555455'),
-            _buildDetailRow('Model', 'BMW i7'),
-            _buildDetailRow('Number', '532212'),
+            _buildDetailRow('Agent Name', driverName),
+            _buildDetailRow('Order ID', orderId),
+            _buildDetailRow('Model', '-'),
+            _buildDetailRow('Number', '-'),
             const SizedBox(height: 10),
             _buildSectionHeader('Details'),
-            _buildDetailRow('Service', 'Low Battery'),
-            _buildDetailRow('Booking Time', '20:10'),
+            _buildDetailRow('Service', serviceName),
+            _buildDetailRow('Booking Time', bookingTime),
             _buildDetailRow(
               'Location',
-              '1901 Thornridge\nCir. Shiloh, Hawaii 81063',
+              location,
               isMultiLine: true,
             ),
-            _buildDetailRow('Number', '532212'),
+            _buildDetailRow('Number', '-'),
             const SizedBox(height: 10),
             _buildSectionHeader('Payment Details'),
-            _buildDetailRow('Total Amount', 'AED 7500.00'),
-            _buildDetailRow('TRN Number', '#95249'),
+            _buildDetailRow('Total Amount', totalAmount),
+            _buildDetailRow('TRN Number', trnNumber),
             _buildDetailRow(
               'Payment Method',
-              'Bank Transfer\nRef#000000, TT Ref#\n00000000',
+              paymentMethod,
               isMultiLine: true,
             ),
-            _buildDetailRow('Payment Status', 'Paid'),
+            _buildDetailRow('Payment Status', paymentStatus),
             const SizedBox(height: 40),
           ],
         ),

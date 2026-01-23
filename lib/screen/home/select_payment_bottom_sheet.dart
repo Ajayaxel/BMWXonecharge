@@ -1,9 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:onecharge/const/onebtn.dart';
 import 'package:onecharge/screen/home/success_bottom_sheet.dart';
+import 'package:onecharge/screen/payment/payment_webview_screen.dart';
+import 'package:onecharge/models/ticket_model.dart';
 
 class SelectPaymentBottomSheet extends StatefulWidget {
-  const SelectPaymentBottomSheet({super.key});
+  final PaymentBreakdown? paymentBreakdown;
+  final String? paymentUrl;
+  final String? intentionId;
+
+  const SelectPaymentBottomSheet({
+    super.key,
+    this.paymentBreakdown,
+    this.paymentUrl,
+    this.intentionId,
+  });
 
   @override
   State<SelectPaymentBottomSheet> createState() =>
@@ -112,6 +123,14 @@ class _SelectPaymentBottomSheetState extends State<SelectPaymentBottomSheet> {
             title: "Pay",
             logo: "assets/issue/tamara.png",
           ),
+          if (widget.paymentUrl != null) ...[
+            const SizedBox(height: 16),
+            _buildPaymentOption(
+              id: "paymob",
+              title: "Paymob",
+              logo: null,
+            ),
+          ],
 
           const SizedBox(height: 16),
           const Text(
@@ -128,13 +147,38 @@ class _SelectPaymentBottomSheetState extends State<SelectPaymentBottomSheet> {
           const SizedBox(height: 16),
           OneBtn(
             onPressed: () {
-              Navigator.pop(context);
-              showModalBottomSheet(
-                context: context,
-                isScrollControlled: true,
-                backgroundColor: Colors.transparent,
-                builder: (context) => const SuccessBottomSheet(),
-              );
+              // Handle Paymob payment
+              if (_selectedMethod == "paymob" && widget.paymentUrl != null) {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => PaymentWebViewScreen(
+                      paymentUrl: widget.paymentUrl!,
+                      intentionId: widget.intentionId,
+                    ),
+                  ),
+                ).then((paymentSuccess) {
+                  if (paymentSuccess == true && mounted) {
+                    // Show success screen
+                    showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (context) => const SuccessBottomSheet(),
+                    );
+                  }
+                });
+              } else {
+                // Handle other payment methods (card, tabby, tamara, cash)
+                Navigator.pop(context);
+                showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.transparent,
+                  builder: (context) => const SuccessBottomSheet(),
+                );
+              }
             },
             text: "Make Payment",
           ),

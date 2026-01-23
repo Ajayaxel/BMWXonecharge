@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:onecharge/models/ticket_model.dart';
 
 class ServiceNotificationOverlay extends StatefulWidget {
   final String
@@ -7,6 +8,7 @@ class ServiceNotificationOverlay extends StatefulWidget {
   final VoidCallback onDismiss;
   final VoidCallback onSolved;
   final VoidCallback? onTap;
+  final Ticket? ticket;
 
   const ServiceNotificationOverlay({
     super.key,
@@ -15,6 +17,7 @@ class ServiceNotificationOverlay extends StatefulWidget {
     required this.onDismiss,
     required this.onSolved,
     this.onTap,
+    this.ticket,
   });
 
   @override
@@ -61,6 +64,9 @@ class _ServiceNotificationOverlayState extends State<ServiceNotificationOverlay>
   }
 
   Widget _buildFindingAgent() {
+    final issueCategory = widget.ticket?.issueCategory?.name ?? '';
+    final ticketId = widget.ticket?.ticketId;
+    
     return Container(
       key: const ValueKey('finding'),
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
@@ -71,29 +77,44 @@ class _ServiceNotificationOverlayState extends State<ServiceNotificationOverlay>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: const [
-              Text(
-                "Finding your agent",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  fontFamily: 'Lufga',
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  "Finding your agent",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    fontFamily: 'Lufga',
+                  ),
                 ),
-              ),
-              SizedBox(height: 4),
-              Text(
-                "Your request has been received. An\nagent will be assigned shortly.",
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 13,
-                  fontFamily: 'Lufga',
+                const SizedBox(height: 4),
+                Text(
+                  issueCategory.isNotEmpty
+                      ? "Your $issueCategory request has been\nreceived. An agent will be assigned shortly."
+                      : "Your request has been received. An\nagent will be assigned shortly.",
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 13,
+                    fontFamily: 'Lufga',
+                  ),
                 ),
-              ),
-            ],
+                if (ticketId != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    "Ticket: $ticketId",
+                    style: const TextStyle(
+                      color: Colors.white60,
+                      fontSize: 11,
+                      fontFamily: 'Lufga',
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
           // Circle loading indicator
           const SizedBox(
@@ -132,7 +153,9 @@ class _ServiceNotificationOverlayState extends State<ServiceNotificationOverlay>
                   children: [
                     Text(
                       isSolving
-                          ? "Your Agent solving the issue"
+                          ? widget.ticket?.issueCategory != null
+                              ? "Your Agent solving\nthe ${widget.ticket!.issueCategory!.name} issue"
+                              : "Your Agent solving the issue"
                           : isReaching
                           ? "Reach In 5min"
                           : "Agent Assigned",
@@ -142,6 +165,8 @@ class _ServiceNotificationOverlayState extends State<ServiceNotificationOverlay>
                         fontWeight: FontWeight.w700,
                         fontFamily: 'Lufga',
                       ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -149,7 +174,9 @@ class _ServiceNotificationOverlayState extends State<ServiceNotificationOverlay>
                           ? "Please wait a moment"
                           : isReaching
                           ? "meet at location"
-                          : "Sayed will reach you shortly",
+                          : widget.ticket?.driver?.name != null
+                          ? "${widget.ticket!.driver!.name} will reach you shortly"
+                          : "Agent will reach you shortly",
                       style: const TextStyle(
                         color: Colors.white70,
                         fontSize: 13,
@@ -177,12 +204,17 @@ class _ServiceNotificationOverlayState extends State<ServiceNotificationOverlay>
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         border: Border.all(color: Colors.black, width: 2),
-                        image: const DecorationImage(
-                          image: NetworkImage(
-                            'https://i.pravatar.cc/150?u=sayed',
-                          ),
-                          fit: BoxFit.cover,
-                        ),
+                        image: widget.ticket?.driver?.image != null
+                            ? DecorationImage(
+                                image: NetworkImage(widget.ticket!.driver!.image!),
+                                fit: BoxFit.cover,
+                              )
+                            : const DecorationImage(
+                                image: NetworkImage(
+                                  'https://i.pravatar.cc/150?u=agent',
+                                ),
+                                fit: BoxFit.cover,
+                              ),
                       ),
                     ),
                   ),
@@ -249,16 +281,34 @@ class _ServiceNotificationOverlayState extends State<ServiceNotificationOverlay>
         children: [
           Row(
             children: [
-              const Expanded(
-                child: Text(
-                  "All the issues you\nmentioned have been\nresolved",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    fontFamily: 'Lufga',
-                    height: 1.3,
-                  ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.ticket?.issueCategory != null
+                          ? "Your ${widget.ticket!.issueCategory!.name}\nissue has been\nresolved"
+                          : "All the issues you\nmentioned have been\nresolved",
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        fontFamily: 'Lufga',
+                        height: 1.3,
+                      ),
+                    ),
+                    if (widget.ticket?.ticketId != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        "Ticket: ${widget.ticket!.ticketId}",
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12,
+                          fontFamily: 'Lufga',
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
               Image.asset(

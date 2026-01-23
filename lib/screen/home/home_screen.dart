@@ -1,16 +1,24 @@
 import 'package:flutter/material.dart';
-import 'package:onecharge/core/storage/vehicle_storage.dart';
 import 'package:onecharge/screen/home/issue_reporting_bottom_sheet.dart';
 import 'package:onecharge/screen/home/widgets/service_notification.dart';
 import 'package:onecharge/screen/home/widgets/service_summary_bottom_sheet.dart';
 import 'package:onecharge/screen/home/settings_screen.dart';
 import 'package:onecharge/screen/home/tracking_map_screen.dart';
+import 'package:onecharge/screen/vehicle/vehicle_selection.dart';
+import 'package:onecharge/const/onebtn.dart';
 import 'dart:async';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:onecharge/logic/blocs/issue_category/issue_category_bloc.dart';
 import 'package:onecharge/logic/blocs/issue_category/issue_category_state.dart';
+import 'package:onecharge/logic/blocs/vehicle_list/vehicle_list_bloc.dart';
+import 'package:onecharge/logic/blocs/vehicle_list/vehicle_list_state.dart';
+import 'package:onecharge/logic/blocs/vehicle_list/vehicle_list_event.dart';
+import 'package:onecharge/models/vehicle_list_model.dart';
+import 'package:onecharge/models/ticket_model.dart';
+import 'package:onecharge/core/storage/vehicle_storage.dart';
+import 'package:shimmer/shimmer.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -23,19 +31,23 @@ class HomeScreenState extends State<HomeScreen> {
   static HomeScreenState? activeState;
   int selectedIndex = -1;
   int selectedVehicleIndex = 0;
-  List<UserVehicle> vehicles = [];
+  List<VehicleListItem> vehicles = [];
   bool isLoadingVehicles = true;
   String currentAddress = "Fetching location...";
   String _currentServiceStage = 'none';
   double _serviceProgress = 0.0;
   Timer? _serviceTimer;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  Ticket? _currentTicket;
 
   @override
   void initState() {
     super.initState();
     activeState = this;
-    _loadUserVehicles();
     _getCurrentLocation();
+    // Vehicles will be loaded via BLoC
+    context.read<VehicleListBloc>().add(FetchVehicles());
   }
 
   Future<void> _getCurrentLocation() async {
@@ -111,13 +123,15 @@ class HomeScreenState extends State<HomeScreen> {
   void dispose() {
     activeState = null;
     _serviceTimer?.cancel();
+    _searchController.dispose();
     super.dispose();
   }
 
-  void startServiceFlow() {
+  void startServiceFlow({Ticket? ticket}) {
     setState(() {
       _currentServiceStage = 'finding';
       _serviceProgress = 0.0;
+      _currentTicket = ticket;
     });
 
     _serviceTimer?.cancel();
@@ -162,81 +176,139 @@ class HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  Future<void> _loadUserVehicles() async {
-    final loadedVehicles = await VehicleStorage.getAllVehicles();
-    setState(() {
-      vehicles = loadedVehicles;
-      isLoadingVehicles = false;
-    });
-  }
 
   void _showVehicleSelectionBottomSheet(String category) {
-    if (isLoadingVehicles) return;
-
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            return Container(
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-              ),
-              padding: const EdgeInsets.all(20.00),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (vehicles.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 20),
-                      child: Text(
-                        'No vehicles found. Please add a vehicle.',
-                        style: TextStyle(fontFamily: 'Lufga'),
-                      ),
-                    )
-                  else
-                    ...List.generate(vehicles.length, (index) {
-                      final vehicle = vehicles[index];
-                      final isSelected = selectedVehicleIndex == index;
-                      return GestureDetector(
-                        onTap: () {
-                          setSheetState(() {
-                            selectedVehicleIndex = index;
-                          });
-                          setState(() {});
-                          VehicleStorage.selectVehicle(vehicle);
+        return BlocBuilder<VehicleListBloc, VehicleListState>(
+          builder: (context, state) {
+            if (state is VehicleListLoading) {
+              return Container(
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                ),
+                padding: const EdgeInsets.all(20.00),
+                child: const Center(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 40),
+                    child: CircularProgressIndicator(),
+                  ),
+                ),
+              );
+            }
 
-                          // Close current sheet and open Issue Reporting
+            if (state is VehicleListError) {
+              return Container(
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                ),
+                padding: const EdgeInsets.all(20.00),
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 40),
+                    child: Text(
+                      'Error: ${state.message}',
+                      style: const TextStyle(fontFamily: 'Lufga'),
+                    ),
+                  ),
+                ),
+              );
+            }
+
+            final vehicleList = state is VehicleListLoaded ? state.vehicles : <VehicleListItem>[];
+
+            return StatefulBuilder(
+              builder: (context, setSheetState) {
+                return Container(
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                  ),
+                  padding: const EdgeInsets.all(20.00),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (vehicleList.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 20),
+                          child: Text(
+                            'No vehicles found. Please add a vehicle.',
+                            style: TextStyle(fontFamily: 'Lufga'),
+                          ),
+                        )
+                      else
+                        ...List.generate(vehicleList.length, (index) {
+                          final vehicle = vehicleList[index];
+                          final isSelected = selectedVehicleIndex == index;
+                          return GestureDetector(
+                            onTap: () async {
+                              setSheetState(() {
+                                selectedVehicleIndex = index;
+                              });
+                              setState(() {});
+
+                              // Save vehicle IDs to storage before opening Issue Reporting
+                              await VehicleStorage.saveVehicleInfo(
+                                name: vehicle.vehicleName,
+                                number: vehicle.vehicleNumber,
+                                image: vehicle.vehicleImage,
+                                vehicleTypeId: vehicle.vehicleTypeId,
+                                brandId: vehicle.brandId,
+                                modelId: vehicle.modelId,
+                              );
+
+                              // Close current sheet and open Issue Reporting
+                              if (!mounted) return;
+                              Navigator.pop(context);
+                              showModalBottomSheet(
+                                context: context,
+                                backgroundColor: Colors.transparent,
+                                isScrollControlled: true,
+                                builder: (context) => IssueReportingBottomSheet(
+                                  vehicleName: vehicle.vehicleName,
+                                  vehiclePlate: vehicle.vehicleNumber,
+                                  currentAddress: currentAddress,
+                                  initialCategory: category,
+                                ),
+                              );
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: _buildCarItem(
+                                title: vehicle.vehicleName,
+                                subtitle: vehicle.vehicleNumber,
+                                imageUrl: vehicle.vehicleImage,
+                                isSelected: isSelected,
+                              ),
+                            ),
+                          );
+                        }),
+                      const SizedBox(height: 16),
+                      // Add Vehicle Button
+                      OneBtn(
+                        text: "Add Vehicle",
+                        onPressed: () {
+                          // Close the bottom sheet
                           Navigator.pop(context);
-                          showModalBottomSheet(
-                            context: context,
-                            backgroundColor: Colors.transparent,
-                            isScrollControlled: true,
-                            builder: (context) => IssueReportingBottomSheet(
-                              vehicleName: vehicle.name,
-                              vehiclePlate: vehicle.number,
-                              currentAddress: currentAddress,
-                              initialCategory: category,
+                          // Navigate to Vehicle Selection screen
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const VehicleSelection(),
                             ),
                           );
                         },
-                        child: Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: _buildCarItem(
-                            title: vehicle.name,
-                            subtitle: vehicle.number,
-                            imagePath: vehicle.image ?? '',
-                            isSelected: isSelected,
-                          ),
-                        ),
-                      );
-                    }),
-                  const SizedBox(height: 10),
-                ],
-              ),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
+                  ),
+                );
+              },
             );
           },
         );
@@ -247,9 +319,20 @@ class HomeScreenState extends State<HomeScreen> {
   Widget _buildCarItem({
     required String title,
     required String subtitle,
-    required String imagePath,
+    String? imageUrl,
     bool isSelected = false,
   }) {
+    // Construct full image URL if image path is provided
+    String? fullImageUrl;
+    if (imageUrl != null && imageUrl.isNotEmpty) {
+      if (imageUrl.startsWith('http')) {
+        fullImageUrl = imageUrl;
+      } else {
+        // Assuming the API returns relative paths, prepend base URL
+        fullImageUrl = 'https://onecharge.io/storage/$imageUrl';
+      }
+    }
+
     return Container(
       height: 80,
       padding: const EdgeInsets.only(left: 16),
@@ -291,15 +374,16 @@ class HomeScreenState extends State<HomeScreen> {
               ],
             ),
           ),
-          if (imagePath.isNotEmpty)
+          if (fullImageUrl != null && fullImageUrl.isNotEmpty)
             Positioned(
               right: 0,
               top: 5,
               bottom: 5,
-              child: Image.asset(
-                imagePath,
+              child: Image.network(
+                fullImageUrl,
                 fit: BoxFit.fitHeight,
                 alignment: Alignment.centerRight,
+                width: 150,
                 errorBuilder: (context, error, stackTrace) =>
                     const SizedBox(width: 100),
               ),
@@ -411,8 +495,14 @@ class HomeScreenState extends State<HomeScreen> {
                       color: const Color(0xffF5F5F5),
                       borderRadius: BorderRadius.circular(15),
                     ),
-                    child: const TextField(
-                      decoration: InputDecoration(
+                    child: TextField(
+                      controller: _searchController,
+                      onChanged: (value) {
+                        setState(() {
+                          _searchQuery = value.toLowerCase();
+                        });
+                      },
+                      decoration: const InputDecoration(
                         hintText: 'Search for any services',
                         hintStyle: TextStyle(
                           color: Color(0xffB8B9BD),
@@ -482,22 +572,34 @@ class HomeScreenState extends State<HomeScreen> {
                   BlocBuilder<IssueCategoryBloc, IssueCategoryState>(
                     builder: (context, state) {
                       if (state is IssueCategoryLoading) {
-                        return const Center(
-                          child: Padding(
-                            padding: EdgeInsets.all(20.0),
-                            child: CircularProgressIndicator(
-                              color: Colors.black,
-                            ),
-                          ),
+                        return LayoutBuilder(
+                          builder: (context, constraints) {
+                            final double cardWidth =
+                                (constraints.maxWidth - 13) / 2;
+                            return Wrap(
+                              spacing: 13,
+                              runSpacing: 13,
+                              children: List.generate(6, (index) {
+                                return _buildShimmerServiceCard(cardWidth);
+                              }),
+                            );
+                          },
                         );
                       } else if (state is IssueCategoryError) {
                         return Center(child: Text('Error: ${state.message}'));
                       } else if (state is IssueCategoryLoaded) {
                         // Filter out 'Other' if it exists in the API list to avoid duplication
                         // Also filter out categories with null names
-                        final categories = state.categories
+                        var categories = state.categories
                             .where((c) => c.name != null && c.name!.toLowerCase() != 'other')
                             .toList();
+
+                        if (_searchQuery.isNotEmpty) {
+                          categories = categories
+                              .where((c) =>
+                                  (c.name ?? '').toLowerCase().contains(_searchQuery))
+                              .toList();
+                        }
 
                         return LayoutBuilder(
                           builder: (context, constraints) {
@@ -539,10 +641,12 @@ class HomeScreenState extends State<HomeScreen> {
               ServiceNotificationOverlay(
                 stage: _currentServiceStage,
                 progress: _serviceProgress,
+                ticket: _currentTicket,
                 onDismiss: () {
                   setState(() {
                     _currentServiceStage = 'none';
                     _serviceTimer?.cancel();
+                    _currentTicket = null;
                   });
                 },
                 onTap: () {
@@ -557,15 +661,19 @@ class HomeScreenState extends State<HomeScreen> {
                   );
                 },
                 onSolved: () {
+                  final ticketId = _currentTicket?.id;
                   setState(() {
                     _currentServiceStage = 'none';
                     _serviceTimer?.cancel();
+                    _currentTicket = null;
                   });
                   showModalBottomSheet(
                     context: context,
                     isScrollControlled: true,
                     backgroundColor: Colors.transparent,
-                    builder: (context) => const ServiceSummaryBottomSheet(),
+                    builder: (context) => ServiceSummaryBottomSheet(
+                      ticketId: ticketId,
+                    ),
                   );
                 },
               ),
@@ -679,6 +787,21 @@ class HomeScreenState extends State<HomeScreen> {
                 ),
               ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildShimmerServiceCard(double width) {
+    return Shimmer.fromColors(
+      baseColor: const Color(0xffE0E0E0),
+      highlightColor: Colors.white,
+      child: Container(
+        width: width,
+        height: 150,
+        decoration: BoxDecoration(
+          color: const Color(0xffF5F5F5),
+          borderRadius: BorderRadius.circular(15),
         ),
       ),
     );

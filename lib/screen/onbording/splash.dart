@@ -6,6 +6,7 @@ import 'package:onecharge/screen/home/home_screen.dart';
 import 'package:onecharge/screen/login/phone_login.dart';
 import 'package:onecharge/screen/onbording/onbording_screen.dart';
 import 'package:onecharge/screen/vehicle/vehicle_selection.dart';
+import 'package:onecharge/test/testlogin.dart';
 import 'package:onecharge/utils/onboarding_service.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -94,10 +95,10 @@ class _SplashScreenState extends State<SplashScreen> {
     if (!mounted) return;
 
     final destination = isCompleted
-        ? const PhoneLogin()
+        ? const Testlogin()
         : const OnboardingScreen();
     print(
-      '🚀 [SplashScreen] Navigating to: ${isCompleted ? "PhoneLogin" : "OnboardingScreen"}',
+      '🚀 [SplashScreen] Navigating to: ${isCompleted ? "Testlogin" : "OnboardingScreen"}',
     );
 
     Navigator.pushReplacement(

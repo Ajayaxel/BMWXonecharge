@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:onecharge/const/onebtn.dart';
 import 'package:onecharge/screen/home/select_payment_bottom_sheet.dart';
+import 'package:onecharge/models/ticket_model.dart';
 
 class PaymentBottomSheet extends StatelessWidget {
   final String vehicleName;
@@ -9,6 +10,9 @@ class PaymentBottomSheet extends StatelessWidget {
   final String locationCity;
   final String date;
   final String time;
+  final PaymentBreakdown? paymentBreakdown;
+  final String? paymentUrl;
+  final String? intentionId;
 
   const PaymentBottomSheet({
     super.key,
@@ -18,6 +22,9 @@ class PaymentBottomSheet extends StatelessWidget {
     required this.locationCity,
     required this.date,
     required this.time,
+    this.paymentBreakdown,
+    this.paymentUrl,
+    this.intentionId,
   });
 
   @override
@@ -145,13 +152,38 @@ class PaymentBottomSheet extends StatelessWidget {
           const SizedBox(height: 32),
 
           // Price Breakdown
-          _buildPriceRow("Service Cost", "AED 2441"),
-          const SizedBox(height: 12),
-          _buildPriceRow("Service Charge", "AED 73.23"),
-          const SizedBox(height: 12),
-          _buildPriceRow("Vat", "AED 122.05"),
-          const SizedBox(height: 16),
-          _buildPriceRow("Total price", "AED 2,636.73", isTotal: true),
+          if (paymentBreakdown != null) ...[
+            _buildPriceRow(
+              "Service Cost",
+              "${paymentBreakdown!.baseAmount.toStringAsFixed(2)} ${paymentBreakdown!.currency}",
+            ),
+            const SizedBox(height: 12),
+            _buildPriceRow(
+              "Vat",
+              "${paymentBreakdown!.vatAmount.toStringAsFixed(2)} ${paymentBreakdown!.currency}",
+            ),
+            if (paymentBreakdown!.discountApplied) ...[
+              const SizedBox(height: 12),
+              _buildPriceRow(
+                "Discount",
+                "-${paymentBreakdown!.discountAmount.toStringAsFixed(2)} ${paymentBreakdown!.currency}",
+              ),
+            ],
+            const SizedBox(height: 16),
+            _buildPriceRow(
+              "Total price",
+              "${paymentBreakdown!.totalAmount.toStringAsFixed(2)} ${paymentBreakdown!.currency}",
+              isTotal: true,
+            ),
+          ] else ...[
+            _buildPriceRow("Service Cost", "AED 2441"),
+            const SizedBox(height: 12),
+            _buildPriceRow("Service Charge", "AED 73.23"),
+            const SizedBox(height: 12),
+            _buildPriceRow("Vat", "AED 122.05"),
+            const SizedBox(height: 16),
+            _buildPriceRow("Total price", "AED 2,636.73", isTotal: true),
+          ],
           const SizedBox(height: 32),
 
           OneBtn(
@@ -161,7 +193,11 @@ class PaymentBottomSheet extends StatelessWidget {
                 context: context,
                 isScrollControlled: true,
                 backgroundColor: Colors.transparent,
-                builder: (context) => const SelectPaymentBottomSheet(),
+                builder: (context) => SelectPaymentBottomSheet(
+                  paymentBreakdown: paymentBreakdown,
+                  paymentUrl: paymentUrl,
+                  intentionId: intentionId,
+                ),
               );
             },
             text: "Make Payment",

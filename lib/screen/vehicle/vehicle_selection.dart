@@ -1,12 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:shimmer/shimmer.dart';
 import 'package:onecharge/const/onebtn.dart';
 import 'package:onecharge/core/storage/vehicle_storage.dart';
 import 'package:onecharge/logic/blocs/brand/brand_bloc.dart';
 import 'package:onecharge/logic/blocs/brand/brand_state.dart';
 import 'package:onecharge/logic/blocs/vehicle_model/vehicle_model_bloc.dart';
 import 'package:onecharge/logic/blocs/vehicle_model/vehicle_model_state.dart';
+import 'package:onecharge/logic/blocs/charging_type/charging_type_bloc.dart';
+import 'package:onecharge/logic/blocs/charging_type/charging_type_state.dart';
 import 'package:onecharge/models/vehicle_model.dart';
+import 'package:onecharge/models/charging_type_model.dart';
+import 'package:onecharge/models/add_vehicle_model.dart';
+import 'package:onecharge/logic/blocs/add_vehicle/add_vehicle_bloc.dart';
+import 'package:onecharge/logic/blocs/add_vehicle/add_vehicle_event.dart';
+import 'package:onecharge/logic/blocs/add_vehicle/add_vehicle_state.dart';
 import 'package:onecharge/screen/home/home_screen.dart';
 
 class VehicleSelection extends StatefulWidget {
@@ -108,9 +116,43 @@ class _VehicleSelectionState extends State<VehicleSelection> {
                       BlocBuilder<BrandBloc, BrandState>(
                         builder: (context, state) {
                           if (state is BrandLoading) {
-                            return const SizedBox(
+                            return SizedBox(
                               height: 110,
-                              child: Center(child: CircularProgressIndicator()),
+                              child: ListView.builder(
+                                scrollDirection: Axis.horizontal,
+                                itemCount: 4,
+                                itemBuilder: (context, index) {
+                                  return Padding(
+                                    padding: const EdgeInsets.only(right: 15),
+                                    child: Shimmer.fromColors(
+                                      baseColor: Colors.grey.shade300,
+                                      highlightColor: Colors.grey.shade100,
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Container(
+                                            width: 77,
+                                            height: 77,
+                                            decoration: BoxDecoration(
+                                              shape: BoxShape.circle,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 5),
+                                          Container(
+                                            width: 50,
+                                            height: 14,
+                                            decoration: BoxDecoration(
+                                              color: Colors.white,
+                                              borderRadius: BorderRadius.circular(4),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
                             );
                           } else if (state is BrandError) {
                             return SizedBox(
@@ -333,10 +375,25 @@ class _VehicleSelectionState extends State<VehicleSelection> {
                                   );
                                 },
                             child: (state is VehicleModelLoading)
-                                ? const Padding(
-                                    padding: EdgeInsets.symmetric(vertical: 40),
-                                    child: Center(
-                                      child: CircularProgressIndicator(),
+                                ? Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 20),
+                                    child: Column(
+                                      children: List.generate(3, (index) {
+                                        return Padding(
+                                          padding: const EdgeInsets.only(bottom: 16),
+                                          child: Shimmer.fromColors(
+                                            baseColor: Colors.grey.shade300,
+                                            highlightColor: Colors.grey.shade100,
+                                            child: Container(
+                                              height: 141,
+                                              decoration: BoxDecoration(
+                                                color: Colors.white,
+                                                borderRadius: BorderRadius.circular(6),
+                                              ),
+                                            ),
+                                          ),
+                                        );
+                                      }),
                                     ),
                                   )
                                 : (state is VehicleModelError)
@@ -501,6 +558,7 @@ class _VehicleSelectionState extends State<VehicleSelection> {
   void _showVehicleNumberBottomSheet() {
     final TextEditingController vehicleNumberController =
         TextEditingController();
+    ChargingType? selectedChargingType;
 
     showModalBottomSheet(
       context: context,
@@ -574,6 +632,129 @@ class _VehicleSelectionState extends State<VehicleSelection> {
                   ),
                 ),
 
+                const SizedBox(height: 20),
+
+                // Charging Type Dropdown
+                BlocBuilder<ChargingTypeBloc, ChargingTypeState>(
+                  builder: (context, state) {
+                    if (state is ChargingTypeLoading) {
+                      return Shimmer.fromColors(
+                        baseColor: Colors.grey.shade300,
+                        highlightColor: Colors.grey.shade100,
+                        child: Container(
+                          height: 56,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.grey.shade300),
+                          ),
+                        ),
+                      );
+                    } else if (state is ChargingTypeError) {
+                      return Container(
+                        height: 56,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey.shade300),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Center(
+                          child: Text(
+                            'Error loading charging types',
+                            style: TextStyle(
+                              color: Colors.red.shade700,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      );
+                    } else if (state is ChargingTypeLoaded) {
+                      return StatefulBuilder(
+                        builder: (context, setModalState) {
+                          return Container(
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.grey.shade300),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: DropdownButtonFormField<ChargingType>(
+                              value: selectedChargingType,
+                              decoration: InputDecoration(
+                                hintText: "Charging Type",
+                                hintStyle: TextStyle(color: Colors.grey.shade400),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: BorderSide(color: Colors.grey.shade300),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: BorderSide(color: Colors.grey.shade300),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: const BorderSide(color: Colors.black, width: 1.5),
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 20,
+                                  vertical: 16,
+                                ),
+                                filled: true,
+                                fillColor: Colors.white,
+                              ),
+                              dropdownColor: Colors.white,
+                              selectedItemBuilder: (BuildContext context) {
+                                return state.chargingTypes.map<Widget>((ChargingType chargingType) {
+                                  return Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 5),
+                                    child: Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: Text(
+                                        chargingType.name,
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          color: Colors.black,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }).toList();
+                              },
+                              items: state.chargingTypes.map((chargingType) {
+                                return DropdownMenuItem<ChargingType>(
+                                  value: chargingType,
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 7),
+                                    child: Text(
+                                      chargingType.name,
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        color: Colors.black,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                              onChanged: (ChargingType? newValue) {
+                                setModalState(() {
+                                  selectedChargingType = newValue;
+                                });
+                              },
+                              icon: Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: Icon(
+                                  Icons.arrow_drop_down,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                              isExpanded: true,
+                            ),
+                          );
+                        },
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
+
                 const SizedBox(height: 12),
 
                 // Prompt text with selected vehicle name
@@ -594,23 +775,99 @@ class _VehicleSelectionState extends State<VehicleSelection> {
                 const SizedBox(height: 24),
 
                 // Submit Button
-                OneBtn(
-                  text: "Submit",
-                  onPressed: () {
-                    final vehicleNumber = vehicleNumberController.text.trim();
-                    if (vehicleNumber.isEmpty) {
+                BlocListener<AddVehicleBloc, AddVehicleState>(
+                  listener: (context, state) {
+                    if (state is AddVehicleError) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Please enter your vehicle number.'),
+                        SnackBar(
+                          content: Text('Error: ${state.message}'),
+                          backgroundColor: Colors.red,
                         ),
                       );
-                      return;
                     }
-
-                    // Close the bottom sheet and show success
-                    Navigator.of(context).pop();
-                    _showSuccessBottomSheet(vehicleNumber);
                   },
+                  child: BlocBuilder<AddVehicleBloc, AddVehicleState>(
+                    builder: (context, addVehicleState) {
+                      return OneBtn(
+                        text: addVehicleState is AddVehicleLoading
+                            ? "Submitting..."
+                            : "Submit",
+                        onPressed: addVehicleState is AddVehicleLoading
+                            ? null
+                            : () {
+                                final vehicleNumber =
+                                    vehicleNumberController.text.trim();
+                                if (vehicleNumber.isEmpty) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content:
+                                          Text('Please enter your vehicle number.'),
+                                    ),
+                                  );
+                                  return;
+                                }
+                                if (selectedChargingType == null) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Please select a charging type.'),
+                                    ),
+                                  );
+                                  return;
+                                }
+
+                                // Validate selected vehicle
+                                final currentVehicle = selectedVehicle;
+                                if (currentVehicle == null) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Please select a vehicle.'),
+                                    ),
+                                  );
+                                  return;
+                                }
+
+                                // Get vehicle type ID and brand ID from selected brand
+                                final brandState = context.read<BrandBloc>().state;
+                                int vehicleTypeId = 1; // Default to Car
+                                int brandId = currentVehicle.brandId; // Use vehicle's brand ID
+                                
+                                if (brandState is BrandLoaded && brandState.brands.isNotEmpty) {
+                                  try {
+                                    final selectedBrandData = brandState.brands
+                                        .firstWhere(
+                                          (brand) => brand.name == selectedBrand,
+                                        );
+                                    vehicleTypeId = selectedBrandData.vehicleTypeId;
+                                    brandId = selectedBrandData.id;
+                                  } catch (e) {
+                                    // If brand not found, use first brand as fallback
+                                    final firstBrand = brandState.brands.first;
+                                    vehicleTypeId = firstBrand.vehicleTypeId;
+                                    brandId = firstBrand.id;
+                                  }
+                                }
+
+                                // Create add vehicle request
+                                final request = AddVehicleRequest(
+                                  vehicleTypeId: vehicleTypeId,
+                                  brandId: brandId,
+                                  modelId: currentVehicle.id,
+                                  chargingTypeId: selectedChargingType!.id,
+                                  vehicleNumber: vehicleNumber,
+                                );
+
+                                // Dispatch add vehicle event
+                                context.read<AddVehicleBloc>().add(
+                                      AddVehicleRequested(request),
+                                    );
+                                
+                                // Show loading bottom sheet
+                                Navigator.of(context).pop();
+                                _showSuccessBottomSheet(vehicleNumber, selectedChargingType!);
+                              },
+                      );
+                    },
+                  ),
                 ),
 
                 const SizedBox(height: 16),
@@ -633,7 +890,80 @@ class _VehicleSelectionState extends State<VehicleSelection> {
     );
   }
 
-  void _showSuccessBottomSheet(String vehicleNumber) {
+  void _showSuccessBottomSheet(
+      String vehicleNumber, ChargingType chargingType) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => BlocListener<AddVehicleBloc, AddVehicleState>(
+        listener: (context, state) {
+          if (state is AddVehicleSuccess) {
+            // Close the bottom sheet when vehicle is successfully added
+            Navigator.of(context).pop();
+            _showFinalSuccessBottomSheet(vehicleNumber, state.response);
+          }
+        },
+        child: Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+              left: 16,
+              right: 16,
+              top: 16,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // Drag handle
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 20),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+
+                  // Loading or Success message
+                  BlocBuilder<AddVehicleBloc, AddVehicleState>(
+                    builder: (context, state) {
+                      if (state is AddVehicleLoading) {
+                        return Column(
+                          children: [
+                            const CircularProgressIndicator(),
+                            const SizedBox(height: 16),
+                            const Text(
+                              "Adding your vehicle...",
+                              textAlign: TextAlign.center,
+                              style: TextStyle(fontSize: 16, color: Colors.black),
+                            ),
+                          ],
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showFinalSuccessBottomSheet(
+      String vehicleNumber, AddVehicleResponse response) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -681,10 +1011,12 @@ class _VehicleSelectionState extends State<VehicleSelection> {
                 const SizedBox(height: 12),
 
                 // Success message
-                const Text(
-                  "Vehicle number successfully added!",
+                Text(
+                  response.message.isNotEmpty
+                      ? response.message
+                      : "Vehicle number successfully added!",
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 16, color: Colors.black),
+                  style: const TextStyle(fontSize: 16, color: Colors.black),
                 ),
 
                 const SizedBox(height: 24),
@@ -708,11 +1040,14 @@ class _VehicleSelectionState extends State<VehicleSelection> {
                   onPressed: () async {
                     Navigator.of(context).pop(); // Close success sheet
 
-                    // Save vehicle info to storage
+                    // Save vehicle info to storage with all IDs
                     await VehicleStorage.saveVehicleInfo(
                       name: selectedVehicle?.name ?? 'My Vehicle',
                       number: vehicleNumber,
                       image: selectedVehicle?.image,
+                      vehicleTypeId: response.data.vehicleTypeId,
+                      brandId: response.data.brandId,
+                      modelId: response.data.modelId,
                     );
 
                     // Navigate to HomeScreen and remove all previous routes

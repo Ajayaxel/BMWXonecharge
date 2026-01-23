@@ -1,8 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:onecharge/logic/blocs/ticket/ticket_bloc.dart';
+import 'package:onecharge/logic/blocs/ticket/ticket_state.dart';
+import 'package:onecharge/logic/blocs/ticket/ticket_event.dart';
+import 'package:onecharge/models/ticket_model.dart';
 import 'package:onecharge/screen/home/booking_detail_screen.dart';
 
-class RecentBookingsScreen extends StatelessWidget {
+class RecentBookingsScreen extends StatefulWidget {
   const RecentBookingsScreen({super.key});
+
+  @override
+  State<RecentBookingsScreen> createState() => _RecentBookingsScreenState();
+}
+
+class _RecentBookingsScreenState extends State<RecentBookingsScreen> {
+  @override
+  void initState() {
+    super.initState();
+    context.read<TicketBloc>().add(const FetchTicketsRequested());
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -31,18 +47,82 @@ class RecentBookingsScreen extends StatelessWidget {
         ),
         centerTitle: true,
       ),
-      body: ListView.separated(
-        padding: const EdgeInsets.all(16),
-        itemCount: 4,
-        separatorBuilder: (context, index) => const SizedBox(height: 16),
-        itemBuilder: (context, index) {
-          return _buildBookingCard(context);
+      body: BlocBuilder<TicketBloc, TicketState>(
+        builder: (context, state) {
+          if (state is TicketListLoading) {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          }
+
+          if (state is TicketListLoaded) {
+            final tickets = state.tickets;
+            if (tickets.isEmpty) {
+              return const Center(
+                child: Text(
+                  'No bookings found',
+                  style: TextStyle(
+                    fontFamily: 'Lufga',
+                    fontSize: 16,
+                  ),
+                ),
+              );
+            }
+
+            return ListView.separated(
+              padding: const EdgeInsets.all(16),
+              itemCount: tickets.length,
+              separatorBuilder: (context, index) =>
+                  const SizedBox(height: 16),
+              itemBuilder: (context, index) {
+                final ticket = tickets[index];
+                return _buildBookingCard(context, ticket);
+              },
+            );
+          }
+
+          if (state is TicketError) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text(
+                  state.message,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontFamily: 'Lufga',
+                    fontSize: 14,
+                    color: Colors.red,
+                  ),
+                ),
+              ),
+            );
+          }
+
+          return const SizedBox.shrink();
         },
       ),
     );
   }
 
-  Widget _buildBookingCard(BuildContext context) {
+  Widget _buildBookingCard(BuildContext context, Ticket ticket) {
+    final bookingId = ticket.ticketId;
+    final createdAt = ticket.createdAt;
+    String dateTimeText = '';
+    if (createdAt != null && createdAt.isNotEmpty) {
+      try {
+        final dt = DateTime.parse(createdAt);
+        final date =
+            '${dt.day.toString().padLeft(2, '0')}-${dt.month.toString().padLeft(2, '0')}-${dt.year}';
+        final time =
+            '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+        dateTimeText = '$date   $time';
+      } catch (_) {
+        dateTimeText = createdAt;
+      }
+    }
+
+    final serviceName = ticket.issueCategory?.name ?? 'Service';
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -55,9 +135,9 @@ class RecentBookingsScreen extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Booking ID: 555455',
-                style: TextStyle(
+              Text(
+                'Booking ID: $bookingId',
+                style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
                   fontFamily: 'Lufga',
@@ -68,18 +148,18 @@ class RecentBookingsScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 4),
-          const Text(
-            '11-09-2024   20:10',
-            style: TextStyle(
+          Text(
+            dateTimeText,
+            style: const TextStyle(
               fontSize: 12,
               color: Colors.grey,
               fontFamily: 'Lufga',
             ),
           ),
           const SizedBox(height: 12),
-          const Text(
-            'Low Battery',
-            style: TextStyle(
+          Text(
+            serviceName,
+            style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
               fontFamily: 'Lufga',
@@ -95,7 +175,7 @@ class RecentBookingsScreen extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const BookingDetailScreen(),
+                    builder: (context) => BookingDetailScreen(ticket: ticket),
                   ),
                 );
               },

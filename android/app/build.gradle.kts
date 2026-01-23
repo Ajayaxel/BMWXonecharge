@@ -53,17 +53,34 @@ android {
     }
 
     signingConfigs {
-        create("release") {
-            keyAlias = keystoreProperties["keyAlias"] as String?
-            keyPassword = keystoreProperties["keyPassword"] as String?
-            storeFile = keystoreProperties["storeFile"]?.let { rootProject.file(it as String) }
-            storePassword = keystoreProperties["storePassword"] as String?
+        // Only create release signing config if key.properties exists and has required properties
+        val hasKeystore = keystorePropertiesFile.exists() && 
+            keystoreProperties.containsKey("storeFile") && 
+            keystoreProperties.containsKey("keyAlias")
+        
+        if (hasKeystore) {
+            create("release") {
+                keyAlias = keystoreProperties["keyAlias"] as String?
+                keyPassword = keystoreProperties["keyPassword"] as String?
+                storeFile = keystoreProperties["storeFile"]?.let { rootProject.file(it as String) }
+                storePassword = keystoreProperties["storePassword"] as String?
+            }
         }
     }
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("release")
+            // Only use release signing config if it exists, otherwise use debug signing for development
+            val hasKeystore = keystorePropertiesFile.exists() && 
+                keystoreProperties.containsKey("storeFile") && 
+                keystoreProperties.containsKey("keyAlias")
+            
+            if (hasKeystore) {
+                signingConfig = signingConfigs.getByName("release")
+            } else {
+                // Use debug signing for development builds when key.properties is not present
+                signingConfig = signingConfigs.getByName("debug")
+            }
             isMinifyEnabled = false
             isShrinkResources = false
         }

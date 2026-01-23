@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:onecharge/const/onebtn.dart';
 import 'package:onecharge/resources/app_resources.dart';
 import 'package:onecharge/screen/login/phone_login.dart';
+import 'package:onecharge/test/testlogin.dart';
 import 'package:onecharge/utils/onboarding_service.dart';
 
 class OnboardingScreen extends StatefulWidget {
@@ -52,7 +53,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       // Mark onboarding as completed
       await OnboardingService.completeOnboarding();
       if (!mounted) return;
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => PhoneLogin()));
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => Testlogin()));
     }
   }
 

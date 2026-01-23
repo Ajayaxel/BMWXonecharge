@@ -1,5 +1,7 @@
 import 'package:onecharge/core/network/api_client.dart';
 import 'package:onecharge/models/vehicle_model.dart';
+import 'package:onecharge/models/add_vehicle_model.dart';
+import 'package:onecharge/models/vehicle_list_model.dart';
 
 class VehicleRepository {
   final ApiClient apiClient;
@@ -14,6 +16,39 @@ class VehicleRepository {
         return modelsJson.map((json) => VehicleModel.fromJson(json)).toList();
       } else {
         throw Exception('Failed to load models: ${response.data['message']}');
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<AddVehicleResponse> addVehicle(AddVehicleRequest request) async {
+    try {
+      final response = await apiClient.post(
+        '/customer/vehicles',
+        data: request.toJson(),
+      );
+      if (response.data['success'] == true) {
+        return AddVehicleResponse.fromJson(response.data);
+      } else {
+        throw Exception(
+          'Failed to add vehicle: ${response.data['message'] ?? 'Unknown error'}',
+        );
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<VehicleListResponse> getVehicles() async {
+    try {
+      final response = await apiClient.get('/customer/vehicles');
+      if (response.data['success'] == true) {
+        return VehicleListResponse.fromJson(response.data);
+      } else {
+        throw Exception(
+          'Failed to load vehicles: ${response.data['message'] ?? 'Unknown error'}',
+        );
       }
     } catch (e) {
       rethrow;

@@ -6,11 +6,18 @@ import 'package:onecharge/const/onebtn.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:onecharge/screen/home/payment_bottom_sheet.dart';
+import 'package:onecharge/screen/home/home_screen.dart';
 import 'package:onecharge/screen/home/location_map_screen.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:onecharge/logic/blocs/issue_category/issue_category_bloc.dart';
 import 'package:onecharge/logic/blocs/issue_category/issue_category_state.dart';
+import 'package:onecharge/logic/blocs/ticket/ticket_bloc.dart';
+import 'package:onecharge/logic/blocs/ticket/ticket_event.dart';
+import 'package:onecharge/logic/blocs/ticket/ticket_state.dart';
 import 'package:onecharge/models/issue_category_model.dart';
+import 'package:onecharge/models/ticket_model.dart';
+import 'package:onecharge/core/storage/vehicle_storage.dart';
+import 'package:geolocator/geolocator.dart';
 
 class IssueReportingBottomSheet extends StatefulWidget {
   final String vehicleName;
@@ -34,6 +41,8 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
   String _selectedCategory = "Low Battery";
   IssueCategory? _selectedCategoryObj;
   String _currentAddress = "";
+  double _currentLatitude = 0.0;
+  double _currentLongitude = 0.0;
   final TextEditingController _issueController = TextEditingController();
   final TextEditingController _slotController = TextEditingController();
   DateTime _selectedDateTime = DateTime.now();
@@ -64,6 +73,25 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
     _currentAddress = widget.currentAddress;
     _slotController.text =
         "${DateFormat('MMM dd').format(_selectedDateTime)}, ${DateFormat('hh:mm a').format(_selectedDateTime)}";
+    _getCurrentCoordinates();
+  }
+
+  Future<void> _getCurrentCoordinates() async {
+    try {
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+      setState(() {
+        _currentLatitude = position.latitude;
+        _currentLongitude = position.longitude;
+      });
+    } catch (e) {
+      // Default to Dubai coordinates if location fails
+      setState(() {
+        _currentLatitude = 25.2048;
+        _currentLongitude = 55.2708;
+      });
+    }
   }
 
   @override
@@ -77,6 +105,9 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
   void _showToast(String message) {
     _toastEntry?.remove();
     _toastEntry = null;
+
+    final overlayState = Overlay.maybeOf(context);
+    if (overlayState == null) return;
 
     final entry = OverlayEntry(
       builder: (context) => Positioned(
@@ -132,9 +163,10 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
     );
 
     _toastEntry = entry;
-    Overlay.of(context).insert(entry);
+    overlayState.insert(entry);
 
     Future.delayed(const Duration(seconds: 3), () {
+      if (!mounted) return;
       if (_toastEntry == entry) {
         _toastEntry?.remove();
         _toastEntry = null;
@@ -375,7 +407,7 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
                         const Duration(minutes: 1),
                       ),
                       onDateTimeChanged: (DateTime newDate) {
-                        tempDate = newDate;
+                        tempDate = newDate; 
                       },
                     ),
                   ),
@@ -823,9 +855,55 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
                           return _buildChargeUnitCard(subType, isSelected);
                         },
                       ),
+                      // Show description field for "Other" category even if it has subTypes
+                      if (_selectedCategoryObj?.id == 6) ...[
+                        const SizedBox(height: 16),
+                        Text(
+                          "Describe your issue (Required)",
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            fontFamily: 'Lufga',
+                            color: Colors.black,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: _issueController.text.trim().isEmpty
+                                  ? Colors.red
+                                  : const Color(0xFFE0E0E0),
+                            ),
+                          ),
+                          child: TextField(
+                            controller: _issueController,
+                            decoration: const InputDecoration(
+                              hintText: "Type your issue (Required for Other category)",
+                              hintStyle: TextStyle(
+                                color: Color(0xFFBDBDBD),
+                                fontFamily: 'Lufga',
+                                fontSize: 14,
+                              ),
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
+                            ),
+                            onChanged: (_) {
+                              setState(() {}); // Update border color
+                            },
+                          ),
+                        ),
+                      ],
                     ] else ...[
-                      const Text(
-                        "Describe your issue",
+                      Text(
+                        _selectedCategoryObj?.id == 6
+                            ? "Describe your issue (Required)"
+                            : "Describe your issue",
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
@@ -838,23 +916,35 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFFE0E0E0)),
+                          border: Border.all(
+                            color: _selectedCategoryObj?.id == 6 &&
+                                    _issueController.text.trim().isEmpty
+                                ? Colors.red
+                                : const Color(0xFFE0E0E0),
+                          ),
                         ),
                         child: TextField(
                           controller: _issueController,
-                          decoration: const InputDecoration(
-                            hintText: "Type your issue",
-                            hintStyle: TextStyle(
+                          decoration: InputDecoration(
+                            hintText: _selectedCategoryObj?.id == 6
+                                ? "Type your issue (Required for Other category)"
+                                : "Type your issue",
+                            hintStyle: const TextStyle(
                               color: Color(0xFFBDBDBD),
                               fontFamily: 'Lufga',
                               fontSize: 14,
                             ),
                             border: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(
+                            contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16,
                               vertical: 12,
                             ),
                           ),
+                          onChanged: (_) {
+                            if (_selectedCategoryObj?.id == 6) {
+                              setState(() {}); // Update border color
+                            }
+                          },
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -1031,31 +1121,128 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
                     ),
                     const SizedBox(height: 32),
 
-                    OneBtn(
-                      onPressed: () {
-                        if (_slotController.text.isEmpty) {
-                          _showToast("Please select a Slot");
-                          return;
+                    BlocListener<TicketBloc, TicketState>(
+                      listener: (context, state) {
+                        if (state is TicketSuccess) {
+                          final requiresPayment =
+                              state.response.data?.paymentRequired == true &&
+                                  state.response.data?.paymentUrl != null;
+
+                          if (requiresPayment) {
+                            // Close the issue reporting sheet first
+                            Navigator.pop(context);
+
+                            // Then show payment bottom sheet with payment breakdown
+                            showModalBottomSheet(
+                              context: context,
+                              isScrollControlled: true,
+                              backgroundColor: Colors.transparent,
+                              builder: (context) => PaymentBottomSheet(
+                                vehicleName: widget.vehicleName,
+                                vehiclePlate: widget.vehiclePlate,
+                                locationAddress: _currentAddress,
+                                locationCity: "",
+                                date: "Today",
+                                time: _slotController.text,
+                                paymentBreakdown:
+                                    state.response.data?.paymentBreakdown,
+                                paymentUrl: state.response.data?.paymentUrl,
+                                intentionId: state.response.data?.intentionId,
+                              ),
+                            );
+                          } else {
+                            // No payment: return to home and show service notification flow
+                            HomeScreenState.activeState?.startServiceFlow(
+                              ticket: state.response.data?.ticket,
+                            );
+                            Navigator.pop(context);
+                          }
+                        } else if (state is TicketError) {
+                          _showToast("Error: ${state.message}");
                         }
-
-                        // Close the Issue Reporting sheet first
-                        Navigator.pop(context);
-
-                        showModalBottomSheet(
-                          context: context,
-                          isScrollControlled: true,
-                          backgroundColor: Colors.transparent,
-                          builder: (context) => PaymentBottomSheet(
-                            vehicleName: widget.vehicleName,
-                            vehiclePlate: widget.vehiclePlate,
-                            locationAddress: _currentAddress,
-                            locationCity: "",
-                            date: "Today", // Placeholder
-                            time: _slotController.text,
-                          ),
-                        );
                       },
-                      text: "Submit Service",
+                      child: BlocBuilder<TicketBloc, TicketState>(
+                        builder: (context, ticketState) {
+                          return OneBtn(
+                            onPressed: ticketState is TicketLoading
+                                ? null
+                                : () async {
+                                    // Validation
+                                    if (_slotController.text.isEmpty) {
+                                      _showToast("Please select a Slot");
+                                      return;
+                                    }
+
+                                    // Check if "Other" category requires description
+                                    if (_selectedCategoryObj?.id == 6) {
+                                      if (_issueController.text.trim().isEmpty) {
+                                        _showToast(
+                                          "Please provide a description for 'Other' category",
+                                        );
+                                        return;
+                                      }
+                                      if (_selectedFiles.isEmpty) {
+                                        _showToast(
+                                          "Please upload issue images for 'Other' category",
+                                        );
+                                        return;
+                                      }
+                                    }
+
+                                    // Validate submodel if category has subTypes
+                                    if (_selectedCategoryObj != null &&
+                                        _selectedCategoryObj!.subTypes.isNotEmpty &&
+                                        _selectedChargeUnit == null) {
+                                      _showToast("Please select a charge unit");
+                                      return;
+                                    }
+
+                                    // Get vehicle IDs from storage
+                                    final vehicleTypeId =
+                                        await VehicleStorage.getVehicleTypeId();
+                                    final brandId =
+                                        await VehicleStorage.getBrandId();
+                                    final modelId =
+                                        await VehicleStorage.getModelId();
+
+                                    // Validate that all required IDs are present
+                                    if (vehicleTypeId == null || brandId == null || modelId == null) {
+                                      _showToast("Vehicle information is incomplete. Please select a vehicle again.");
+                                      return;
+                                    }
+
+                                    // Create ticket request
+                                    final request = CreateTicketRequest(
+                                      issueCategoryId: _selectedCategoryObj?.id ?? 1,
+                                      issueCategorySubTypeId:
+                                          _selectedChargeUnit?.id,
+                                      vehicleTypeId: vehicleTypeId,
+                                      brandId: brandId,
+                                      modelId: modelId,
+                                      numberPlate: widget.vehiclePlate,
+                                      description: _issueController.text.trim().isNotEmpty
+                                          ? _issueController.text.trim()
+                                          : null,
+                                      location: _currentAddress,
+                                      latitude: _currentLatitude,
+                                      longitude: _currentLongitude,
+                                      attachments: _selectedFiles.isNotEmpty
+                                          ? _selectedFiles
+                                          : null,
+                                      redeemCode: null, // Can be added later if needed
+                                    );
+
+                                    // Dispatch create ticket event
+                                    context.read<TicketBloc>().add(
+                                          CreateTicketRequested(request),
+                                        );
+                                  },
+                            text: ticketState is TicketLoading
+                                ? "Submitting..."
+                                : "Submit Service",
+                          );
+                        },
+                      ),
                     ),
                   ],
                 ),
