@@ -21,7 +21,7 @@ class _MyVehicleScreenState extends State<MyVehicleScreen> {
     },
     {
       'model': 'BMW i4 M50',
-      'image': 'assets/home/bluecar.png',
+      'image': 'assets/home/carimag.png',
       // Using same image as placeholder
       'range': '210 km Left',
       'battery': '75',
@@ -30,7 +30,7 @@ class _MyVehicleScreenState extends State<MyVehicleScreen> {
     },
     {
       'model': 'Audi e-tron GT',
-      'image': 'assets/home/redcar.png', // Using same image as placeholder
+      'image': 'assets/home/carimag.png', // Using same image as placeholder
       'range': '185 km Left',
       'battery': '60',
       'type': 'Type 2 / CCS',
@@ -78,11 +78,11 @@ class _MyVehicleScreenState extends State<MyVehicleScreen> {
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
+        padding: const EdgeInsets.symmetric(horizontal: 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 10),
+            const SizedBox(height: 5),
             TweenAnimationBuilder<double>(
               tween: Tween<double>(begin: 0.0, end: 1.0),
               duration: const Duration(milliseconds: 1200),
@@ -106,7 +106,7 @@ class _MyVehicleScreenState extends State<MyVehicleScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 30),
+            const SizedBox(height: 12),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -146,7 +146,7 @@ class _MyVehicleScreenState extends State<MyVehicleScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 10),
             TweenAnimationBuilder<double>(
               tween: Tween<double>(begin: 0.0, end: 1.0),
               duration: const Duration(milliseconds: 1400),
@@ -162,7 +162,7 @@ class _MyVehicleScreenState extends State<MyVehicleScreen> {
               },
               child: _buildInfoColumn('Vehicle Number', vehicle['number']!),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 5),
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               mainAxisAlignment: MainAxisAlignment.center,
@@ -193,7 +193,7 @@ class _MyVehicleScreenState extends State<MyVehicleScreen> {
                     },
                     child: Image.asset(
                       vehicle['image']!,
-                      height: 400,
+                      height: 380,
                       fit: BoxFit.contain,
                     ),
                   ),

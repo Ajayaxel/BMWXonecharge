@@ -66,43 +66,26 @@ class _SelectPaymentBottomSheetState extends State<SelectPaymentBottomSheet> {
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
 
           // Debit/Credit Card Section
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                "Debit/Credit Card",
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: () {},
+              child: const Text(
+                "+Add Card",
                 style: TextStyle(
-                  fontSize: 16,
+                  color: Color(0xFF2196F3),
+                  fontSize: 14,
                   fontWeight: FontWeight.w600,
                   fontFamily: 'Lufga',
                 ),
               ),
-              TextButton(
-                onPressed: () {},
-                child: const Text(
-                  "+Add Card",
-                  style: TextStyle(
-                    color: Color(0xFF2196F3),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    fontFamily: 'Lufga',
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _buildPaymentOption(
-            id: "card",
-            title: "•••• 9999",
-            isSecured: true,
-            logo: "assets/issue/debatcard.png",
+            ),
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
           const Text(
             "Online Payment",
             style: TextStyle(
@@ -111,18 +94,18 @@ class _SelectPaymentBottomSheetState extends State<SelectPaymentBottomSheet> {
               fontFamily: 'Lufga',
             ),
           ),
-          const SizedBox(height: 16),
-          _buildPaymentOption(
-            id: "tabby",
-            title: "Pay",
-            logo: "assets/issue/tabby.png",
-          ),
-          const SizedBox(height: 16),
-          _buildPaymentOption(
-            id: "tamara",
-            title: "Pay",
-            logo: "assets/issue/tamara.png",
-          ),
+          // const SizedBox(height: 16),
+          // _buildPaymentOption(
+          //   id: "tabby",
+          //   title: "Pay",
+          //   logo: "assets/issue/tabby.png",
+          // ),
+          // const SizedBox(height: 16),
+          // _buildPaymentOption(
+          //   id: "tamara",
+          //   title: "Pay",
+          //   logo: "assets/issue/tamara.png",
+          // ),
           if (widget.paymentUrl != null) ...[
             const SizedBox(height: 16),
             _buildPaymentOption(id: "paymob", title: "Paymob", logo: null),

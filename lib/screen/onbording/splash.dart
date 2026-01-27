@@ -3,11 +3,12 @@ import 'package:onecharge/core/storage/token_storage.dart';
 
 import 'package:onecharge/core/storage/vehicle_storage.dart';
 import 'package:onecharge/screen/home/home_screen.dart';
-import 'package:onecharge/screen/login/phone_login.dart';
 import 'package:onecharge/screen/onbording/onbording_screen.dart';
 import 'package:onecharge/screen/vehicle/vehicle_selection.dart';
 import 'package:onecharge/test/testlogin.dart';
 import 'package:onecharge/utils/onboarding_service.dart';
+import 'package:onecharge/core/network/api_client.dart';
+import 'package:onecharge/data/repositories/vehicle_repository.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -54,32 +55,62 @@ class _SplashScreenState extends State<SplashScreen> {
     if (token != null && token.isNotEmpty) {
       print('✅ [SplashScreen] Token exists, user is authenticated');
 
-      // Check for actual vehicle data
-      final vehicleName = await VehicleStorage.getVehicleName();
-      final hasVehicleData = vehicleName != null && vehicleName.isNotEmpty;
+      // 1. Check for local vehicle data first (fastest)
+      String? vehicleName = await VehicleStorage.getVehicleName();
+      bool hasLocalVehicle = vehicleName != null && vehicleName.isNotEmpty;
 
-      print(
-        '🔍 [SplashScreen] Vehicle data exists: $hasVehicleData (name: $vehicleName)',
-      );
+      if (hasLocalVehicle) {
+        print('🏠 [SplashScreen] Local vehicle found: $vehicleName');
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
+        );
+        return;
+      }
 
-      // --- DUMMY DATA OVERRIDE ---
-      // To test HomeScreen directly, uncomment the line below:
-      // const hasVehicleData = true;
+      // 2. No local vehicle, check server for existing vehicles
+      print('🔍 [SplashScreen] No local vehicle, checking server...');
+      try {
+        final apiClient = ApiClient();
+        final vehicleRepo = VehicleRepository(apiClient: apiClient);
+        final response = await vehicleRepo.getVehicles();
+
+        if (response.vehicles.isNotEmpty) {
+          final firstVehicle = response.vehicles.first;
+          print(
+            '🚗 [SplashScreen] Found ${response.vehicles.length} vehicles on server. Selecting ${firstVehicle.vehicleName}',
+          );
+
+          // Save the first vehicle found and navigate to Home
+          await VehicleStorage.saveVehicleInfo(
+            name: firstVehicle.vehicleName,
+            number: firstVehicle.vehicleNumber,
+            image: firstVehicle.vehicleImage,
+            vehicleTypeId: firstVehicle.vehicleTypeId,
+            brandId: firstVehicle.brandId,
+            modelId: firstVehicle.modelId,
+          );
+
+          if (!mounted) return;
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const HomeScreen()),
+          );
+          return;
+        }
+      } catch (e) {
+        print('❌ [SplashScreen] Error fetching vehicles from server: $e');
+        // Fall through to VehicleSelection if server check fails
+      }
 
       if (!mounted) return;
-
-      // Navigate to HomeScreen only if vehicle is actually saved
-      final destination = hasVehicleData
-          ? const HomeScreen()
-          : const VehicleSelection();
-
       print(
-        '🚀 [SplashScreen] Navigating to: ${hasVehicleData ? "HomeScreen" : "VehicleSelection"}',
+        '🚀 [SplashScreen] No vehicles found locally or on server, navigating to VehicleSelection',
       );
-
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => destination),
+        MaterialPageRoute(builder: (_) => const VehicleSelection()),
       );
       return;
     }

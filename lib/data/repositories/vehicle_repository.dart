@@ -54,4 +54,17 @@ class VehicleRepository {
       rethrow;
     }
   }
+
+  Future<void> deleteVehicle(int vehicleId) async {
+    try {
+      final response = await apiClient.delete('/customer/vehicles/$vehicleId');
+      if (response.data['success'] != true) {
+        throw Exception(
+          'Failed to delete vehicle: ${response.data['message'] ?? 'Unknown error'}',
+        );
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
 }

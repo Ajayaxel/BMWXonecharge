@@ -1,7 +1,13 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:onecharge/const/onebtn.dart';
+import 'package:onecharge/logic/blocs/profile/profile_bloc.dart';
+import 'package:onecharge/logic/blocs/profile/profile_event.dart';
+import 'package:onecharge/logic/blocs/profile/profile_state.dart';
+import 'package:onecharge/utils/toast_utils.dart';
+import 'package:onecharge/models/user_profile_model.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -11,18 +17,19 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  final TextEditingController _fullNameController = TextEditingController(
-    text: 'Saleh Al Sabah',
-  );
-  final TextEditingController _emailController = TextEditingController(
-    text: 'example@gmail.com',
-  );
-  final TextEditingController _phoneController = TextEditingController(
-    text: '+971 524 2213 15',
-  );
+  final TextEditingController _fullNameController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
 
   XFile? _imageFile;
   final ImagePicker _picker = ImagePicker();
+
+  @override
+  void initState() {
+    super.initState();
+    // Fetch profile if not already loaded, though main.dart already adds FetchProfile
+    // context.read<ProfileBloc>().add(FetchProfile());
+  }
 
   Future<void> _pickImage() async {
     final XFile? pickedFile = await _picker.pickImage(
@@ -35,137 +42,234 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  void _updateProfile() {
+    context.read<ProfileBloc>().add(
+      UpdateProfile(
+        name: _fullNameController.text,
+        phone: _phoneController.text,
+        profileImage: _imageFile != null ? File(_imageFile!.path) : null,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
+    return BlocListener<ProfileBloc, ProfileState>(
+      listener: (context, state) {
+        if (state is ProfileUpdated) {
+          ToastUtils.showToast(context, state.message);
+        } else if (state is ProfileError) {
+          ToastUtils.showToast(context, state.message, isError: true);
+        }
+      },
+      child: Scaffold(
         backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new,
-            color: Colors.black,
-            size: 20,
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.white,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(
+              Icons.arrow_back_ios_new,
+              color: Colors.black,
+              size: 20,
+            ),
+            onPressed: () => Navigator.pop(context),
           ),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Profile',
-          style: TextStyle(
-            color: Colors.black,
-            fontFamily: 'Lufga',
-            fontWeight: FontWeight.w600,
-            fontSize: 18,
+          title: const Text(
+            'Profile',
+            style: TextStyle(
+              color: Colors.black,
+              fontFamily: 'Lufga',
+              fontWeight: FontWeight.w600,
+              fontSize: 18,
+            ),
           ),
+          centerTitle: true,
         ),
-        centerTitle: true,
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Column(
-                  children: [
-                    const SizedBox(height: 30),
-                    // Profile Image Section
-                    Center(
-                      child: GestureDetector(
-                        onTap: _pickImage,
-                        child: Stack(
-                          children: [
-                            Container(
-                              width: 110,
-                              height: 110,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: Colors.white,
-                                  width: 2,
-                                ),
-                                image: DecorationImage(
-                                  image: _imageFile != null
-                                      ? FileImage(File(_imageFile!.path))
-                                      : const NetworkImage(
-                                              'https://plus.unsplash.com/premium_photo-1689568126014-06fea9d5d341?fm=jpg&q=60&w=3000&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MXx8cHJvZmlsZXxlbnwwfHwwfHx8MA%3D%3D',
-                                            )
-                                            as ImageProvider,
-                                  fit: BoxFit.cover,
-                                ),
-                              ),
-                            ),
-                            Positioned(
-                              bottom: 0,
-                              right: 0,
-                              child: Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  shape: BoxShape.circle,
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.1),
-                                      blurRadius: 10,
-                                      offset: const Offset(0, 4),
+        body: SafeArea(
+          child: BlocBuilder<ProfileBloc, ProfileState>(
+            builder: (context, state) {
+              if (state is ProfileLoading && state is! ProfileUpdating) {
+                return const Center(
+                  child: CircularProgressIndicator(color: Colors.black),
+                );
+              }
+
+              Customer? customer;
+              bool isUpdating = false;
+
+              if (state is ProfileLoaded) {
+                customer = state.customer;
+                _fullNameController.text = customer.name;
+                _emailController.text = customer.email;
+                _phoneController.text = customer.phone;
+              } else if (state is ProfileUpdating) {
+                customer = state.currentCustomer;
+                isUpdating = true;
+              } else if (state is ProfileUpdated) {
+                customer = state.customer;
+              } else if (state is ProfileError &&
+                  _fullNameController.text.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text('Error: ${state.message}'),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: () =>
+                            context.read<ProfileBloc>().add(FetchProfile()),
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              return Column(
+                children: [
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Column(
+                        children: [
+                          const SizedBox(height: 30),
+                          // Profile Image Section
+                          Center(
+                            child: GestureDetector(
+                              onTap: isUpdating ? null : _pickImage,
+                              child: Stack(
+                                children: [
+                                  Container(
+                                    width: 110,
+                                    height: 110,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: Colors.grey[200]!,
+                                        width: 2,
+                                      ),
                                     ),
-                                  ],
-                                ),
-                                child: const Icon(
-                                  Icons.camera_alt_outlined,
-                                  size: 22,
-                                  color: Colors.black,
-                                ),
+                                    child: ClipOval(
+                                      child: _imageFile != null
+                                          ? Image.file(
+                                              File(_imageFile!.path),
+                                              fit: BoxFit.cover,
+                                            )
+                                          : (customer?.profileImage != null
+                                                ? Image.network(
+                                                    customer!.profileImage!,
+                                                    fit: BoxFit.cover,
+                                                    errorBuilder:
+                                                        (
+                                                          context,
+                                                          error,
+                                                          stackTrace,
+                                                        ) => Image.network(
+                                                          'https://plus.unsplash.com/premium_photo-1689568126014-06fea9d5d341?fm=jpg&q=60&w=3000&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MXx8cHJvZmlsZXxlbnwwfHwwfHx8MA%3D%3D',
+                                                          fit: BoxFit.cover,
+                                                        ),
+                                                  )
+                                                : Image.network(
+                                                    'https://plus.unsplash.com/premium_photo-1689568126014-06fea9d5d341?fm=jpg&q=60&w=3000&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MXx8cHJvZmlsZXxlbnwwfHwwfHx8MA%3D%3D',
+                                                    fit: BoxFit.cover,
+                                                  )),
+                                    ),
+                                  ),
+                                  Positioned(
+                                    bottom: 0,
+                                    right: 0,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        shape: BoxShape.circle,
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withOpacity(
+                                              0.1,
+                                            ),
+                                            blurRadius: 10,
+                                            offset: const Offset(0, 4),
+                                          ),
+                                        ],
+                                      ),
+                                      child: const Icon(
+                                        Icons.camera_alt_outlined,
+                                        size: 22,
+                                        color: Colors.black,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                          ],
-                        ),
+                          ),
+                          const SizedBox(height: 16),
+                          GestureDetector(
+                            onTap: isUpdating ? null : _pickImage,
+                            child: const Text(
+                              'Tap change photo',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontFamily: 'Lufga',
+                                fontWeight: FontWeight.w400,
+                                color: Colors.black,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 40),
+                          // Input Fields
+                          _buildInputField(
+                            'Full Name',
+                            _fullNameController,
+                            enabled: !isUpdating,
+                          ),
+                          const SizedBox(height: 20),
+                          _buildInputField(
+                            'Email',
+                            _emailController,
+                            enabled: false,
+                          ), // Email usually not editable here
+                          const SizedBox(height: 20),
+                          _buildInputField(
+                            'Phone',
+                            _phoneController,
+                            enabled: !isUpdating,
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    GestureDetector(
-                      onTap: _pickImage,
-                      child: const Text(
-                        'Tap change photo',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontFamily: 'Lufga',
-                          fontWeight: FontWeight.w400,
-                          color: Colors.black,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 40),
-                    // Input Fields
-                    _buildInputField('Full Name', _fullNameController),
-                    const SizedBox(height: 20),
-                    _buildInputField('Email', _emailController),
-                    const SizedBox(height: 20),
-                    _buildInputField('Phone', _phoneController),
-                  ],
-                ),
-              ),
-            ),
-            // Update Button
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: OneBtn(onPressed: () {}, text: 'Update'),
-            ),
-          ],
+                  ),
+                  // Update Button
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    child: isUpdating
+                        ? const CircularProgressIndicator(color: Colors.black)
+                        : OneBtn(onPressed: _updateProfile, text: 'Update'),
+                  ),
+                ],
+              );
+            },
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildInputField(String label, TextEditingController controller) {
+  Widget _buildInputField(
+    String label,
+    TextEditingController controller, {
+    bool enabled = true,
+  }) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
         border: Border.all(color: Colors.grey.withOpacity(0.3)),
         borderRadius: BorderRadius.circular(12),
+        color: enabled ? Colors.white : Colors.grey[50],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -180,16 +284,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           TextField(
             controller: controller,
+            enabled: enabled,
             decoration: const InputDecoration(
               isDense: true,
               border: InputBorder.none,
               contentPadding: EdgeInsets.symmetric(vertical: 4),
             ),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w500,
               fontFamily: 'Lufga',
-              color: Colors.black,
+              color: enabled ? Colors.black : Colors.grey[600],
             ),
           ),
         ],

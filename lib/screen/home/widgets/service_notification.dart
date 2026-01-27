@@ -66,7 +66,7 @@ class _ServiceNotificationOverlayState extends State<ServiceNotificationOverlay>
   Widget _buildFindingAgent() {
     final issueCategory = widget.ticket?.issueCategory?.name ?? '';
     final ticketId = widget.ticket?.ticketId;
-    
+
     return Container(
       key: const ValueKey('finding'),
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
@@ -154,8 +154,8 @@ class _ServiceNotificationOverlayState extends State<ServiceNotificationOverlay>
                     Text(
                       isSolving
                           ? widget.ticket?.issueCategory != null
-                              ? "Your Agent solving\nthe ${widget.ticket!.issueCategory!.name} issue"
-                              : "Your Agent solving the issue"
+                                ? "Your Agent solving\nthe ${widget.ticket!.issueCategory!.name} issue"
+                                : "Your Agent solving the issue"
                           : isReaching
                           ? "Reach In 5min"
                           : "Agent Assigned",
@@ -206,7 +206,9 @@ class _ServiceNotificationOverlayState extends State<ServiceNotificationOverlay>
                         border: Border.all(color: Colors.black, width: 2),
                         image: widget.ticket?.driver?.image != null
                             ? DecorationImage(
-                                image: NetworkImage(widget.ticket!.driver!.image!),
+                                image: NetworkImage(
+                                  widget.ticket!.driver!.image!,
+                                ),
                                 fit: BoxFit.cover,
                               )
                             : const DecorationImage(

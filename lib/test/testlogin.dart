@@ -2,13 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:onecharge/const/onebtn.dart';
-import 'package:onecharge/core/storage/vehicle_storage.dart';
 import 'package:onecharge/logic/blocs/auth/auth_bloc.dart';
 import 'package:onecharge/logic/blocs/auth/auth_event.dart';
 import 'package:onecharge/logic/blocs/auth/auth_state.dart';
 import 'package:onecharge/models/login_model.dart';
-import 'package:onecharge/screen/home/home_screen.dart';
-import 'package:onecharge/screen/vehicle/vehicle_selection.dart';
+import 'package:onecharge/screen/login/user_info.dart';
 
 class Testlogin extends StatefulWidget {
   const Testlogin({super.key});
@@ -56,9 +54,7 @@ class _TestloginState extends State<Testlogin> {
         backgroundColor: Colors.black,
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
   }
@@ -77,8 +73,12 @@ class _TestloginState extends State<Testlogin> {
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
         if (state is AuthSuccess) {
-          // Navigate based on vehicle setup
-          _navigateAfterLogin();
+          // Navigate to UserInfo screen after successful login
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (_) => const UserInfo()),
+            (route) => false,
+          );
         } else if (state is AuthError) {
           _showToast(state.message.replaceAll('Exception: ', ''));
         }
@@ -231,9 +231,7 @@ class _TestloginState extends State<Testlogin> {
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               errorBorder: OutlineInputBorder(
-                                borderSide: const BorderSide(
-                                  color: Colors.red,
-                                ),
+                                borderSide: const BorderSide(color: Colors.red),
                                 borderRadius: BorderRadius.circular(10),
                               ),
                             ),
@@ -294,9 +292,7 @@ class _TestloginState extends State<Testlogin> {
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               errorBorder: OutlineInputBorder(
-                                borderSide: const BorderSide(
-                                  color: Colors.red,
-                                ),
+                                borderSide: const BorderSide(color: Colors.red),
                                 borderRadius: BorderRadius.circular(10),
                               ),
                             ),
@@ -353,25 +349,6 @@ class _TestloginState extends State<Testlogin> {
           },
         ),
       ),
-    );
-  }
-
-  Future<void> _navigateAfterLogin() async {
-    // Check if vehicle is already set up
-    final vehicleName = await VehicleStorage.getVehicleName();
-    final hasVehicleData = vehicleName != null && vehicleName.isNotEmpty;
-
-    if (!mounted) return;
-
-    // Navigate based on vehicle setup
-    final destination = hasVehicleData
-        ? const HomeScreen()
-        : const VehicleSelection();
-
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (_) => destination),
-      (route) => false,
     );
   }
 }

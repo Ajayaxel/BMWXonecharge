@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:onecharge/const/onebtn.dart';
 import 'package:onecharge/resources/app_resources.dart';
-import 'package:onecharge/screen/login/phone_login.dart';
 import 'package:onecharge/test/testlogin.dart';
 import 'package:onecharge/utils/onboarding_service.dart';
 
@@ -26,13 +25,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     OnboardingPageData(
       title: "Discover",
       description:
-            "Book mechanical help, battery swaps, or\ntowing with one app",
+          "Book mechanical help, battery swaps, or\ntowing with one app",
       image: AppOnbordImages.onbord3,
     ),
     OnboardingPageData(
       title: "Discover",
       description:
-           "Share your issue with photos or video\n— we handle the rest.",
+          "Share your issue with photos or video\n— we handle the rest.",
       image: AppOnbordImages.onbord2,
     ),
   ];
@@ -53,7 +52,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       // Mark onboarding as completed
       await OnboardingService.completeOnboarding();
       if (!mounted) return;
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => Testlogin()));
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => Testlogin()),
+      );
     }
   }
 
@@ -63,7 +65,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmallScreen = screenHeight < 700;
     final isLargeScreen = screenHeight > 900;
-    
+
     return Scaffold(
       body: SafeArea(
         child: Column(
@@ -259,19 +261,25 @@ class _OnboardingPageWidgetState extends State<OnboardingPageWidget>
     final imageHeight = widget.isSmallScreen
         ? widget.screenHeight * 0.25
         : widget.isLargeScreen
-            ? widget.screenHeight * 0.35
-            : widget.screenHeight * 0.30;
-    
+        ? widget.screenHeight * 0.35
+        : widget.screenHeight * 0.30;
+
     final titleSpacing = widget.isSmallScreen ? 20.0 : 30.0;
     final descriptionSpacing = widget.isSmallScreen ? 8.0 : 10.0;
-    final titleFontSize = widget.isSmallScreen ? 20.0 : widget.isLargeScreen ? 28.0 : 24.0;
-    final descriptionFontSize = widget.isSmallScreen ? 12.0 : widget.isLargeScreen ? 16.0 : 14.0;
-    
+    final titleFontSize = widget.isSmallScreen
+        ? 20.0
+        : widget.isLargeScreen
+        ? 28.0
+        : 24.0;
+    final descriptionFontSize = widget.isSmallScreen
+        ? 12.0
+        : widget.isLargeScreen
+        ? 16.0
+        : 14.0;
+
     return SingleChildScrollView(
       child: ConstrainedBox(
-        constraints: BoxConstraints(
-          minHeight: widget.screenHeight * 0.5,
-        ),
+        constraints: BoxConstraints(minHeight: widget.screenHeight * 0.5),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -287,8 +295,8 @@ class _OnboardingPageWidgetState extends State<OnboardingPageWidget>
                     alignment: widget.pageIndex == 0
                         ? Alignment.centerLeft
                         : widget.pageIndex == 1
-                            ? Alignment.centerRight
-                            : Alignment.center,
+                        ? Alignment.centerRight
+                        : Alignment.center,
                     child: Image.asset(
                       widget.pageData.image,
                       fit: BoxFit.contain,

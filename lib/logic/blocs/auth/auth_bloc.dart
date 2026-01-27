@@ -19,8 +19,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(AuthLoading());
     try {
       final loginResponse = await authRepository.login(event.loginRequest);
-      // Save token to storage
+      // Save token and name to storage
       await TokenStorage.saveToken(loginResponse.token);
+      await TokenStorage.saveUserName(loginResponse.customer.name);
       emit(AuthSuccess(loginResponse));
     } catch (e) {
       emit(AuthError(e.toString()));

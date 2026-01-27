@@ -24,6 +24,10 @@ import 'package:onecharge/logic/blocs/add_vehicle/add_vehicle_bloc.dart';
 import 'package:onecharge/logic/blocs/vehicle_list/vehicle_list_bloc.dart';
 import 'package:onecharge/logic/blocs/vehicle_list/vehicle_list_event.dart';
 import 'package:onecharge/logic/blocs/ticket/ticket_bloc.dart';
+import 'package:onecharge/logic/blocs/delete_vehicle/delete_vehicle_bloc.dart';
+import 'package:onecharge/data/repositories/profile_repository.dart';
+import 'package:onecharge/logic/blocs/profile/profile_bloc.dart';
+import 'package:onecharge/logic/blocs/profile/profile_event.dart';
 import 'package:onecharge/screen/onbording/splash.dart';
 
 void main() {
@@ -34,9 +38,9 @@ void main() {
   final vehicleRepository = VehicleRepository(apiClient: apiClient);
   final issueRepository = IssueRepository(apiClient: apiClient);
   final chatRepository = ChatRepository(apiClient: apiClient);
-  final chargingTypeRepository =
-      ChargingTypeRepository(apiClient: apiClient);
+  final chargingTypeRepository = ChargingTypeRepository(apiClient: apiClient);
   final authRepository = AuthRepository(apiClient: apiClient);
+  final profileRepository = ProfileRepository(apiClient: apiClient);
 
   runApp(
     MultiRepositoryProvider(
@@ -46,8 +50,10 @@ void main() {
         RepositoryProvider<IssueRepository>.value(value: issueRepository),
         RepositoryProvider<ChatRepository>.value(value: chatRepository),
         RepositoryProvider<ChargingTypeRepository>.value(
-            value: chargingTypeRepository),
+          value: chargingTypeRepository,
+        ),
         RepositoryProvider<AuthRepository>.value(value: authRepository),
+        RepositoryProvider<ProfileRepository>.value(value: profileRepository),
       ],
       child: MultiBlocProvider(
         providers: [
@@ -69,22 +75,33 @@ void main() {
             create: (context) => ChatBloc(chatRepository: chatRepository),
           ),
           BlocProvider<ChargingTypeBloc>(
-            create: (context) => ChargingTypeBloc(
-                    chargingTypeRepository: chargingTypeRepository)
-                ..add(FetchChargingTypes()),
+            create: (context) =>
+                ChargingTypeBloc(chargingTypeRepository: chargingTypeRepository)
+                  ..add(FetchChargingTypes()),
           ),
           BlocProvider<AuthBloc>(
             create: (context) => AuthBloc(authRepository: authRepository),
           ),
           BlocProvider<AddVehicleBloc>(
-            create: (context) => AddVehicleBloc(vehicleRepository: vehicleRepository),
+            create: (context) =>
+                AddVehicleBloc(vehicleRepository: vehicleRepository),
           ),
           BlocProvider<VehicleListBloc>(
-            create: (context) => VehicleListBloc(vehicleRepository: vehicleRepository)
-              ..add(FetchVehicles()),
+            create: (context) =>
+                VehicleListBloc(vehicleRepository: vehicleRepository)
+                  ..add(FetchVehicles()),
           ),
           BlocProvider<TicketBloc>(
             create: (context) => TicketBloc(issueRepository: issueRepository),
+          ),
+          BlocProvider<DeleteVehicleBloc>(
+            create: (context) =>
+                DeleteVehicleBloc(vehicleRepository: vehicleRepository),
+          ),
+          BlocProvider<ProfileBloc>(
+            create: (context) =>
+                ProfileBloc(profileRepository: profileRepository)
+                  ..add(FetchProfile()),
           ),
         ],
         child: const MyApp(),

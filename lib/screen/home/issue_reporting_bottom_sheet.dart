@@ -866,31 +866,39 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 52,
-                      child: OutlinedButton(
-                        onPressed: () => _submitTicket(isInstant: true),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(
-                            color: Colors.black,
-                            width: 1.5,
+                    BlocBuilder<TicketBloc, TicketState>(
+                      builder: (context, state) {
+                        return SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: OutlinedButton(
+                            onPressed: state is TicketLoading
+                                ? null
+                                : () => _submitTicket(isInstant: true),
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(
+                                color: Colors.black,
+                                width: 1.5,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              backgroundColor: Colors.white,
+                            ),
+                            child: state is TicketLoading
+                                ? const CupertinoActivityIndicator()
+                                : const Text(
+                                    "Instant Booking",
+                                    style: TextStyle(
+                                      color: Colors.black,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700,
+                                      fontFamily: 'Lufga',
+                                    ),
+                                  ),
                           ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          backgroundColor: Colors.white,
-                        ),
-                        child: const Text(
-                          "Instant Booking",
-                          style: TextStyle(
-                            color: Colors.black,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            fontFamily: 'Lufga',
-                          ),
-                        ),
-                      ),
+                        );
+                      },
                     ),
                     const SizedBox(height: 16),
 
@@ -1405,9 +1413,8 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
                                 : () async {
                                     _submitTicket(isInstant: false);
                                   },
-                            text: ticketState is TicketLoading
-                                ? "Submitting..."
-                                : "Submit Service",
+                            text: "Submit Service",
+                            isLoading: ticketState is TicketLoading,
                           );
                         },
                       ),

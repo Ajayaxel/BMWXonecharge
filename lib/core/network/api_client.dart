@@ -96,6 +96,40 @@ class ApiClient {
     }
   }
 
+  Future<Response> put(
+    String path, {
+    dynamic data,
+    Map<String, dynamic>? queryParameters,
+  }) async {
+    try {
+      final response = await _dio.put(
+        path,
+        data: data,
+        queryParameters: queryParameters,
+      );
+      return response;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<Response> delete(
+    String path, {
+    dynamic data,
+    Map<String, dynamic>? queryParameters,
+  }) async {
+    try {
+      final response = await _dio.delete(
+        path,
+        data: data,
+        queryParameters: queryParameters,
+      );
+      return response;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
   Future<Response> getWithBaseUrl(
     String path,
     String baseUrl, {
@@ -150,6 +184,29 @@ class ApiClient {
       }
 
       final response = await _dio.post(
+        path,
+        data: formData,
+        options: Options(headers: headers, contentType: 'multipart/form-data'),
+      );
+      return response;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<Response> putMultipart(
+    String path, {
+    required FormData formData,
+  }) async {
+    try {
+      // Get token for multipart request
+      final token = await TokenStorage.readToken();
+      final headers = <String, dynamic>{'Accept': 'application/json'};
+      if (token != null && token.isNotEmpty) {
+        headers['Authorization'] = 'Bearer $token';
+      }
+
+      final response = await _dio.put(
         path,
         data: formData,
         options: Options(headers: headers, contentType: 'multipart/form-data'),

@@ -463,7 +463,7 @@ class _LocationMapScreenState extends State<LocationMapScreen> {
                   const SizedBox(height: 24),
                   SizedBox(
                     width: double.infinity,
-                    height: 56,
+                    height: 47,
                     child: ElevatedButton(
                       onPressed: () {
                         if (!_showAddressDetailsForm) {

@@ -12,6 +12,8 @@ import 'package:geocoding/geocoding.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:onecharge/logic/blocs/issue_category/issue_category_bloc.dart';
 import 'package:onecharge/logic/blocs/issue_category/issue_category_state.dart';
+import 'package:onecharge/logic/blocs/auth/auth_bloc.dart';
+import 'package:onecharge/logic/blocs/auth/auth_state.dart';
 import 'package:onecharge/logic/blocs/vehicle_list/vehicle_list_bloc.dart';
 import 'package:onecharge/logic/blocs/vehicle_list/vehicle_list_state.dart';
 import 'package:onecharge/logic/blocs/vehicle_list/vehicle_list_event.dart';
@@ -20,6 +22,7 @@ import 'package:onecharge/models/ticket_model.dart';
 import 'package:onecharge/core/storage/vehicle_storage.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:onecharge/screen/notification/notification_screen.dart';
+import 'package:onecharge/core/storage/token_storage.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -41,14 +44,27 @@ class HomeScreenState extends State<HomeScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   Ticket? _currentTicket;
+  String _userName = 'Mishal';
 
   @override
   void initState() {
     super.initState();
     activeState = this;
+    _loadUserName();
     _getCurrentLocation();
     // Vehicles will be loaded via BLoC
     context.read<VehicleListBloc>().add(FetchVehicles());
+  }
+
+  Future<void> _loadUserName() async {
+    final name = await TokenStorage.readUserName();
+    if (name != null) {
+      if (mounted) {
+        setState(() {
+          _userName = name.split(' ')[0];
+        });
+      }
+    }
   }
 
   Future<void> _getCurrentLocation() async {
@@ -273,12 +289,33 @@ class HomeScreenState extends State<HomeScreen> {
                   color: Colors.white,
                   borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
                 ),
-                padding: const EdgeInsets.all(20.00),
-                child: const Center(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(vertical: 40),
-                    child: CircularProgressIndicator(),
-                  ),
+                padding: const EdgeInsets.all(20.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(height: 10),
+                    ...List.generate(
+                      3,
+                      (index) => Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _buildShimmerCarItem(),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Shimmer.fromColors(
+                      baseColor: const Color(0xffE0E0E0),
+                      highlightColor: Colors.white,
+                      child: Container(
+                        height: 50,
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                  ],
                 ),
               );
             }
@@ -479,6 +516,66 @@ class HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildShimmerCarItem() {
+    return Shimmer.fromColors(
+      baseColor: const Color(0xffE0E0E0),
+      highlightColor: Colors.white,
+      child: Container(
+        height: 80,
+        padding: const EdgeInsets.only(left: 16),
+        decoration: BoxDecoration(
+          color: const Color(0xffF5F5F5),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Stack(
+          children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 120,
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    width: 80,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Positioned(
+              right: 0,
+              top: 5,
+              bottom: 5,
+              child: Container(
+                width: 130,
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.only(
+                    topRight: Radius.circular(12),
+                    bottomRight: Radius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -518,14 +615,23 @@ class HomeScreenState extends State<HomeScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Text(
-                              'Hi Mishal',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w600,
-                                fontFamily: 'Lufga',
-                                color: Colors.black,
-                              ),
+                            BlocBuilder<AuthBloc, AuthState>(
+                              builder: (context, state) {
+                                String name = _userName;
+                                if (state is AuthSuccess) {
+                                  name = state.loginResponse.customer.name
+                                      .split(' ')[0];
+                                }
+                                return Text(
+                                  'Hi $name',
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w600,
+                                    fontFamily: 'Lufga',
+                                    color: Colors.black,
+                                  ),
+                                );
+                              },
                             ),
                             const SizedBox(height: 2),
                             Row(
