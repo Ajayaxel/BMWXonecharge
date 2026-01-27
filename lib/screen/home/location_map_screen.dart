@@ -4,6 +4,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart' as geo;
 import 'package:google_place/google_place.dart';
 import 'dart:async';
+import 'package:onecharge/models/location_model.dart';
 
 class LocationMapScreen extends StatefulWidget {
   final String initialAddress;
@@ -477,7 +478,19 @@ class _LocationMapScreenState extends State<LocationMapScreen> {
                             fullAddress =
                                 "${_houseController.text}, $fullAddress";
                           }
-                          Navigator.pop(context, fullAddress);
+
+                          final location = LocationModel(
+                            name: _mainText.isEmpty
+                                ? "Selected Location"
+                                : _mainText,
+                            address: fullAddress,
+                            latitude: _selectedLocation?.latitude ?? 0.0,
+                            longitude: _selectedLocation?.longitude ?? 0.0,
+                            additionalInfo: _directionController.text,
+                            isDefault: false,
+                          );
+
+                          Navigator.pop(context, location);
                         }
                       },
                       style: ElevatedButton.styleFrom(

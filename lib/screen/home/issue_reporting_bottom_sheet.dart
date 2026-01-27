@@ -7,8 +7,11 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:onecharge/screen/home/payment_bottom_sheet.dart';
 import 'package:onecharge/screen/home/home_screen.dart';
-import 'package:onecharge/screen/home/location_map_screen.dart';
+import 'package:onecharge/screen/home/my_location_screen.dart';
+import 'package:onecharge/models/location_model.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:onecharge/logic/blocs/location/location_bloc.dart';
+import 'package:onecharge/logic/blocs/location/location_state.dart';
 import 'package:onecharge/logic/blocs/issue_category/issue_category_bloc.dart';
 import 'package:onecharge/logic/blocs/issue_category/issue_category_state.dart';
 import 'package:onecharge/logic/blocs/ticket/ticket_bloc.dart';
@@ -23,12 +26,16 @@ class IssueReportingBottomSheet extends StatefulWidget {
   final String vehicleName;
   final String vehiclePlate;
   final String currentAddress;
+  final double? latitude;
+  final double? longitude;
   final String? initialCategory;
   const IssueReportingBottomSheet({
     super.key,
     required this.vehicleName,
     required this.vehiclePlate,
     required this.currentAddress,
+    this.latitude,
+    this.longitude,
     this.initialCategory,
   });
 
@@ -80,9 +87,32 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
       );
     }
     _currentAddress = widget.currentAddress;
+
+    if (widget.latitude != null && widget.latitude != 0.0) {
+      _currentLatitude = widget.latitude!;
+      _currentLongitude = widget.longitude!;
+    } else {
+      // Try to get default saved location
+      final locationState = context.read<LocationBloc>().state;
+      if (locationState is LocationsLoaded) {
+        final defaultLoc =
+            locationState.locations.where((l) => l.isDefault).firstOrNull ??
+            locationState.locations.firstOrNull;
+        if (defaultLoc != null) {
+          _currentAddress = defaultLoc.address;
+          _currentLatitude = defaultLoc.latitude;
+          _currentLongitude = defaultLoc.longitude;
+        }
+      }
+    }
+
     _slotController.text =
         "${DateFormat('MMM dd').format(_selectedDateTime)}, ${DateFormat('hh:mm a').format(_selectedDateTime)}";
-    _getCurrentCoordinates();
+
+    // Only fetch current coordinates if we don't have them from a saved location
+    if (_currentLatitude == 0.0) {
+      _getCurrentCoordinates();
+    }
   }
 
   Future<void> _getCurrentCoordinates() async {
@@ -841,18 +871,21 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
                           const SizedBox(width: 10),
                           GestureDetector(
                             onTap: () async {
-                              final updatedAddress =
-                                  await Navigator.push<String>(
+                              final result =
+                                  await Navigator.push<LocationModel>(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (context) => LocationMapScreen(
-                                        initialAddress: _currentAddress,
-                                      ),
+                                      builder: (context) =>
+                                          const MyLocationScreen(
+                                            isPicker: true,
+                                          ),
                                     ),
                                   );
-                              if (updatedAddress != null) {
+                              if (result != null) {
                                 setState(() {
-                                  _currentAddress = updatedAddress;
+                                  _currentAddress = result.address;
+                                  _currentLatitude = result.latitude;
+                                  _currentLongitude = result.longitude;
                                 });
                               }
                             },

@@ -23,6 +23,8 @@ import 'package:onecharge/core/storage/vehicle_storage.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:onecharge/screen/notification/notification_screen.dart';
 import 'package:onecharge/core/storage/token_storage.dart';
+import 'package:onecharge/screen/home/my_location_screen.dart';
+import 'package:onecharge/models/location_model.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -38,6 +40,8 @@ class HomeScreenState extends State<HomeScreen> {
   List<VehicleListItem> vehicles = [];
   bool isLoadingVehicles = true;
   String currentAddress = "Fetching location...";
+  double _currentLatitude = 0.0;
+  double _currentLongitude = 0.0;
   String _currentServiceStage = 'none';
   double _serviceProgress = 0.0;
   Timer? _serviceTimer;
@@ -123,6 +127,8 @@ class HomeScreenState extends State<HomeScreen> {
           }
 
           currentAddress = addressParts.join(", ");
+          _currentLatitude = position.latitude;
+          _currentLongitude = position.longitude;
           if (currentAddress.isEmpty) {
             currentAddress =
                 "${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}";
@@ -396,6 +402,8 @@ class HomeScreenState extends State<HomeScreen> {
                                   vehicleName: vehicle.vehicleName,
                                   vehiclePlate: vehicle.vehicleNumber,
                                   currentAddress: currentAddress,
+                                  latitude: _currentLatitude,
+                                  longitude: _currentLongitude,
                                   initialCategory: category,
                                 ),
                               );
@@ -634,33 +642,51 @@ class HomeScreenState extends State<HomeScreen> {
                               },
                             ),
                             const SizedBox(height: 2),
-                            Row(
-                              children: [
-                                Container(
-                                  width: 10,
-                                  height: 10,
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xff4CAF50),
-                                    shape: BoxShape.circle,
+                            GestureDetector(
+                              onTap: () async {
+                                final result =
+                                    await Navigator.push<LocationModel>(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            const MyLocationScreen(
+                                              isPicker: true,
+                                            ),
+                                      ),
+                                    );
+                                if (result != null) {
+                                  setState(() {
+                                    currentAddress = result.address;
+                                    _currentLatitude = result.latitude;
+                                    _currentLongitude = result.longitude;
+                                  });
+                                }
+                              },
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.location_on,
+                                    color: Color.fromARGB(255, 23, 23, 23),
+                                    size: 14,
                                   ),
-                                ),
-                                const SizedBox(width: 6),
-                                Expanded(
-                                  child: Text(
-                                    currentAddress,
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: const Color(
-                                        0xFF1D1B20,
-                                      ).withOpacity(0.6),
-                                      fontFamily: 'Lufga',
-                                      fontWeight: FontWeight.w400,
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      currentAddress,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: const Color(
+                                          0xFF1D1B20,
+                                        ).withOpacity(0.6),
+                                        fontFamily: 'Lufga',
+                                        fontWeight: FontWeight.w400,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                      maxLines: 1,
                                     ),
-                                    overflow: TextOverflow.ellipsis,
-                                    maxLines: 1,
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ],
                         ),

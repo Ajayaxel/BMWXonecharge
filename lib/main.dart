@@ -28,6 +28,9 @@ import 'package:onecharge/logic/blocs/delete_vehicle/delete_vehicle_bloc.dart';
 import 'package:onecharge/data/repositories/profile_repository.dart';
 import 'package:onecharge/logic/blocs/profile/profile_bloc.dart';
 import 'package:onecharge/logic/blocs/profile/profile_event.dart';
+import 'package:onecharge/data/repositories/location_repository.dart';
+import 'package:onecharge/logic/blocs/location/location_bloc.dart';
+import 'package:onecharge/logic/blocs/location/location_event.dart';
 import 'package:onecharge/screen/onbording/splash.dart';
 
 void main() {
@@ -41,6 +44,7 @@ void main() {
   final chargingTypeRepository = ChargingTypeRepository(apiClient: apiClient);
   final authRepository = AuthRepository(apiClient: apiClient);
   final profileRepository = ProfileRepository(apiClient: apiClient);
+  final locationRepository = LocationRepository(apiClient: apiClient);
 
   runApp(
     MultiRepositoryProvider(
@@ -54,6 +58,7 @@ void main() {
         ),
         RepositoryProvider<AuthRepository>.value(value: authRepository),
         RepositoryProvider<ProfileRepository>.value(value: profileRepository),
+        RepositoryProvider<LocationRepository>.value(value: locationRepository),
       ],
       child: MultiBlocProvider(
         providers: [
@@ -102,6 +107,11 @@ void main() {
             create: (context) =>
                 ProfileBloc(profileRepository: profileRepository)
                   ..add(FetchProfile()),
+          ),
+          BlocProvider<LocationBloc>(
+            create: (context) =>
+                LocationBloc(repository: locationRepository)
+                  ..add(FetchLocations()),
           ),
         ],
         child: const MyApp(),

@@ -1,47 +1,113 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:onecharge/logic/blocs/location/location_bloc.dart';
+import 'package:onecharge/logic/blocs/location/location_event.dart';
+import 'package:onecharge/logic/blocs/location/location_state.dart';
+import 'package:onecharge/models/location_model.dart';
 import 'package:onecharge/screen/home/location_map_screen.dart';
 
-class SavedLocation {
-  final String title;
-  final String address;
-  final IconData icon;
-  final bool isDefault;
-
-  SavedLocation({
-    required this.title,
-    required this.address,
-    required this.icon,
-    this.isDefault = false,
-  });
-}
-
 class MyLocationScreen extends StatefulWidget {
-  const MyLocationScreen({super.key});
+  final bool isPicker;
+  const MyLocationScreen({super.key, this.isPicker = false});
 
   @override
   State<MyLocationScreen> createState() => _MyLocationScreenState();
 }
 
 class _MyLocationScreenState extends State<MyLocationScreen> {
-  String selectedLocation = 'Home';
-  final List<SavedLocation> _locations = [
-    SavedLocation(
-      title: 'Home',
-      address: '1901 Thornridge Cir. Shiloh, Hawaii 81063',
-      icon: Icons.home_outlined,
-      isDefault: true,
-    ),
-    SavedLocation(
-      title: 'Work',
-      address: '4517 Washington Ave. Manchester, Kentucky 39495',
-      icon: Icons.work_outline,
-    ),
-    SavedLocation(
-      title: 'Other',
-      address: '2464 Royal Ln. Mesa, New Jersey 45463',
-      icon: Icons.location_on_outlined,
-    ),
-  ];
+  int? selectedLocationId;
+  OverlayEntry? _toastEntry;
+
+  @override
+  void initState() {
+    super.initState();
+    // Fetch locations when the screen is initialized
+    context.read<LocationBloc>().add(FetchLocations());
+  }
+
+  @override
+  void dispose() {
+    _toastEntry?.remove();
+    super.dispose();
+  }
+
+  void _showToast(String message, {bool isError = false}) {
+    _toastEntry?.remove();
+    _toastEntry = null;
+
+    final overlayState = Overlay.maybeOf(context);
+    if (overlayState == null) return;
+
+    final entry = OverlayEntry(
+      builder: (context) => Positioned(
+        top: MediaQuery.of(context).padding.top + 20,
+        right: 20,
+        child: Material(
+          color: Colors.transparent,
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0.0, end: 1.0),
+            duration: const Duration(milliseconds: 300),
+            builder: (context, value, child) {
+              return Opacity(
+                opacity: value,
+                child: Transform.translate(
+                  offset: Offset(0, -20 * (1 - value)),
+                  child: child,
+                ),
+              );
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.9),
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.3),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    isError ? Icons.error_outline : Icons.check_circle_outline,
+                    color: isError ? Colors.red : Colors.green,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 10),
+                  Flexible(
+                    child: Text(
+                      message,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        fontFamily: 'Lufga',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    _toastEntry = entry;
+    overlayState.insert(entry);
+
+    Future.delayed(const Duration(seconds: 4), () {
+      if (!mounted) return;
+      if (_toastEntry == entry) {
+        _toastEntry?.remove();
+        _toastEntry = null;
+      }
+    });
+  }
 
   Future<void> _navigateAndAddLocation() async {
     final result = await Navigator.push(
@@ -51,16 +117,16 @@ class _MyLocationScreenState extends State<MyLocationScreen> {
       ),
     );
 
-    if (result != null && result is String) {
-      setState(() {
-        _locations.add(
-          SavedLocation(
-            title: 'New Location ${_locations.length + 1}',
-            address: result,
-            icon: Icons.location_on_outlined,
-          ),
-        );
-      });
+    if (result != null && result is LocationModel) {
+      if (widget.isPicker) {
+        // If we are in picker mode and just added a new location,
+        // return it immediately
+        if (mounted) Navigator.pop(context, result);
+        return;
+      }
+      if (mounted) {
+        context.read<LocationBloc>().add(AddLocation(result));
+      }
     }
   }
 
@@ -100,76 +166,124 @@ class _MyLocationScreenState extends State<MyLocationScreen> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Saved Locations',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                fontFamily: 'Lufga',
-                color: Colors.black,
-              ),
-            ),
-            const SizedBox(height: 16),
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: _locations.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 16),
-              itemBuilder: (context, index) {
-                final location = _locations[index];
-                return _buildLocationItem(
-                  icon: location.icon,
-                  title: location.title,
-                  address: location.address,
-                  isDefault: location.isDefault,
-                  onDelete: () {
-                    setState(() {
-                      _locations.removeAt(index);
-                    });
-                  },
-                );
-              },
-            ),
-            const SizedBox(height: 30),
-            Center(
-              child: TextButton.icon(
-                onPressed: _navigateAndAddLocation,
-                icon: const Icon(Icons.add, color: Colors.blue),
-                label: const Text(
-                  'Add New Location',
+      body: BlocConsumer<LocationBloc, LocationState>(
+        listener: (context, state) {
+          if (state is LocationAdded) {
+            _showToast('Location added successfully');
+          } else if (state is LocationDeleted) {
+            _showToast('Location deleted successfully');
+          } else if (state is LocationError) {
+            _showToast(state.message, isError: true);
+          }
+        },
+        builder: (context, state) {
+          if (state is LocationLoading && state is! LocationsLoaded) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          List<LocationModel> locations = [];
+          if (state is LocationsLoaded) {
+            locations = state.locations;
+          }
+
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Saved Locations',
                   style: TextStyle(
-                    color: Colors.blue,
-                    fontFamily: 'Lufga',
+                    fontSize: 18,
                     fontWeight: FontWeight.w600,
+                    fontFamily: 'Lufga',
+                    color: Colors.black,
                   ),
                 ),
-              ),
+                const SizedBox(height: 16),
+                if (locations.isEmpty && state is! LocationLoading)
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.only(top: 40),
+                      child: Text(
+                        'No saved locations found',
+                        style: TextStyle(
+                          fontFamily: 'Lufga',
+                          color: Colors.grey,
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: locations.length,
+                    separatorBuilder: (context, index) =>
+                        const SizedBox(height: 16),
+                    itemBuilder: (context, index) {
+                      final location = locations[index];
+                      return _buildLocationItem(
+                        icon: _getIconForName(location.name),
+                        location: location,
+                        onDelete: () {
+                          if (location.id != null) {
+                            context.read<LocationBloc>().add(
+                              DeleteLocation(location.id!),
+                            );
+                          }
+                        },
+                      );
+                    },
+                  ),
+                const SizedBox(height: 30),
+                Center(
+                  child: TextButton.icon(
+                    onPressed: _navigateAndAddLocation,
+                    icon: const Icon(Icons.add, color: Colors.blue),
+                    label: const Text(
+                      'Add New Location',
+                      style: TextStyle(
+                        color: Colors.blue,
+                        fontFamily: 'Lufga',
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
 
+  IconData _getIconForName(String name) {
+    final lowerName = name.toLowerCase();
+    if (lowerName.contains('home')) return Icons.home_outlined;
+    if (lowerName.contains('work') || lowerName.contains('office')) {
+      return Icons.work_outline;
+    }
+    return Icons.location_on_outlined;
+  }
+
   Widget _buildLocationItem({
     required IconData icon,
-    required String title,
-    required String address,
-    bool isDefault = false,
+    required LocationModel location,
     required VoidCallback onDelete,
   }) {
-    bool isSelected = selectedLocation == title;
+    bool isSelected = selectedLocationId == location.id;
 
     return GestureDetector(
       onTap: () {
-        setState(() {
-          selectedLocation = title;
-        });
+        if (widget.isPicker) {
+          Navigator.pop(context, location);
+        } else {
+          setState(() {
+            selectedLocationId = location.id;
+          });
+        }
       },
       child: Container(
         padding: const EdgeInsets.all(16),
@@ -195,16 +309,20 @@ class _MyLocationScreenState extends State<MyLocationScreen> {
                 children: [
                   Row(
                     children: [
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          fontFamily: 'Lufga',
-                          color: Colors.black,
+                      Flexible(
+                        child: Text(
+                          location.name,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            fontFamily: 'Lufga',
+                            color: Colors.black,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      if (isDefault) ...[
+                      if (location.isDefault) ...[
                         const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(
@@ -229,7 +347,7 @@ class _MyLocationScreenState extends State<MyLocationScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    address,
+                    location.address,
                     style: TextStyle(
                       fontSize: 13,
                       color: Colors.grey[600],
