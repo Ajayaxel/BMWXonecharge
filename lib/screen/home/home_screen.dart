@@ -453,15 +453,40 @@ class HomeScreenState extends State<HomeScreen> {
     String? imageUrl,
     bool isSelected = false,
   }) {
-    // Construct full image URL if image path is provided
-    String? fullImageUrl;
+    Widget imageWidget;
     if (imageUrl != null && imageUrl.isNotEmpty) {
       if (imageUrl.startsWith('http')) {
-        fullImageUrl = imageUrl;
+        imageWidget = Image.network(
+          imageUrl,
+          fit: BoxFit.contain,
+          alignment: Alignment.centerRight,
+          width: 200,
+          errorBuilder: (context, error, stackTrace) =>
+              const Icon(Icons.directions_car, size: 60, color: Colors.grey),
+        );
+      } else if (imageUrl.startsWith('assets/')) {
+        imageWidget = Image.asset(
+          imageUrl,
+          fit: BoxFit.contain,
+          alignment: Alignment.centerRight,
+          width: 200,
+          errorBuilder: (context, error, stackTrace) =>
+              const Icon(Icons.directions_car, size: 60, color: Colors.grey),
+        );
       } else {
         // Assuming the API returns relative paths, prepend base URL
-        fullImageUrl = 'https://onecharge.io/storage/$imageUrl';
+        final fullImageUrl = 'https://app.onecharge.io/storage/$imageUrl';
+        imageWidget = Image.network(
+          fullImageUrl,
+          fit: BoxFit.contain,
+          alignment: Alignment.centerRight,
+          width: 200,
+          errorBuilder: (context, error, stackTrace) =>
+              const Icon(Icons.directions_car, size: 60, color: Colors.grey),
+        );
       }
+    } else {
+      imageWidget = const SizedBox.shrink();
     }
 
     return Container(
@@ -505,20 +530,8 @@ class HomeScreenState extends State<HomeScreen> {
               ],
             ),
           ),
-          if (fullImageUrl != null && fullImageUrl.isNotEmpty)
-            Positioned(
-              right: 0,
-              top: 5,
-              bottom: 5,
-              child: Image.network(
-                fullImageUrl,
-                fit: BoxFit.fitHeight,
-                alignment: Alignment.centerRight,
-                width: 150,
-                errorBuilder: (context, error, stackTrace) =>
-                    const SizedBox(width: 100),
-              ),
-            ),
+          if (imageUrl != null && imageUrl.isNotEmpty)
+            Positioned(right: 0, top: -20, bottom: -20, child: imageWidget),
         ],
       ),
     );

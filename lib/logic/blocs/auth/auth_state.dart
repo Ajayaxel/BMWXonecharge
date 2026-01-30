@@ -30,4 +30,15 @@ class AuthError extends AuthState {
   List<Object> get props => [message];
 }
 
+class AuthOtpRequired extends AuthState {
+  final String email;
+
+  const AuthOtpRequired(this.email);
+
+  @override
+  List<Object> get props => [email];
+}
+
+class AuthOtpResent extends AuthState {}
+
 class AuthLoggedOut extends AuthState {}

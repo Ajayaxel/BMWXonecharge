@@ -4,10 +4,7 @@ class VehicleListResponse extends Equatable {
   final bool success;
   final List<VehicleListItem> vehicles;
 
-  const VehicleListResponse({
-    required this.success,
-    required this.vehicles,
-  });
+  const VehicleListResponse({required this.success, required this.vehicles});
 
   factory VehicleListResponse.fromJson(Map<String, dynamic> json) {
     return VehicleListResponse(
@@ -55,15 +52,15 @@ class VehicleListItem extends Equatable {
 
   factory VehicleListItem.fromJson(Map<String, dynamic> json) {
     return VehicleListItem(
-      id: json['id'],
-      customerId: json['customer_id'],
-      vehicleTypeId: json['vehicle_type_id'],
-      brandId: json['brand_id'],
-      modelId: json['model_id'],
-      chargingTypeId: json['charging_type_id'],
-      vehicleNumber: json['vehicle_number'],
-      createdAt: json['created_at'],
-      updatedAt: json['updated_at'],
+      id: json['id'] ?? 0,
+      customerId: json['customer_id'] ?? 0,
+      vehicleTypeId: json['vehicle_type_id'] ?? 0,
+      brandId: json['brand_id'] ?? 0,
+      modelId: json['model_id'] ?? 0,
+      chargingTypeId: json['charging_type_id'] ?? 0,
+      vehicleNumber: json['vehicle_number'] ?? '',
+      createdAt: json['created_at'] ?? '',
+      updatedAt: json['updated_at'] ?? '',
       vehicleType: json['vehicle_type'] != null
           ? VehicleTypeInfo.fromJson(json['vehicle_type'])
           : null,
@@ -81,20 +78,20 @@ class VehicleListItem extends Equatable {
 
   @override
   List<Object?> get props => [
-        id,
-        customerId,
-        vehicleTypeId,
-        brandId,
-        modelId,
-        chargingTypeId,
-        vehicleNumber,
-        createdAt,
-        updatedAt,
-        vehicleType,
-        brand,
-        model,
-        chargingType,
-      ];
+    id,
+    customerId,
+    vehicleTypeId,
+    brandId,
+    modelId,
+    chargingTypeId,
+    vehicleNumber,
+    createdAt,
+    updatedAt,
+    vehicleType,
+    brand,
+    model,
+    chargingType,
+  ];
 }
 
 class VehicleTypeInfo extends Equatable {
@@ -114,11 +111,11 @@ class VehicleTypeInfo extends Equatable {
 
   factory VehicleTypeInfo.fromJson(Map<String, dynamic> json) {
     return VehicleTypeInfo(
-      id: json['id'],
-      name: json['name'],
-      status: json['status'],
-      createdAt: json['created_at'],
-      updatedAt: json['updated_at'],
+      id: json['id'] ?? 0,
+      name: json['name'] ?? '',
+      status: json['status'] ?? false,
+      createdAt: json['created_at'] ?? '',
+      updatedAt: json['updated_at'] ?? '',
     );
   }
 
@@ -145,17 +142,24 @@ class BrandInfo extends Equatable {
 
   factory BrandInfo.fromJson(Map<String, dynamic> json) {
     return BrandInfo(
-      id: json['id'],
-      name: json['name'],
-      vehicleTypeId: json['vehicle_type_id'],
-      image: json['image'],
-      createdAt: json['created_at'],
-      updatedAt: json['updated_at'],
+      id: json['id'] ?? 0,
+      name: json['name'] ?? '',
+      vehicleTypeId: json['vehicle_type_id'] ?? 0,
+      image: json['image'] ?? '',
+      createdAt: json['created_at'] ?? '',
+      updatedAt: json['updated_at'] ?? '',
     );
   }
 
   @override
-  List<Object?> get props => [id, name, vehicleTypeId, image, createdAt, updatedAt];
+  List<Object?> get props => [
+    id,
+    name,
+    vehicleTypeId,
+    image,
+    createdAt,
+    updatedAt,
+  ];
 }
 
 class ModelInfo extends Equatable {
@@ -177,12 +181,12 @@ class ModelInfo extends Equatable {
 
   factory ModelInfo.fromJson(Map<String, dynamic> json) {
     return ModelInfo(
-      id: json['id'],
-      name: json['name'],
-      brandId: json['brand_id'],
-      image: json['image'],
-      createdAt: json['created_at'],
-      updatedAt: json['updated_at'],
+      id: json['id'] ?? 0,
+      name: json['name'] ?? '',
+      brandId: json['brand_id'] ?? 0,
+      image: json['image'] ?? '',
+      createdAt: json['created_at'] ?? '',
+      updatedAt: json['updated_at'] ?? '',
     );
   }
 
@@ -207,11 +211,11 @@ class ChargingTypeInfo extends Equatable {
 
   factory ChargingTypeInfo.fromJson(Map<String, dynamic> json) {
     return ChargingTypeInfo(
-      id: json['id'],
-      name: json['name'],
-      status: json['status'],
-      createdAt: json['created_at'],
-      updatedAt: json['updated_at'],
+      id: json['id'] ?? 0,
+      name: json['name'] ?? '',
+      status: json['status'] ?? false,
+      createdAt: json['created_at'] ?? '',
+      updatedAt: json['updated_at'] ?? '',
     );
   }
 

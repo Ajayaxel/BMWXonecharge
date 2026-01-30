@@ -6,6 +6,7 @@ class VehicleModel extends Equatable {
   final int brandId;
   final String image;
   final ModelBrand? brand;
+  final VehicleCategory? vehicleCategory;
 
   const VehicleModel({
     required this.id,
@@ -13,20 +14,24 @@ class VehicleModel extends Equatable {
     required this.brandId,
     required this.image,
     this.brand,
+    this.vehicleCategory,
   });
 
   factory VehicleModel.fromJson(Map<String, dynamic> json) {
     return VehicleModel(
-      id: json['id'],
-      name: json['name'],
-      brandId: json['brand_id'],
-      image: json['image'],
+      id: json['id'] ?? 0,
+      name: json['name'] ?? '',
+      brandId: json['brand_id'] ?? 0,
+      image: json['image'] ?? '',
       brand: json['brand'] != null ? ModelBrand.fromJson(json['brand']) : null,
+      vehicleCategory: json['vehicle_category'] != null
+          ? VehicleCategory.fromJson(json['vehicle_category'])
+          : null,
     );
   }
 
   @override
-  List<Object?> get props => [id, name, brandId, image, brand];
+  List<Object?> get props => [id, name, brandId, image, brand, vehicleCategory];
 }
 
 class ModelBrand extends Equatable {
@@ -36,7 +41,21 @@ class ModelBrand extends Equatable {
   const ModelBrand({required this.id, required this.name});
 
   factory ModelBrand.fromJson(Map<String, dynamic> json) {
-    return ModelBrand(id: json['id'], name: json['name']);
+    return ModelBrand(id: json['id'] ?? 0, name: json['name'] ?? '');
+  }
+
+  @override
+  List<Object?> get props => [id, name];
+}
+
+class VehicleCategory extends Equatable {
+  final int id;
+  final String name;
+
+  const VehicleCategory({required this.id, required this.name});
+
+  factory VehicleCategory.fromJson(Map<String, dynamic> json) {
+    return VehicleCategory(id: json['id'] ?? 0, name: json['name'] ?? '');
   }
 
   @override

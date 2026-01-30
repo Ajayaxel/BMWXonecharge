@@ -4,16 +4,10 @@ class ChargingType extends Equatable {
   final int id;
   final String name;
 
-  const ChargingType({
-    required this.id,
-    required this.name,
-  });
+  const ChargingType({required this.id, required this.name});
 
   factory ChargingType.fromJson(Map<String, dynamic> json) {
-    return ChargingType(
-      id: json['id'],
-      name: json['name'],
-    );
+    return ChargingType(id: json['id'] ?? 0, name: json['name'] ?? '');
   }
 
   @override

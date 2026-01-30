@@ -3,7 +3,7 @@ import 'package:onecharge/core/storage/token_storage.dart';
 
 class ApiClient {
   late Dio _dio;
-  static const String baseUrl = 'https://onecharge.io/api';
+  static const String baseUrl = 'https://app.onecharge.io/api';
 
   ApiClient() {
     _dio = Dio(
@@ -11,6 +11,9 @@ class ApiClient {
         baseUrl: baseUrl,
         connectTimeout: const Duration(seconds: 30),
         receiveTimeout: const Duration(seconds: 30),
+        validateStatus: (status) {
+          return status != null && status < 500;
+        },
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',

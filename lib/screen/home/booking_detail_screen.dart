@@ -12,10 +12,91 @@ class BookingDetailScreen extends StatelessWidget {
 
   const BookingDetailScreen({super.key, required this.ticket});
 
+  // Inside BookingDetailScreen
+  void _showSideToast(
+    BuildContext context,
+    String message, {
+    bool isError = true,
+  }) {
+    final overlay = Overlay.of(context);
+    OverlayEntry? entry;
+
+    entry = OverlayEntry(
+      builder: (context) => Positioned(
+        top:
+            MediaQuery.of(context).padding.top +
+            60, // Adjust top padding as needed
+        right: 16,
+        child: Material(
+          color: Colors.transparent,
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0.0, end: 1.0),
+            duration: const Duration(milliseconds: 300),
+            builder: (context, value, child) {
+              return Opacity(
+                opacity: value,
+                child: Transform.translate(
+                  offset: Offset(20 * (1 - value), 0),
+                  child: child,
+                ),
+              );
+            },
+            child: Container(
+              constraints: BoxConstraints(
+                maxWidth: MediaQuery.of(context).size.width * 0.7,
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.9),
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.3),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    isError ? Icons.error_outline : Icons.check_circle_outline,
+                    color: isError ? Colors.redAccent : Colors.greenAccent,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 10),
+                  Flexible(
+                    child: Text(
+                      message,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    overlay.insert(entry);
+
+    Future.delayed(const Duration(seconds: 3), () {
+      entry?.remove();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    // ... variable declarations ...
     final invoice = ticket.invoice;
     final driverName = ticket.driver?.name ?? '-';
+    // ... existing variable logic ...
     final orderId = ticket.ticketId;
     final serviceName = ticket.issueCategory?.name ?? '-';
     final location = ticket.location ?? '-';
@@ -52,27 +133,16 @@ class BookingDetailScreen extends StatelessWidget {
     return BlocListener<TicketBloc, TicketState>(
       listener: (context, state) {
         if (state is InvoiceDownloadLoading) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Downloading invoice...'),
-              duration: Duration(seconds: 1),
-            ),
-          );
+          _showSideToast(context, 'Downloading invoice...', isError: false);
         } else if (state is InvoiceDownloadSuccess) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Invoice downloaded successfully!'),
-              backgroundColor: Colors.green,
-            ),
+          _showSideToast(
+            context,
+            'Invoice downloaded successfully!',
+            isError: false,
           );
           OpenFile.open(state.filePath);
         } else if (state is InvoiceDownloadError) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error: ${state.message}'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          _showSideToast(context, 'Error: ${state.message}', isError: true);
         }
       },
       child: Scaffold(

@@ -7,6 +7,9 @@ import 'package:onecharge/logic/blocs/auth/auth_event.dart';
 import 'package:onecharge/logic/blocs/auth/auth_state.dart';
 import 'package:onecharge/models/login_model.dart';
 import 'package:onecharge/screen/login/user_info.dart';
+import 'package:onecharge/screen/vehicle/vehicle_selection.dart';
+import 'package:onecharge/test/testregister.dart';
+import 'package:onecharge/screen/login/otp_verification_screen.dart';
 
 class Testlogin extends StatefulWidget {
   const Testlogin({super.key});
@@ -21,9 +24,11 @@ class _TestloginState extends State<Testlogin> {
   final _formKey = GlobalKey<FormState>();
   bool _obscurePassword = true;
   bool _isChecked = false;
+  OverlayEntry? _overlayEntry;
 
   @override
   void dispose() {
+    _overlayEntry?.remove();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -35,7 +40,7 @@ class _TestloginState extends State<Testlogin> {
     }
 
     if (!_isChecked) {
-      _showToast("Please accept privacy policy and terms");
+      _showTopError("Please accept privacy policy and terms");
       return;
     }
 
@@ -47,16 +52,62 @@ class _TestloginState extends State<Testlogin> {
     context.read<AuthBloc>().add(LoginRequested(loginRequest));
   }
 
-  void _showToast(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.black,
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+  void _showTopError(String message) {
+    _overlayEntry?.remove();
+    _overlayEntry = null;
+
+    final overlay = Overlay.of(context);
+    final topPadding = MediaQuery.of(context).padding.top;
+
+    _overlayEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        top: topPadding + 10,
+        right: 16,
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            constraints: BoxConstraints(
+              maxWidth: MediaQuery.of(context).size.width * 0.8,
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.black,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.white24),
+              boxShadow: const [
+                BoxShadow(
+                  color: Colors.black26,
+                  blurRadius: 10,
+                  offset: Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    message,
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
+
+    overlay.insert(_overlayEntry!);
+
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) {
+        _overlayEntry?.remove();
+        _overlayEntry = null;
+      }
+    });
   }
 
   @override
@@ -76,11 +127,19 @@ class _TestloginState extends State<Testlogin> {
           // Navigate to UserInfo screen after successful login
           Navigator.pushAndRemoveUntil(
             context,
-            MaterialPageRoute(builder: (_) => const UserInfo()),
+            MaterialPageRoute(builder: (_) => const VehicleSelection()),
             (route) => false,
           );
+        } else if (state is AuthOtpRequired) {
+          // Navigate to OTP verification screen if login requires verification
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => OtpVerificationScreen(email: state.email),
+            ),
+          );
         } else if (state is AuthError) {
-          _showToast(state.message.replaceAll('Exception: ', ''));
+          _showTopError(state.message.replaceAll('Exception: ', ''));
         }
       },
       child: Scaffold(
@@ -338,6 +397,37 @@ class _TestloginState extends State<Testlogin> {
                                 onPressed: _handleLogin,
                               );
                             },
+                          ),
+                          const SizedBox(height: 16),
+                          Center(
+                            child: GestureDetector(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const Testregister(),
+                                  ),
+                                );
+                              },
+                              child: RichText(
+                                text: const TextSpan(
+                                  text: "Don't have an account? ",
+                                  style: TextStyle(
+                                    color: Colors.black54,
+                                    fontSize: 14,
+                                  ),
+                                  children: [
+                                    TextSpan(
+                                      text: "Register",
+                                      style: TextStyle(
+                                        color: Colors.black,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
                           ),
                         ],
                       ),

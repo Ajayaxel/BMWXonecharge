@@ -370,6 +370,7 @@ class _VehicleSelectionState extends State<VehicleSelection> {
                       BlocBuilder<VehicleModelBloc, VehicleModelState>(
                         builder: (context, state) {
                           List<VehicleModel> filteredModels = [];
+
                           if (state is VehicleModelLoaded) {
                             filteredModels = state.models.where((model) {
                               // Filter by brand
@@ -384,7 +385,18 @@ class _VehicleSelectionState extends State<VehicleSelection> {
                                     searchController.text.toLowerCase(),
                                   );
 
-                              return matchesBrand && matchesSearch;
+                              // Filter by vehicle type (Sedan/SUV)
+                              bool matchesType = false;
+                              if (model.vehicleCategory != null) {
+                                // Compare backend category with selected type (case-insensitive)
+                                matchesType =
+                                    model.vehicleCategory!.name.toLowerCase() ==
+                                    selectedVehicleType.toLowerCase();
+                              }
+
+                              return matchesBrand &&
+                                  matchesSearch &&
+                                  matchesType;
                             }).toList();
                           }
 
@@ -551,29 +563,54 @@ class _VehicleSelectionState extends State<VehicleSelection> {
                                                   right: 0,
                                                   bottom: 5,
                                                   top: 5,
-                                                  child: Image.network(
-                                                    vehicle.image,
-                                                    fit: BoxFit.contain,
-                                                    height: 142,
-                                                    errorBuilder:
-                                                        (
-                                                          context,
-                                                          error,
-                                                          stackTrace,
-                                                        ) {
-                                                          // Fallback to icon if image not found
-                                                          return Center(
-                                                            child: Icon(
-                                                              Icons
-                                                                  .directions_car,
-                                                              size: 80,
-                                                              color: Colors
-                                                                  .grey
-                                                                  .shade400,
-                                                            ),
-                                                          );
-                                                        },
-                                                  ),
+                                                  child:
+                                                      vehicle.image.startsWith(
+                                                        'http',
+                                                      )
+                                                      ? Image.network(
+                                                          vehicle.image,
+                                                          fit: BoxFit.contain,
+                                                          height: 142,
+                                                          errorBuilder:
+                                                              (
+                                                                context,
+                                                                error,
+                                                                stackTrace,
+                                                              ) {
+                                                                return Center(
+                                                                  child: Icon(
+                                                                    Icons
+                                                                        .directions_car,
+                                                                    size: 80,
+                                                                    color: Colors
+                                                                        .grey
+                                                                        .shade400,
+                                                                  ),
+                                                                );
+                                                              },
+                                                        )
+                                                      : Image.asset(
+                                                          vehicle.image,
+                                                          fit: BoxFit.contain,
+                                                          height: 142,
+                                                          errorBuilder:
+                                                              (
+                                                                context,
+                                                                error,
+                                                                stackTrace,
+                                                              ) {
+                                                                return Center(
+                                                                  child: Icon(
+                                                                    Icons
+                                                                        .directions_car,
+                                                                    size: 80,
+                                                                    color: Colors
+                                                                        .grey
+                                                                        .shade400,
+                                                                  ),
+                                                                );
+                                                              },
+                                                        ),
                                                 ),
                                               ],
                                             ),

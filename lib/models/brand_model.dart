@@ -17,10 +17,10 @@ class Brand extends Equatable {
 
   factory Brand.fromJson(Map<String, dynamic> json) {
     return Brand(
-      id: json['id'],
-      name: json['name'],
-      vehicleTypeId: json['vehicle_type_id'],
-      image: json['image'],
+      id: json['id'] ?? 0,
+      name: json['name'] ?? '',
+      vehicleTypeId: json['vehicle_type_id'] ?? 0,
+      image: json['image'] ?? '',
       vehicleType: json['vehicle_type'] != null
           ? VehicleType.fromJson(json['vehicle_type'])
           : null,
@@ -38,7 +38,7 @@ class VehicleType extends Equatable {
   const VehicleType({required this.id, required this.name});
 
   factory VehicleType.fromJson(Map<String, dynamic> json) {
-    return VehicleType(id: json['id'], name: json['name']);
+    return VehicleType(id: json['id'] ?? 0, name: json['name'] ?? '');
   }
 
   @override

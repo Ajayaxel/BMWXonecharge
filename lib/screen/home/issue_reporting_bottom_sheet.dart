@@ -57,7 +57,7 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
   final List<File> _selectedFiles = [];
   OverlayEntry? _toastEntry;
   IssueSubType? _selectedChargeUnit;
-  String _selectedPaymentMethod = "online"; // "online" or "cod"
+  String _selectedPaymentMethod = "cod"; // "online" or "cod"
 
   @override
   void initState() {
