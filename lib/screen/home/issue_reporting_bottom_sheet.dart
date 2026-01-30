@@ -937,8 +937,10 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
 
                     if (_selectedCategoryObj != null &&
                         _selectedCategoryObj!.subTypes.isNotEmpty) ...[
-                      const Text(
-                        "Select charge Unit",
+                      Text(
+                        _selectedCategoryObj?.id == 6
+                            ? "Quick Services"
+                            : "Select charge Unit",
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w500,
@@ -955,7 +957,7 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
                               crossAxisCount: 2,
                               crossAxisSpacing: 12,
                               mainAxisSpacing: 12,
-                              mainAxisExtent: 140,
+                              mainAxisExtent: 170,
                             ),
                         padding: EdgeInsets.zero,
                         itemCount: _selectedCategoryObj!.subTypes.length,
@@ -970,7 +972,7 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
                       if (_selectedCategoryObj?.id == 6) ...[
                         const SizedBox(height: 16),
                         Text(
-                          "Describe your issue (Required)",
+                          "Describe your issue",
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
@@ -983,17 +985,12 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: _issueController.text.trim().isEmpty
-                                  ? Colors.red
-                                  : const Color(0xFFE0E0E0),
-                            ),
+                            border: Border.all(color: const Color(0xFFE0E0E0)),
                           ),
                           child: TextField(
                             controller: _issueController,
                             decoration: const InputDecoration(
-                              hintText:
-                                  "Type your issue (Required for Other category)",
+                              hintText: "Type your issue",
                               hintStyle: TextStyle(
                                 color: Color(0xFFBDBDBD),
                                 fontFamily: 'Lufga',
@@ -1012,10 +1009,8 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
                         ),
                       ],
                     ] else ...[
-                      Text(
-                        _selectedCategoryObj?.id == 6
-                            ? "Describe your issue (Required)"
-                            : "Describe your issue",
+                      const Text(
+                        "Describe your issue",
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
@@ -1028,20 +1023,12 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color:
-                                _selectedCategoryObj?.id == 6 &&
-                                    _issueController.text.trim().isEmpty
-                                ? Colors.red
-                                : const Color(0xFFE0E0E0),
-                          ),
+                          border: Border.all(color: const Color(0xFFE0E0E0)),
                         ),
                         child: TextField(
                           controller: _issueController,
                           decoration: InputDecoration(
-                            hintText: _selectedCategoryObj?.id == 6
-                                ? "Type your issue (Required for Other category)"
-                                : "Type your issue",
+                            hintText: "Type your issue",
                             hintStyle: const TextStyle(
                               color: Color(0xFFBDBDBD),
                               fontFamily: 'Lufga',
@@ -1470,16 +1457,13 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
     }
 
     // Check if "Other" category requires description
-    if (_selectedCategoryObj?.id == 6) {
-      if (_issueController.text.trim().isEmpty) {
-        _showToast("Please provide a description for 'Other' category");
-        return;
-      }
-      if (_selectedFiles.isEmpty) {
-        _showToast("Please upload issue images for 'Other' category");
-        return;
-      }
-    }
+    // Check if "Other" category requires description
+    // if (_selectedCategoryObj?.id == 6) {
+    //   if (_selectedFiles.isEmpty) {
+    //     _showToast("Please upload issue images for 'Other' category");
+    //     return;
+    //   }
+    // }
 
     // Validate submodel if category has subTypes
     if (_selectedCategoryObj != null &&
@@ -1531,6 +1515,17 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
     }
   }
 
+  String _getQuickServiceIcon(String name) {
+    if (name.toLowerCase().contains('unlock')) {
+      return 'assets/icon/Unlock.png';
+    } else if (name.toLowerCase().contains('replacement')) {
+      return 'assets/icon/batteryreplacemnanet.png';
+    } else if (name.toLowerCase().contains('booster')) {
+      return 'assets/icon/batteryboost.png';
+    }
+    return '';
+  }
+
   Widget _buildChargeUnitCard(IssueSubType subType, bool isSelected) {
     return GestureDetector(
       onTap: () {
@@ -1568,8 +1563,15 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
                 color: Colors.black,
                 shape: BoxShape.circle,
               ),
-              child: const Center(
-                child: Icon(Icons.power, color: Colors.white, size: 24),
+              child: Center(
+                child: _getQuickServiceIcon(subType.name ?? '').isNotEmpty
+                    ? Image.asset(
+                        _getQuickServiceIcon(subType.name ?? ''),
+                        width: 24,
+                        height: 24,
+                        color: Colors.white,
+                      )
+                    : const Icon(Icons.power, color: Colors.white, size: 24),
               ),
             ),
           ],
