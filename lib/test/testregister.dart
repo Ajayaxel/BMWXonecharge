@@ -9,6 +9,7 @@ import 'package:onecharge/models/register_model.dart';
 import 'package:onecharge/screen/login/user_info.dart';
 import 'package:onecharge/screen/login/otp_verification_screen.dart';
 import 'package:onecharge/test/testlogin.dart';
+import 'package:intl_phone_field/intl_phone_field.dart';
 
 class Testregister extends StatefulWidget {
   const Testregister({super.key});
@@ -30,6 +31,7 @@ class _TestregisterState extends State<Testregister> {
   bool _obscureConfirmPassword = true;
 
   OverlayEntry? _overlayEntry;
+  String _selectedCountryCode = '+91';
 
   @override
   void dispose() {
@@ -50,7 +52,7 @@ class _TestregisterState extends State<Testregister> {
     final registerRequest = RegisterRequest(
       name: _nameController.text.trim(),
       email: _emailController.text.trim(),
-      phone: _phoneController.text.trim(),
+      phone: _selectedCountryCode + _phoneController.text.trim(),
       password: _passwordController.text,
       passwordConfirmation: _confirmPasswordController.text,
     );
@@ -269,20 +271,52 @@ class _TestregisterState extends State<Testregister> {
                               const SizedBox(height: 16),
 
                               // Phone Field
-                              TextFormField(
+                              IntlPhoneField(
                                 controller: _phoneController,
-                                keyboardType: TextInputType.phone,
-                                textInputAction: TextInputAction.next,
-                                validator: (value) {
-                                  if (value == null || value.isEmpty) {
-                                    return 'Please enter your phone';
+                                initialCountryCode: 'IN',
+                                disableLengthCheck: true,
+                                decoration: InputDecoration(
+                                  hintText: "Enter your phone",
+                                  hintStyle: const TextStyle(
+                                    color: Color(0xffB8B9BD),
+                                  ),
+                                  border: OutlineInputBorder(
+                                    borderSide: const BorderSide(
+                                      color: Color(0xffE4E4E4),
+                                    ),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderSide: const BorderSide(
+                                      color: Color(0xffE4E4E4),
+                                    ),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderSide: const BorderSide(
+                                      color: Colors.black,
+                                    ),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  errorBorder: OutlineInputBorder(
+                                    borderSide: const BorderSide(
+                                      color: Colors.red,
+                                    ),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                                onCountryChanged: (country) {
+                                  setState(() {
+                                    _selectedCountryCode =
+                                        '+${country.dialCode}';
+                                  });
+                                },
+                                validator: (phone) {
+                                  if (phone == null || phone.number.isEmpty) {
+                                    return "Phone is required";
                                   }
                                   return null;
                                 },
-                                decoration: _buildInputDecoration(
-                                  'Enter your phone',
-                                  Icons.phone_outlined,
-                                ),
                               ),
                               const SizedBox(height: 16),
 
