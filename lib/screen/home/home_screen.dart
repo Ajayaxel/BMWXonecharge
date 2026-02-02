@@ -25,6 +25,8 @@ import 'package:onecharge/screen/notification/notification_screen.dart';
 import 'package:onecharge/core/storage/token_storage.dart';
 import 'package:onecharge/screen/home/my_location_screen.dart';
 import 'package:onecharge/models/location_model.dart';
+import 'package:onecharge/logic/blocs/location/location_bloc.dart';
+import 'package:onecharge/logic/blocs/location/location_state.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -164,7 +166,6 @@ class HomeScreenState extends State<HomeScreen> {
       builder: (context) => Positioned(
         top: MediaQuery.of(context).padding.top + 20,
         right: 20,
-        left: 20,
         child: Material(
           color: Colors.transparent,
           child: TweenAnimationBuilder<double>(
@@ -599,333 +600,342 @@ class HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        bottom: false,
-        child: Stack(
-          children: [
-            SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 10),
-                  // Top Header
-                  Row(
-                    children: [
-                      GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const SettingsScreen(),
-                            ),
-                          );
-                        },
-                        child: const CircleAvatar(
-                          radius: 25,
-                          backgroundImage: NetworkImage(
-                            'https://plus.unsplash.com/premium_photo-1689568126014-06fea9d5d341?fm=jpg&q=60&w=3000&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MXx8cHJvZmlsZXxlbnwwfHwwfHx8MA%3D%3D',
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            BlocBuilder<AuthBloc, AuthState>(
-                              builder: (context, state) {
-                                String name = _userName;
-                                if (state is AuthSuccess) {
-                                  name = state.loginResponse.customer.name
-                                      .split(' ')[0];
-                                }
-                                return Text(
-                                  'Hi $name',
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w600,
-                                    fontFamily: 'Lufga',
-                                    color: Colors.black,
-                                  ),
-                                );
-                              },
-                            ),
-                            const SizedBox(height: 2),
-                            GestureDetector(
-                              onTap: () async {
-                                final result =
-                                    await Navigator.push<LocationModel>(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            const MyLocationScreen(
-                                              isPicker: true,
-                                            ),
-                                      ),
-                                    );
-                                if (result != null) {
-                                  setState(() {
-                                    currentAddress = result.address;
-                                    _currentLatitude = result.latitude;
-                                    _currentLongitude = result.longitude;
-                                  });
-                                }
-                              },
-                              child: Row(
-                                children: [
-                                  const Icon(
-                                    Icons.location_on,
-                                    color: Color.fromARGB(255, 23, 23, 23),
-                                    size: 14,
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Expanded(
-                                    child: Text(
-                                      currentAddress,
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        color: const Color(
-                                          0xFF1D1B20,
-                                        ).withOpacity(0.6),
-                                        fontFamily: 'Lufga',
-                                        fontWeight: FontWeight.w400,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                      maxLines: 1,
-                                    ),
-                                  ),
-                                ],
+    return BlocListener<LocationBloc, LocationState>(
+      listener: (context, state) {
+        if (state is LocationAdded) {
+          showToast('Location added successfully');
+        }
+      },
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: SafeArea(
+          bottom: false,
+          child: Stack(
+            children: [
+              SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 10),
+                    // Top Header
+                    Row(
+                      children: [
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const SettingsScreen(),
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const NotificationScreen(),
-                            ),
-                          );
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: const BoxDecoration(
-                            color: Color(0xffF5F5F5),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.notifications_none_outlined,
-                            size: 28,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  // Search Bar
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xffF5F5F5),
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                    child: TextField(
-                      controller: _searchController,
-                      onChanged: (value) {
-                        setState(() {
-                          _searchQuery = value.toLowerCase();
-                        });
-                      },
-                      decoration: const InputDecoration(
-                        hintText: 'Search for any services',
-                        hintStyle: TextStyle(
-                          color: Color(0xffB8B9BD),
-                          fontSize: 14,
-                          fontFamily: 'Lufga',
-                        ),
-                        icon: Icon(Icons.search, color: Colors.grey),
-                        border: InputBorder.none,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  // Banner
-                  Stack(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: Image.asset(
-                          'assets/home/bannerBG.png',
-                          width: double.infinity,
-                          height: 180,
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                      Positioned(
-                        top: 20,
-                        left: 20,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Save 30% off\nfirst 2 booking',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.w500,
-                                fontFamily: 'Lufga',
-                                height: 1.2,
-                              ),
-                            ),
-                            const SizedBox(height: 5),
-                            const Text(
-                              'USECODE 125MND',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontFamily: 'Lufga',
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Our Services',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      fontFamily: 'Lufga',
-                      color: Colors.black,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  // Services Grid
-                  BlocBuilder<IssueCategoryBloc, IssueCategoryState>(
-                    builder: (context, state) {
-                      if (state is IssueCategoryLoading) {
-                        return LayoutBuilder(
-                          builder: (context, constraints) {
-                            final double cardWidth =
-                                (constraints.maxWidth - 13) / 2;
-                            return Wrap(
-                              spacing: 13,
-                              runSpacing: 13,
-                              children: List.generate(6, (index) {
-                                return _buildShimmerServiceCard(cardWidth);
-                              }),
                             );
                           },
-                        );
-                      } else if (state is IssueCategoryError) {
-                        return Center(child: Text('Error: ${state.message}'));
-                      } else if (state is IssueCategoryLoaded) {
-                        // Filter out 'Other' if it exists in the API list to avoid duplication
-                        // Also filter out categories with null names
-                        var categories = state.categories
-                            .where(
-                              (c) =>
-                                  c.name != null &&
-                                  c.name!.toLowerCase() != 'other',
-                            )
-                            .toList();
-
-                        if (_searchQuery.isNotEmpty) {
-                          categories = categories
-                              .where(
-                                (c) => (c.name ?? '').toLowerCase().contains(
-                                  _searchQuery,
+                          child: const CircleAvatar(
+                            radius: 25,
+                            backgroundImage: NetworkImage(
+                              'https://plus.unsplash.com/premium_photo-1689568126014-06fea9d5d341?fm=jpg&q=60&w=3000&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MXx8cHJvZmlsZXxlbnwwfHwwfHx8MA%3D%3D',
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              BlocBuilder<AuthBloc, AuthState>(
+                                builder: (context, state) {
+                                  String name = _userName;
+                                  if (state is AuthSuccess) {
+                                    name = state.loginResponse.customer.name
+                                        .split(' ')[0];
+                                  }
+                                  return Text(
+                                    'Hi $name',
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w600,
+                                      fontFamily: 'Lufga',
+                                      color: Colors.black,
+                                    ),
+                                  );
+                                },
+                              ),
+                              const SizedBox(height: 2),
+                              GestureDetector(
+                                onTap: () async {
+                                  final result =
+                                      await Navigator.push<LocationModel>(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              const MyLocationScreen(
+                                                isPicker: true,
+                                              ),
+                                        ),
+                                      );
+                                  if (result != null) {
+                                    setState(() {
+                                      currentAddress = result.address;
+                                      _currentLatitude = result.latitude;
+                                      _currentLongitude = result.longitude;
+                                    });
+                                  }
+                                },
+                                child: Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.location_on,
+                                      color: Color.fromARGB(255, 23, 23, 23),
+                                      size: 14,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        currentAddress,
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: const Color(
+                                            0xFF1D1B20,
+                                          ).withOpacity(0.6),
+                                          fontFamily: 'Lufga',
+                                          fontWeight: FontWeight.w400,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                        maxLines: 1,
+                                      ),
+                                    ),
+                                  ],
                                 ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    const NotificationScreen(),
+                              ),
+                            );
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: const BoxDecoration(
+                              color: Color(0xffF5F5F5),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.notifications_none_outlined,
+                              size: 28,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    // Search Bar
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xffF5F5F5),
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: TextField(
+                        controller: _searchController,
+                        onChanged: (value) {
+                          setState(() {
+                            _searchQuery = value.toLowerCase();
+                          });
+                        },
+                        decoration: const InputDecoration(
+                          hintText: 'Search for any services',
+                          hintStyle: TextStyle(
+                            color: Color(0xffB8B9BD),
+                            fontSize: 14,
+                            fontFamily: 'Lufga',
+                          ),
+                          icon: Icon(Icons.search, color: Colors.grey),
+                          border: InputBorder.none,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Banner
+                    Stack(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.asset(
+                            'assets/home/bannerBG.png',
+                            width: double.infinity,
+                            height: 180,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                        Positioned(
+                          top: 20,
+                          left: 20,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Save 30% off\nfirst 2 booking',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w500,
+                                  fontFamily: 'Lufga',
+                                  height: 1.2,
+                                ),
+                              ),
+                              const SizedBox(height: 5),
+                              const Text(
+                                'USECODE 125MND',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontFamily: 'Lufga',
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Our Services',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Lufga',
+                        color: Colors.black,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Services Grid
+                    BlocBuilder<IssueCategoryBloc, IssueCategoryState>(
+                      builder: (context, state) {
+                        if (state is IssueCategoryLoading) {
+                          return LayoutBuilder(
+                            builder: (context, constraints) {
+                              final double cardWidth =
+                                  (constraints.maxWidth - 13) / 2;
+                              return Wrap(
+                                spacing: 13,
+                                runSpacing: 13,
+                                children: List.generate(6, (index) {
+                                  return _buildShimmerServiceCard(cardWidth);
+                                }),
+                              );
+                            },
+                          );
+                        } else if (state is IssueCategoryError) {
+                          return Center(child: Text('Error: ${state.message}'));
+                        } else if (state is IssueCategoryLoaded) {
+                          // Filter out 'Other' if it exists in the API list to avoid duplication
+                          // Also filter out categories with null names
+                          var categories = state.categories
+                              .where(
+                                (c) =>
+                                    c.name != null &&
+                                    c.name!.toLowerCase() != 'other',
                               )
                               .toList();
-                        }
 
-                        return LayoutBuilder(
-                          builder: (context, constraints) {
-                            final double cardWidth =
-                                (constraints.maxWidth - 13) / 2;
-                            return Wrap(
-                              spacing: 13,
-                              runSpacing: 13,
-                              children: [
-                                ...List.generate(categories.length, (index) {
-                                  final category = categories[index];
-                                  final categoryName =
-                                      category.name ?? 'Unknown';
-                                  return _buildServiceCard(
-                                    index,
-                                    categoryName,
-                                    _getCategoryIcon(categoryName),
+                          if (_searchQuery.isNotEmpty) {
+                            categories = categories
+                                .where(
+                                  (c) => (c.name ?? '').toLowerCase().contains(
+                                    _searchQuery,
+                                  ),
+                                )
+                                .toList();
+                          }
+
+                          return LayoutBuilder(
+                            builder: (context, constraints) {
+                              final double cardWidth =
+                                  (constraints.maxWidth - 13) / 2;
+                              return Wrap(
+                                spacing: 13,
+                                runSpacing: 13,
+                                children: [
+                                  ...List.generate(categories.length, (index) {
+                                    final category = categories[index];
+                                    final categoryName =
+                                        category.name ?? 'Unknown';
+                                    return _buildServiceCard(
+                                      index,
+                                      categoryName,
+                                      _getCategoryIcon(categoryName),
+                                      cardWidth,
+                                    );
+                                  }),
+                                  _buildServiceCard(
+                                    categories.length,
+                                    'Other',
+                                    '',
                                     cardWidth,
-                                  );
-                                }),
-                                _buildServiceCard(
-                                  categories.length,
-                                  'Other',
-                                  '',
-                                  cardWidth,
-                                ),
-                              ],
-                            );
-                          },
-                        );
-                      }
-                      return const SizedBox();
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                ],
-              ),
-            ),
-            if (_currentServiceStage != 'none')
-              ServiceNotificationOverlay(
-                stage: _currentServiceStage,
-                progress: _serviceProgress,
-                ticket: _currentTicket,
-                onDismiss: () {
-                  setState(() {
-                    _currentServiceStage = 'none';
-                    _serviceTimer?.cancel();
-                    _currentTicket = null;
-                  });
-                },
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => TrackingMapScreen(
-                        stage: _currentServiceStage,
-                        progress: _serviceProgress,
-                      ),
+                                  ),
+                                ],
+                              );
+                            },
+                          );
+                        }
+                        return const SizedBox();
+                      },
                     ),
-                  );
-                },
-                onSolved: () {
-                  final ticketId = _currentTicket?.id;
-                  setState(() {
-                    _currentServiceStage = 'none';
-                    _serviceTimer?.cancel();
-                    _currentTicket = null;
-                  });
-                  showModalBottomSheet(
-                    context: context,
-                    isScrollControlled: true,
-                    backgroundColor: Colors.transparent,
-                    builder: (context) =>
-                        ServiceSummaryBottomSheet(ticketId: ticketId),
-                  );
-                },
+                    const SizedBox(height: 20),
+                  ],
+                ),
               ),
-          ],
+              if (_currentServiceStage != 'none')
+                ServiceNotificationOverlay(
+                  stage: _currentServiceStage,
+                  progress: _serviceProgress,
+                  ticket: _currentTicket,
+                  onDismiss: () {
+                    showToast("Our customer support will contact you shortly");
+                    setState(() {
+                      _currentServiceStage = 'none';
+                      _serviceTimer?.cancel();
+                      _currentTicket = null;
+                    });
+                  },
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => TrackingMapScreen(
+                          stage: _currentServiceStage,
+                          progress: _serviceProgress,
+                        ),
+                      ),
+                    );
+                  },
+                  onSolved: () {
+                    final ticketId = _currentTicket?.id;
+                    setState(() {
+                      _currentServiceStage = 'none';
+                      _serviceTimer?.cancel();
+                      _currentTicket = null;
+                    });
+                    showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (context) =>
+                          ServiceSummaryBottomSheet(ticketId: ticketId),
+                    );
+                  },
+                ),
+            ],
+          ),
         ),
       ),
     );

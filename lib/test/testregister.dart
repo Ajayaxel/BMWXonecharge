@@ -10,6 +10,7 @@ import 'package:onecharge/screen/login/user_info.dart';
 import 'package:onecharge/screen/login/otp_verification_screen.dart';
 import 'package:onecharge/test/testlogin.dart';
 import 'package:intl_phone_field/intl_phone_field.dart';
+import 'package:intl_phone_field/country_picker_dialog.dart';
 
 class Testregister extends StatefulWidget {
   const Testregister({super.key});
@@ -141,7 +142,10 @@ class _TestregisterState extends State<Testregister> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => OtpVerificationScreen(email: state.email),
+              builder: (_) => OtpVerificationScreen(
+                email: state.email,
+                isTestRegister: true,
+              ),
             ),
           );
         } else if (state is AuthError) {
@@ -273,7 +277,10 @@ class _TestregisterState extends State<Testregister> {
                               // Phone Field
                               IntlPhoneField(
                                 controller: _phoneController,
-                                initialCountryCode: 'IN',
+                                initialCountryCode: 'AE',
+                                pickerDialogStyle: PickerDialogStyle(
+                                  backgroundColor: Colors.white,
+                                ),
                                 disableLengthCheck: true,
                                 decoration: InputDecoration(
                                   hintText: "Enter your phone",

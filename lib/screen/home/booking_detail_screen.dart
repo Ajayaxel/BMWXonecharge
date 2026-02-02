@@ -93,12 +93,19 @@ class BookingDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // ... variable declarations ...
+    // Variable mappings based on Ticket model
     final invoice = ticket.invoice;
     final driverName = ticket.driver?.name ?? '-';
-    // ... existing variable logic ...
+    // Use ticketId as Order ID
     final orderId = ticket.ticketId;
-    final serviceName = ticket.issueCategory?.name ?? '-';
+
+    // Service name with sub-type if available
+    final serviceName = ticket.issueCategory?.name != null
+        ? (ticket.issueCategorySubType?.name != null
+              ? '${ticket.issueCategory!.name} (${ticket.issueCategorySubType!.name})'
+              : ticket.issueCategory!.name!)
+        : '-';
+
     final location = ticket.location ?? '-';
 
     String bookingTime = '-';
@@ -121,14 +128,30 @@ class BookingDetailScreen extends StatelessWidget {
       }
     }
 
-    final totalAmount = invoice != null
-        ? '${invoice.currency} ${invoice.totalAmount.toStringAsFixed(2)}'
-        : '-';
-    final trnNumber = invoice?.invoiceNumber != null
-        ? '#${invoice!.invoiceNumber}'
-        : '-';
+    final subType = ticket.issueCategorySubType;
+    final serviceCost = subType?.serviceCost ?? 0.0;
+    final serviceCharge = subType?.serviceCharge ?? 0.0;
+    final vat = subType?.vat ?? 0.0;
+    final calculatedTotal = serviceCost + serviceCharge + vat;
+    final currency = invoice?.currency ?? 'AED';
+
+    // final totalAmount = invoice != null
+    //     ? '${invoice.currency} ${invoice.totalAmount.toStringAsFixed(2)}'
+    //     : '-';
+    // final trnNumber = invoice?.invoiceNumber != null
+    //     ? '#${invoice!.invoiceNumber}'
+    //     : '-';
+
     final paymentMethod = ticket.paymentMethod ?? '-';
-    final paymentStatus = (ticket.status ?? 'Pending');
+    String formattedPaymentMethod = '-';
+    if (paymentMethod != '-' && paymentMethod.isNotEmpty) {
+      formattedPaymentMethod =
+          paymentMethod[0].toUpperCase() + paymentMethod.substring(1);
+    }
+
+    final paymentStatus = ticket.status != null
+        ? ticket.status![0].toUpperCase() + ticket.status!.substring(1)
+        : 'Pending';
 
     return BlocListener<TicketBloc, TicketState>(
       listener: (context, state) {
@@ -190,8 +213,8 @@ class BookingDetailScreen extends StatelessWidget {
               _buildSectionHeader('Details'),
               _buildDetailRow('Agent Name', driverName),
               _buildDetailRow('Order ID', orderId),
-              _buildDetailRow('Model', '-'),
-              _buildDetailRow('Number', '-'),
+              // _buildDetailRow('Model', '-'),
+              // _buildDetailRow('Number', '-'),
               const SizedBox(height: 10),
               _buildSectionHeader('Details'),
               _buildDetailRow('Service', serviceName),
@@ -204,17 +227,28 @@ class BookingDetailScreen extends StatelessWidget {
                     : '-',
               ),
               _buildDetailRow('Location', location, isMultiLine: true),
-              _buildDetailRow('Number', '-'),
+
               const SizedBox(height: 10),
               _buildSectionHeader('Payment Details'),
-              _buildDetailRow('Total Amount', totalAmount),
-              _buildDetailRow('TRN Number', trnNumber),
+              _buildDetailRow(
+                'Service Cost',
+                '$currency ${serviceCost.toStringAsFixed(2)}',
+              ),
+              _buildDetailRow(
+                'Service Charge',
+                '$currency ${serviceCharge.toStringAsFixed(2)}',
+              ),
+              _buildDetailRow('VAT', '$currency ${vat.toStringAsFixed(2)}'),
+              _buildDetailRow(
+                'Total Amount',
+                '$currency ${calculatedTotal.toStringAsFixed(2)}',
+              ),
               _buildDetailRow(
                 'Payment Method',
-                paymentMethod,
+                formattedPaymentMethod,
                 isMultiLine: true,
               ),
-              _buildDetailRow('Payment Status', paymentStatus),
+              // _buildDetailRow('Payment Status', paymentStatus),
               const SizedBox(height: 40),
             ],
           ),

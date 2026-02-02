@@ -118,14 +118,14 @@ class _MyLocationScreenState extends State<MyLocationScreen> {
     );
 
     if (result != null && result is LocationModel) {
+      if (mounted) {
+        context.read<LocationBloc>().add(AddLocation(result));
+      }
       if (widget.isPicker) {
         // If we are in picker mode and just added a new location,
         // return it immediately
         if (mounted) Navigator.pop(context, result);
         return;
-      }
-      if (mounted) {
-        context.read<LocationBloc>().add(AddLocation(result));
       }
     }
   }

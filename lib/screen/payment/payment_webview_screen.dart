@@ -31,20 +31,35 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageStarted: (String url) {
+            print('Payment WebView URL: $url');
             setState(() {
               _isLoading = true;
             });
           },
           onPageFinished: (String url) {
+            print('Payment WebView Finished URL: $url');
             setState(() {
               _isLoading = false;
             });
-            
-            // Check if payment is successful (you may need to adjust this based on Paymob's redirect URLs)
-            if (url.contains('success') || url.contains('payment-success')) {
+
+            // Check based on standard Paymob redirection or query parameters
+            final uri = Uri.parse(url);
+            final success = uri.queryParameters['success'] == 'true';
+            final approved =
+                uri.queryParameters['txn_response_code'] == 'APPROVED';
+            // Some integrations use a 'success' part in the path or 'payment-success'
+            final pathContainsSuccess =
+                url.contains('success') || url.contains('payment-success');
+
+            if (success || approved || pathContainsSuccess) {
+              print('Payment Status: SUCCESS');
               _handlePaymentSuccess();
-            } else if (url.contains('cancel') || url.contains('payment-cancel')) {
+            } else if (url.contains('cancel') ||
+                url.contains('payment-cancel')) {
+              print('Payment Status: CANCELED');
               _handlePaymentCancel();
+            } else {
+              print('Payment Status: PENDING/UNKNOWN (Current URL: $url)');
             }
           },
           onWebResourceError: (WebResourceError error) {
@@ -91,11 +106,7 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
         children: [
           WebViewWidget(controller: _controller),
           if (_isLoading)
-            const Center(
-              child: CircularProgressIndicator(
-                color: Colors.black,
-              ),
-            ),
+            const Center(child: CircularProgressIndicator(color: Colors.black)),
         ],
       ),
     );

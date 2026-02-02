@@ -116,7 +116,6 @@ class _SelectPaymentBottomSheetState extends State<SelectPaymentBottomSheet> {
             onPressed: () {
               // Handle Paymob payment
               if (_selectedMethod == "paymob" && widget.paymentUrl != null) {
-                Navigator.pop(context);
                 Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -126,14 +125,17 @@ class _SelectPaymentBottomSheetState extends State<SelectPaymentBottomSheet> {
                     ),
                   ),
                 ).then((paymentSuccess) {
-                  if (paymentSuccess == true && mounted) {
-                    // Show success screen
-                    showModalBottomSheet(
-                      context: context,
-                      isScrollControlled: true,
-                      backgroundColor: Colors.transparent,
-                      builder: (context) => const SuccessBottomSheet(),
-                    );
+                  if (mounted) {
+                    Navigator.pop(context); // Close SelectPaymentBottomSheet
+                    if (paymentSuccess == true) {
+                      // Show success screen
+                      showModalBottomSheet(
+                        context: context,
+                        isScrollControlled: true,
+                        backgroundColor: Colors.transparent,
+                        builder: (context) => const SuccessBottomSheet(),
+                      );
+                    }
                   }
                 });
               } else {

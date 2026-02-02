@@ -5,6 +5,7 @@ import 'package:onecharge/screen/home/widgets/service_notification.dart';
 import 'dart:async';
 import 'dart:ui' as ui;
 import 'package:flutter/services.dart';
+import 'dart:math' as math;
 
 class TrackingMapScreen extends StatefulWidget {
   final String stage;
@@ -27,13 +28,85 @@ class _TrackingMapScreenState extends State<TrackingMapScreen> {
   Timer? _animTimer;
 
   static const LatLng _center = LatLng(25.2048, 55.2708); // User Location
-  static const LatLng _startPos = LatLng(
-    25.2158,
-    55.2858,
-  ); // Agent Start Location
+
+  static const List<LatLng> _routePath = [
+    LatLng(25.2158, 55.2858), // Start
+    LatLng(25.2145, 55.2840),
+    LatLng(25.2132, 55.2818),
+    LatLng(25.2115, 55.2795),
+    LatLng(25.2098, 55.2770),
+    LatLng(25.2082, 55.2748),
+    LatLng(25.2065, 55.2725),
+    LatLng(25.2048, 55.2708), // End
+  ];
 
   final Set<Marker> _markers = {};
   final Set<Polyline> _polylines = {};
+
+  double _getDistance(LatLng p1, LatLng p2) {
+    return math.sqrt(
+      math.pow(p1.latitude - p2.latitude, 2) +
+          math.pow(p1.longitude - p2.longitude, 2),
+    );
+  }
+
+  LatLng _calculatePosition(double progress) {
+    if (progress <= 0) return _routePath.first;
+    if (progress >= 1) return _routePath.last;
+
+    double totalDist = 0;
+    for (int i = 0; i < _routePath.length - 1; i++) {
+      totalDist += _getDistance(_routePath[i], _routePath[i + 1]);
+    }
+
+    double targetDist = totalDist * progress;
+    double currentDist = 0;
+
+    for (int i = 0; i < _routePath.length - 1; i++) {
+      double segmentDist = _getDistance(_routePath[i], _routePath[i + 1]);
+      if (currentDist + segmentDist >= targetDist) {
+        double segmentProgress = (targetDist - currentDist) / segmentDist;
+        return LatLng(
+          _routePath[i].latitude +
+              (_routePath[i + 1].latitude - _routePath[i].latitude) *
+                  segmentProgress,
+          _routePath[i].longitude +
+              (_routePath[i + 1].longitude - _routePath[i].longitude) *
+                  segmentProgress,
+        );
+      }
+      currentDist += segmentDist;
+    }
+    return _routePath.last;
+  }
+
+  List<LatLng> _getRemainingPath(LatLng currentPos) {
+    if (_currentProgress >= 1.0) return [_routePath.last];
+
+    List<LatLng> points = [currentPos];
+
+    double totalDist = 0;
+    for (int i = 0; i < _routePath.length - 1; i++) {
+      totalDist += _getDistance(_routePath[i], _routePath[i + 1]);
+    }
+    double targetDist = totalDist * _currentProgress;
+    double currentDist = 0;
+    int nextPointIndex = 1;
+
+    for (int i = 0; i < _routePath.length - 1; i++) {
+      double segmentDist = _getDistance(_routePath[i], _routePath[i + 1]);
+      if (currentDist + segmentDist >= targetDist) {
+        nextPointIndex = i + 1;
+        break;
+      }
+      currentDist += segmentDist;
+    }
+
+    for (int i = nextPointIndex; i < _routePath.length; i++) {
+      points.add(_routePath[i]);
+    }
+    return points;
+  }
 
   @override
   void initState() {
@@ -130,14 +203,8 @@ class _TrackingMapScreenState extends State<TrackingMapScreen> {
 
     final BitmapDescriptor blackMarker = await _getBlackCircleMarker();
 
-    // Current agent position interpolated by progress
-    final double lat =
-        _startPos.latitude +
-        (_center.latitude - _startPos.latitude) * _currentProgress;
-    final double lng =
-        _startPos.longitude +
-        (_center.longitude - _startPos.longitude) * _currentProgress;
-    final LatLng movingPos = LatLng(lat, lng);
+    // Current agent position interpolated by progress along the route
+    final LatLng movingPos = _calculatePosition(_currentProgress);
 
     // Add ambient cars
     final carPositions = [
@@ -183,18 +250,14 @@ class _TrackingMapScreenState extends State<TrackingMapScreen> {
   }
 
   void _addPolyline() {
-    final double lat =
-        _startPos.latitude +
-        (_center.latitude - _startPos.latitude) * _currentProgress;
-    final double lng =
-        _startPos.longitude +
-        (_center.longitude - _startPos.longitude) * _currentProgress;
+    final LatLng currentPos = _calculatePosition(_currentProgress);
+    final List<LatLng> pathPoints = _getRemainingPath(currentPos);
 
     _polylines.clear();
     _polylines.add(
       Polyline(
         polylineId: const PolylineId('path'),
-        points: [LatLng(lat, lng), _center],
+        points: pathPoints,
         color: Colors.black,
         width: 3,
       ),

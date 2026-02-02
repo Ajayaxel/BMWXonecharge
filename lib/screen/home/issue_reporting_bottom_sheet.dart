@@ -353,59 +353,6 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
     }
   }
 
-  String _getCategoryIcon(String name) {
-    final lowerName = name.toLowerCase();
-    if (lowerName.contains('station') || lowerName.contains('charge')) {
-      return 'assets/issue/Battery.png';
-    }
-    if (lowerName.contains('battery')) return 'assets/issue/lowbattery.png';
-    if (lowerName.contains('mechanical') || lowerName.contains('engine')) {
-      return 'assets/issue/mdi_mechanic.png';
-    }
-    if (lowerName.contains('tire') || lowerName.contains('tyre')) {
-      return 'assets/issue/roentgen_tyre.png';
-    }
-    if (lowerName.contains('tow') || lowerName.contains('pickup')) {
-      return 'assets/issue/truck-pickup.png';
-    }
-    return 'assets/issue/lowbattery.png'; // default
-  }
-
-  String _formatCategoryName(String name) {
-    // Handle special cases for better formatting
-    if (name.toLowerCase().contains('tow') &&
-        name.toLowerCase().contains('pickup')) {
-      return 'Tow / Pickup\nRequired';
-    }
-    if (name.toLowerCase().contains('charging') &&
-        name.toLowerCase().contains('station')) {
-      return 'Charging\nStation';
-    }
-    if (name.toLowerCase().contains('low') &&
-        name.toLowerCase().contains('battery')) {
-      return 'Low\nBattery';
-    }
-    if (name.toLowerCase().contains('mechanical')) {
-      return 'Mechanical\nIssue';
-    }
-    if (name.toLowerCase().contains('flat') &&
-        name.toLowerCase().contains('tyre')) {
-      return 'Flat\nTyre';
-    }
-    // For other names, try to split at reasonable points
-    if (name.contains(' ')) {
-      final parts = name.split(' ');
-      if (parts.length == 2) {
-        return '${parts[0]}\n${parts[1]}';
-      } else if (parts.length > 2) {
-        // Split at the middle point
-        final mid = parts.length ~/ 2;
-        return '${parts.sublist(0, mid).join(' ')}\n${parts.sublist(mid).join(' ')}';
-      }
-    }
-    return name;
-  }
-
   void _showSlotPicker(BuildContext context) {
     _showDatePicker(context);
   }
@@ -677,9 +624,9 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
                           child: const Icon(Icons.arrow_back_ios, size: 20),
                         ),
                         const SizedBox(width: 10),
-                        const Text(
-                          "Issue Reporting",
-                          style: TextStyle(
+                        Text(
+                          "$_selectedCategory Booking",
+                          style: const TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.w700,
                             fontFamily: 'Lufga',
@@ -688,30 +635,12 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 16),
 
                     // Categories Horizontal Scroll
                     BlocBuilder<IssueCategoryBloc, IssueCategoryState>(
                       builder: (context, state) {
-                        if (state is IssueCategoryLoading) {
-                          return const SizedBox(
-                            height: 141,
-                            child: Center(child: CircularProgressIndicator()),
-                          );
-                        } else if (state is IssueCategoryError) {
-                          return SizedBox(
-                            height: 141,
-                            child: Center(
-                              child: Text(
-                                'Error: ${state.message}',
-                                style: const TextStyle(
-                                  fontFamily: 'Lufga',
-                                  color: Colors.red,
-                                ),
-                              ),
-                            ),
-                          );
-                        } else if (state is IssueCategoryLoaded) {
+                        if (state is IssueCategoryLoaded) {
                           final categories = state.categories
                               .where((c) => c.name != null)
                               .toList();
@@ -740,96 +669,10 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
                               });
                             });
                           }
-
-                          return SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: Row(
-                              children: categories.map((cat) {
-                                final categoryName = cat.name ?? '';
-                                final isSelected =
-                                    _selectedCategory == categoryName;
-                                return GestureDetector(
-                                  onTap: () {
-                                    setState(() {
-                                      _selectedCategory = categoryName;
-                                      _selectedCategoryObj = cat;
-                                      if (cat.subTypes.isNotEmpty) {
-                                        _selectedChargeUnit =
-                                            cat.subTypes.first;
-                                      } else {
-                                        _selectedChargeUnit = null;
-                                      }
-                                    });
-                                  },
-                                  child: Container(
-                                    width: 164,
-                                    height: 141,
-                                    margin: const EdgeInsets.only(right: 10),
-                                    padding: const EdgeInsets.all(16),
-                                    decoration: BoxDecoration(
-                                      color: isSelected
-                                          ? Colors.black
-                                          : const Color(0xFFF7F7F7),
-                                      borderRadius: BorderRadius.circular(16),
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            _formatCategoryName(categoryName),
-                                            style: TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.w600,
-                                              fontFamily: 'Lufga',
-                                              color: isSelected
-                                                  ? Colors.white
-                                                  : Colors.black,
-                                            ),
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 8),
-                                        SizedBox(
-                                          width: 44,
-                                          height: 44,
-                                          child: Container(
-                                            decoration: BoxDecoration(
-                                              color: isSelected
-                                                  ? Colors.white
-                                                  : Colors.black,
-                                              shape: BoxShape.circle,
-                                            ),
-                                            child: Center(
-                                              child: Image.asset(
-                                                _getCategoryIcon(categoryName),
-                                                width: 24,
-                                                height: 24,
-                                                color: isSelected
-                                                    ? Colors.black
-                                                    : Colors.white,
-                                                fit: BoxFit.contain,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              }).toList(),
-                            ),
-                          );
                         }
-                        return const SizedBox(height: 141);
+                        return const SizedBox.shrink();
                       },
                     ),
-                    const SizedBox(height: 16),
-
                     const Text(
                       "Location",
                       style: TextStyle(
@@ -899,41 +742,48 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    BlocBuilder<TicketBloc, TicketState>(
-                      builder: (context, state) {
-                        return SizedBox(
-                          width: double.infinity,
-                          height: 52,
-                          child: OutlinedButton(
-                            onPressed: state is TicketLoading
-                                ? null
-                                : () => _submitTicket(isInstant: true),
-                            style: OutlinedButton.styleFrom(
-                              side: const BorderSide(
-                                color: Colors.black,
-                                width: 1.5,
+                    if (!(_selectedCategory.toLowerCase().contains(
+                          'charging',
+                        ) &&
+                        _selectedCategory.toLowerCase().contains(
+                          'station',
+                        ))) ...[
+                      BlocBuilder<TicketBloc, TicketState>(
+                        builder: (context, state) {
+                          return SizedBox(
+                            width: double.infinity,
+                            height: 52,
+                            child: OutlinedButton(
+                              onPressed: state is TicketLoading
+                                  ? null
+                                  : () => _submitTicket(isInstant: true),
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(
+                                  color: Colors.black,
+                                  width: 1.5,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                backgroundColor: Colors.white,
                               ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              backgroundColor: Colors.white,
-                            ),
-                            child: state is TicketLoading
-                                ? const CupertinoActivityIndicator()
-                                : const Text(
-                                    "Instant Booking",
-                                    style: TextStyle(
-                                      color: Colors.black,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w700,
-                                      fontFamily: 'Lufga',
+                              child: state is TicketLoading
+                                  ? const CupertinoActivityIndicator()
+                                  : const Text(
+                                      "Instant Booking",
+                                      style: TextStyle(
+                                        color: Colors.black,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w700,
+                                        fontFamily: 'Lufga',
+                                      ),
                                     ),
-                                  ),
-                          ),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 16),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                    ],
 
                     if (_selectedCategoryObj != null &&
                         _selectedCategoryObj!.subTypes.isNotEmpty) ...[

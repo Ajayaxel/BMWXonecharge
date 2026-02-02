@@ -7,13 +7,19 @@ import 'package:onecharge/logic/blocs/auth/auth_bloc.dart';
 import 'package:onecharge/logic/blocs/auth/auth_event.dart';
 import 'package:onecharge/logic/blocs/auth/auth_state.dart';
 
+import 'package:onecharge/screen/vehicle/vehicle_selection.dart';
 import 'package:onecharge/screen/login/phone_login.dart';
 import 'package:onecharge/test/testlogin.dart';
 
 class OtpVerificationScreen extends StatefulWidget {
   final String email;
+  final bool isTestRegister;
 
-  const OtpVerificationScreen({super.key, required this.email});
+  const OtpVerificationScreen({
+    super.key,
+    required this.email,
+    this.isTestRegister = false,
+  });
 
   @override
   State<OtpVerificationScreen> createState() => _OtpVerificationScreenState();
@@ -161,12 +167,19 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
       listener: (context, state) {
         if (state is AuthSuccess) {
           _showToast("Verification Successful!");
-          // Navigate to PhoneLogin instead of UserInfo
-          Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(builder: (_) => const Testlogin()),
-            (route) => false,
-          );
+          if (widget.isTestRegister) {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (_) => const VehicleSelection()),
+              (route) => false,
+            );
+          } else {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (_) => const Testlogin()),
+              (route) => false,
+            );
+          }
         } else if (state is AuthOtpResent) {
           _showToast("OTP Resent Successfully");
         } else if (state is AuthError) {
