@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:onecharge/logic/blocs/ticket/ticket_bloc.dart';
 import 'package:onecharge/logic/blocs/ticket/ticket_state.dart';
@@ -55,7 +56,7 @@ class _RecentBookingsScreenState extends State<RecentBookingsScreen> {
             current is TicketError,
         builder: (context, state) {
           if (state is TicketListLoading) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(child: CupertinoActivityIndicator());
           }
 
           if (state is TicketListLoaded) {

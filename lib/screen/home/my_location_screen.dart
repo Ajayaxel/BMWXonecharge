@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:onecharge/logic/blocs/location/location_bloc.dart';
 import 'package:onecharge/logic/blocs/location/location_event.dart';
@@ -178,7 +179,7 @@ class _MyLocationScreenState extends State<MyLocationScreen> {
         },
         builder: (context, state) {
           if (state is LocationLoading && state is! LocationsLoaded) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(child: CupertinoActivityIndicator());
           }
 
           List<LocationModel> locations = [];

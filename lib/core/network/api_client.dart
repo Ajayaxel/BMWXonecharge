@@ -59,13 +59,35 @@ class ApiClient {
   Future<Response> get(
     String path, {
     Map<String, dynamic>? queryParameters,
+    int retries = 3,
   }) async {
-    try {
-      final response = await _dio.get(path, queryParameters: queryParameters);
-      return response;
-    } on DioException catch (e) {
-      throw _handleError(e);
+    int attempt = 0;
+    while (attempt < retries) {
+      try {
+        final response = await _dio.get(path, queryParameters: queryParameters);
+        return response;
+      } on DioException catch (e) {
+        attempt++;
+        // Only retry on connection errors or timeouts
+        bool shouldRetry =
+            e.type == DioExceptionType.connectionError ||
+            e.type == DioExceptionType.connectionTimeout ||
+            e.type == DioExceptionType.receiveTimeout ||
+            e.type == DioExceptionType.sendTimeout ||
+            (e.type == DioExceptionType.unknown &&
+                e.message?.contains('Connection reset') == true);
+
+        if (attempt >= retries || !shouldRetry) {
+          throw _handleError(e);
+        }
+
+        // Wait before retrying (exponential backoff could be used here)
+        print('⚠️ [ApiClient] Request failed ($attempt/$retries). Retrying...');
+        await Future.delayed(Duration(milliseconds: 500 * attempt));
+      }
     }
+    // Should not be reached due to throw in loop
+    throw Exception('Failed to request $path after $retries attempts');
   }
 
   Future<Response> post(

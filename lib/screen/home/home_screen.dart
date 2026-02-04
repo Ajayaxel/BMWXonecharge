@@ -12,6 +12,7 @@ import 'package:geocoding/geocoding.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:onecharge/logic/blocs/issue_category/issue_category_bloc.dart';
 import 'package:onecharge/logic/blocs/issue_category/issue_category_state.dart';
+import 'package:onecharge/logic/blocs/issue_category/issue_category_event.dart';
 import 'package:onecharge/logic/blocs/auth/auth_bloc.dart';
 import 'package:onecharge/logic/blocs/auth/auth_state.dart';
 import 'package:onecharge/logic/blocs/vehicle_list/vehicle_list_bloc.dart';
@@ -166,6 +167,7 @@ class HomeScreenState extends State<HomeScreen> {
       builder: (context) => Positioned(
         top: MediaQuery.of(context).padding.top + 20,
         right: 20,
+        left: 20,
         child: Material(
           color: Colors.transparent,
           child: TweenAnimationBuilder<double>(
@@ -835,7 +837,49 @@ class HomeScreenState extends State<HomeScreen> {
                             },
                           );
                         } else if (state is IssueCategoryError) {
-                          return Center(child: Text('Error: ${state.message}'));
+                          return Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.wifi_off_rounded,
+                                  size: 40,
+                                  color: Colors.grey,
+                                ),
+                                const SizedBox(height: 12),
+                                const Text(
+                                  "Couldn't load services",
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    fontFamily: 'Lufga',
+                                    color: Colors.black,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  "Please check your internet connection",
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey.shade600,
+                                    fontFamily: 'Lufga',
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                SizedBox(
+                                  width: 120,
+                                  child: OneBtn(
+                                    text: "Retry",
+                                    onPressed: () {
+                                      context.read<IssueCategoryBloc>().add(
+                                        FetchIssueCategories(),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
                         } else if (state is IssueCategoryLoaded) {
                           // Filter out 'Other' if it exists in the API list to avoid duplication
                           // Also filter out categories with null names

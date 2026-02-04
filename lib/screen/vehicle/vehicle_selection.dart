@@ -16,6 +16,7 @@ import 'package:onecharge/logic/blocs/add_vehicle/add_vehicle_bloc.dart';
 import 'package:onecharge/logic/blocs/add_vehicle/add_vehicle_event.dart';
 import 'package:onecharge/logic/blocs/add_vehicle/add_vehicle_state.dart';
 import 'package:onecharge/screen/home/home_screen.dart';
+import 'package:onecharge/utils/toast_utils.dart';
 
 class VehicleSelection extends StatefulWidget {
   const VehicleSelection({super.key});
@@ -871,11 +872,17 @@ class _VehicleSelectionState extends State<VehicleSelection> {
                 BlocListener<AddVehicleBloc, AddVehicleState>(
                   listener: (context, state) {
                     if (state is AddVehicleError) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Error: ${state.message}'),
-                          backgroundColor: Colors.red,
-                        ),
+                      ToastUtils.showToast(
+                        context,
+                        state
+                            .message, // Removed string interpolation 'Error: ...' to be cleaner, or keep it if preferred. I'll keep it simple as message.
+                        isError: true,
+                      );
+                    } else if (state is AddVehicleSuccess) {
+                      Navigator.of(context).pop(); // Close input sheet
+                      _showFinalSuccessBottomSheet(
+                        vehicleNumberController.text,
+                        state.response,
                       );
                     }
                   },
@@ -892,22 +899,18 @@ class _VehicleSelectionState extends State<VehicleSelection> {
                                     .text
                                     .trim();
                                 if (vehicleNumber.isEmpty) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Please enter your vehicle number.',
-                                      ),
-                                    ),
+                                  ToastUtils.showToast(
+                                    context,
+                                    'Please enter your vehicle number.',
+                                    isError: true,
                                   );
                                   return;
                                 }
                                 if (selectedChargingType == null) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Please select a charging type.',
-                                      ),
-                                    ),
+                                  ToastUtils.showToast(
+                                    context,
+                                    'Please select a charging type.',
+                                    isError: true,
                                   );
                                   return;
                                 }
@@ -915,10 +918,10 @@ class _VehicleSelectionState extends State<VehicleSelection> {
                                 // Validate selected vehicle
                                 final currentVehicle = selectedVehicle;
                                 if (currentVehicle == null) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Please select a vehicle.'),
-                                    ),
+                                  ToastUtils.showToast(
+                                    context,
+                                    'Please select a vehicle.',
+                                    isError: true,
                                   );
                                   return;
                                 }
@@ -963,13 +966,6 @@ class _VehicleSelectionState extends State<VehicleSelection> {
                                 context.read<AddVehicleBloc>().add(
                                   AddVehicleRequested(request),
                                 );
-
-                                // Show loading bottom sheet
-                                Navigator.of(context).pop();
-                                _showSuccessBottomSheet(
-                                  vehicleNumber,
-                                  selectedChargingType!,
-                                );
                               },
                       );
                     },
@@ -989,83 +985,6 @@ class _VehicleSelectionState extends State<VehicleSelection> {
 
                 const SizedBox(height: 30),
               ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showSuccessBottomSheet(
-    String vehicleNumber,
-    ChargingType chargingType,
-  ) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => BlocListener<AddVehicleBloc, AddVehicleState>(
-        listener: (context, state) {
-          if (state is AddVehicleSuccess) {
-            // Close the bottom sheet when vehicle is successfully added
-            Navigator.of(context).pop();
-            _showFinalSuccessBottomSheet(vehicleNumber, state.response);
-          }
-        },
-        child: Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: Padding(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.of(context).viewInsets.bottom,
-              left: 16,
-              right: 16,
-              top: 16,
-            ),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  // Drag handle
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      margin: const EdgeInsets.only(bottom: 20),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade300,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-
-                  // Loading or Success message
-                  BlocBuilder<AddVehicleBloc, AddVehicleState>(
-                    builder: (context, state) {
-                      if (state is AddVehicleLoading) {
-                        return Column(
-                          children: [
-                            const CircularProgressIndicator(),
-                            const SizedBox(height: 16),
-                            const Text(
-                              "Adding your vehicle...",
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.black,
-                              ),
-                            ),
-                          ],
-                        );
-                      }
-                      return const SizedBox.shrink();
-                    },
-                  ),
-                ],
-              ),
             ),
           ),
         ),

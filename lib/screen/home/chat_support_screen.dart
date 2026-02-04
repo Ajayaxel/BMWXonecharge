@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:onecharge/logic/blocs/chat/chat_bloc.dart';
@@ -96,7 +97,7 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
           },
           builder: (context, state) {
             if (state is ChatLoading) {
-              return const Center(child: CircularProgressIndicator());
+              return const Center(child: CupertinoActivityIndicator());
             }
 
             if (state is ChatError) {

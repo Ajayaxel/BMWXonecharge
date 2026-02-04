@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:onecharge/const/onebtn.dart';
@@ -20,6 +21,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final TextEditingController _fullNameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
+  bool _isUpdateLoading = false;
 
   XFile? _imageFile;
   final ImagePicker _picker = ImagePicker();
@@ -56,9 +58,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     return BlocListener<ProfileBloc, ProfileState>(
       listener: (context, state) {
-        if (state is ProfileUpdated) {
+        if (state is ProfileUpdating) {
+          _isUpdateLoading = true;
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (BuildContext context) {
+              return Center(
+                child: Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.black,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const CupertinoActivityIndicator(
+                    color: Colors.white,
+                    radius: 15,
+                  ),
+                ),
+              );
+            },
+          );
+        } else if (state is ProfileUpdated) {
+          if (_isUpdateLoading) {
+            Navigator.of(context).pop();
+            _isUpdateLoading = false;
+          }
           ToastUtils.showToast(context, state.message);
         } else if (state is ProfileError) {
+          if (_isUpdateLoading) {
+            Navigator.of(context).pop();
+            _isUpdateLoading = false;
+          }
           ToastUtils.showToast(context, state.message, isError: true);
         }
       },
@@ -92,7 +123,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             builder: (context, state) {
               if (state is ProfileLoading && state is! ProfileUpdating) {
                 return const Center(
-                  child: CircularProgressIndicator(color: Colors.black),
+                  child: CupertinoActivityIndicator(color: Colors.black),
                 );
               }
 
@@ -245,9 +276,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   // Update Button
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                    child: isUpdating
-                        ? const CircularProgressIndicator(color: Colors.black)
-                        : OneBtn(onPressed: _updateProfile, text: 'Update'),
+                    child: OneBtn(
+                      onPressed: isUpdating ? () {} : _updateProfile,
+                      text: 'Update',
+                    ),
                   ),
                 ],
               );

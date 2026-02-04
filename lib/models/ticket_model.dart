@@ -230,7 +230,17 @@ class Ticket extends Equatable {
     List<String> attachments = [];
     try {
       if (json['attachments'] != null && json['attachments'] is List) {
-        attachments = List<String>.from(json['attachments']);
+        for (var item in json['attachments']) {
+          if (item is String) {
+            attachments.add(item);
+          } else if (item is Map) {
+            // Try to extract URL if attachment is an object
+            final url = item['url'] ?? item['file_url'] ?? item['path'];
+            if (url != null) {
+              attachments.add(url.toString());
+            }
+          }
+        }
       }
     } catch (e) {
       print('⚠️ [Ticket] Error parsing attachments: $e');

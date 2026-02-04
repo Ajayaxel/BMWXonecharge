@@ -6,7 +6,7 @@ import 'package:onecharge/logic/blocs/auth/auth_bloc.dart';
 import 'package:onecharge/logic/blocs/auth/auth_event.dart';
 import 'package:onecharge/logic/blocs/auth/auth_state.dart';
 import 'package:onecharge/models/login_model.dart';
-import 'package:onecharge/screen/login/user_info.dart';
+
 import 'package:onecharge/screen/vehicle/vehicle_selection.dart';
 import 'package:onecharge/test/testregister.dart';
 import 'package:onecharge/screen/login/otp_verification_screen.dart';
@@ -361,6 +361,8 @@ class _TestloginState extends State<Testlogin> {
                           Row(
                             children: [
                               Checkbox(
+                                checkColor: Colors.white,
+                                activeColor: Colors.black,
                                 value: _isChecked,
                                 onChanged: (value) {
                                   setState(() {

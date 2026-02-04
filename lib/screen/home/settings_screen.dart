@@ -16,6 +16,7 @@ import 'package:onecharge/logic/blocs/vehicle_list/vehicle_list_bloc.dart';
 import 'package:onecharge/logic/blocs/vehicle_list/vehicle_list_state.dart';
 import 'package:onecharge/logic/blocs/vehicle_list/vehicle_list_event.dart';
 import 'package:onecharge/models/vehicle_list_model.dart';
+import 'package:shimmer/shimmer.dart';
 import 'package:onecharge/logic/blocs/delete_vehicle/delete_vehicle_bloc.dart';
 import 'package:onecharge/logic/blocs/delete_vehicle/delete_vehicle_event.dart';
 import 'package:onecharge/logic/blocs/delete_vehicle/delete_vehicle_state.dart';
@@ -34,6 +35,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   OverlayEntry? _toastEntry;
   String _userName = 'Saleh Al Sabah';
   bool _notificationsEnabled = true;
+  bool _isDeleteLoading = false;
 
   @override
   void initState() {
@@ -138,15 +140,55 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocListener<DeleteVehicleBloc, DeleteVehicleState>(
-      listener: (context, state) {
-        if (state is DeleteVehicleSuccess) {
-          _showToast('Vehicle removed successfully');
-          context.read<VehicleListBloc>().add(FetchVehicles());
-        } else if (state is DeleteVehicleError) {
-          _showToast(state.message, isError: true);
-        }
-      },
+    return MultiBlocListener(
+      listeners: [
+        BlocListener<DeleteVehicleBloc, DeleteVehicleState>(
+          listener: (context, state) {
+            if (state is DeleteVehicleLoading) {
+              _isDeleteLoading = true;
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (BuildContext context) {
+                  return Center(
+                    child: Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.black,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const CupertinoActivityIndicator(
+                        color: Colors.white,
+                        radius: 15,
+                      ),
+                    ),
+                  );
+                },
+              );
+            } else if (state is DeleteVehicleSuccess) {
+              if (_isDeleteLoading) {
+                Navigator.of(context).pop();
+                _isDeleteLoading = false;
+              }
+              _showToast('Vehicle removed successfully');
+              context.read<VehicleListBloc>().add(FetchVehicles());
+            } else if (state is DeleteVehicleError) {
+              if (_isDeleteLoading) {
+                Navigator.of(context).pop();
+                _isDeleteLoading = false;
+              }
+              _showToast(state.message, isError: true);
+            }
+          },
+        ),
+        BlocListener<VehicleListBloc, VehicleListState>(
+          listener: (context, state) {
+            if (state is VehicleListError) {
+              _showToast(state.message, isError: true);
+            }
+          },
+        ),
+      ],
       child: Scaffold(
         backgroundColor: Colors.white,
         appBar: AppBar(
@@ -238,9 +280,58 @@ class _SettingsScreenState extends State<SettingsScreen> {
               BlocBuilder<VehicleListBloc, VehicleListState>(
                 builder: (context, state) {
                   if (state is VehicleListLoading) {
-                    return const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 16),
-                      child: Center(child: CircularProgressIndicator()),
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        physics: const NeverScrollableScrollPhysics(),
+                        child: Row(
+                          children: List.generate(
+                            2,
+                            (index) => Container(
+                              width: MediaQuery.of(context).size.width * 0.44,
+                              height: 210,
+                              margin: const EdgeInsets.only(right: 10),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF7F7F7),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Shimmer.fromColors(
+                                baseColor: const Color(0xffE0E0E0),
+                                highlightColor: Colors.white,
+                                child: Column(
+                                  children: [
+                                    Expanded(
+                                      child: Container(
+                                        color: Colors.white,
+                                        margin: const EdgeInsets.all(16),
+                                      ),
+                                    ),
+                                    Container(
+                                      width: 100,
+                                      height: 16,
+                                      margin: const EdgeInsets.only(bottom: 8),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                    ),
+                                    Container(
+                                      width: 60,
+                                      height: 12,
+                                      margin: const EdgeInsets.only(bottom: 20),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
                     );
                   }
 
