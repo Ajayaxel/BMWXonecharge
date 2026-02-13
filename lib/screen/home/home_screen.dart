@@ -28,6 +28,8 @@ import 'package:onecharge/screen/home/my_location_screen.dart';
 import 'package:onecharge/models/location_model.dart';
 import 'package:onecharge/logic/blocs/location/location_bloc.dart';
 import 'package:onecharge/logic/blocs/location/location_state.dart';
+import 'package:onecharge/logic/blocs/profile/profile_bloc.dart';
+import 'package:onecharge/logic/blocs/profile/profile_state.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -632,11 +634,24 @@ class HomeScreenState extends State<HomeScreen> {
                               ),
                             );
                           },
-                          child: const CircleAvatar(
-                            radius: 25,
-                            backgroundImage: NetworkImage(
-                              'https://plus.unsplash.com/premium_photo-1689568126014-06fea9d5d341?fm=jpg&q=60&w=3000&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MXx8cHJvZmlsZXxlbnwwfHwwfHx8MA%3D%3D',
-                            ),
+                          child: BlocBuilder<ProfileBloc, ProfileState>(
+                            builder: (context, state) {
+                              String? imageUrl;
+                              if (state is ProfileLoaded) {
+                                imageUrl = state.customer.profileImage;
+                              } else if (state is ProfileUpdated) {
+                                imageUrl = state.customer.profileImage;
+                              } else if (state is ProfileUpdating) {
+                                imageUrl = state.currentCustomer.profileImage;
+                              }
+                              return CircleAvatar(
+                                radius: 25,
+                                backgroundImage: NetworkImage(
+                                  imageUrl ??
+                                      'https://plus.unsplash.com/premium_photo-1689568126014-06fea9d5d341?fm=jpg&q=60&w=3000&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MXx8cHJvZmlsZXxlbnwwfHwwfHx8MA%3D%3D',
+                                ),
+                              );
+                            },
                           ),
                         ),
                         const SizedBox(width: 12),

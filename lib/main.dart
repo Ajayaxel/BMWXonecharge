@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:onecharge/app.dart';
 import 'package:onecharge/core/network/api_client.dart';
 import 'package:onecharge/data/repositories/brand_repository.dart';
 import 'package:onecharge/logic/blocs/brand/brand_bloc.dart';
@@ -31,7 +32,6 @@ import 'package:onecharge/logic/blocs/profile/profile_event.dart';
 import 'package:onecharge/data/repositories/location_repository.dart';
 import 'package:onecharge/logic/blocs/location/location_bloc.dart';
 import 'package:onecharge/logic/blocs/location/location_event.dart';
-import 'package:onecharge/screen/onbording/splash.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -114,25 +114,8 @@ void main() {
                   ..add(FetchLocations()),
           ),
         ],
-        child: const MyApp(),
+        child: MyApp(),
       ),
     ),
   );
-}
-
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'OneCharge',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        scaffoldBackgroundColor: Colors.white,
-        fontFamily: 'Lufga',
-      ),
-      home: const SplashScreen(),
-    );
-  }
 }

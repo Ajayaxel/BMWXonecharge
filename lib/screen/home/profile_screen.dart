@@ -29,8 +29,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
-    // Fetch profile if not already loaded, though main.dart already adds FetchProfile
-    // context.read<ProfileBloc>().add(FetchProfile());
+    // Initialize controllers with current state if available.
+    // This prevents empty fields if the profile is already loaded.
+    final state = context.read<ProfileBloc>().state;
+    if (state is ProfileLoaded) {
+      _fillControllers(state.customer);
+    }
+  }
+
+  void _fillControllers(Customer customer) {
+    _fullNameController.text = customer.name;
+    _emailController.text = customer.email;
+    _phoneController.text = customer.phone;
   }
 
   Future<void> _pickImage() async {
@@ -84,7 +94,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Navigator.of(context).pop();
             _isUpdateLoading = false;
           }
+          // Clear local image file to show network image from response as confirmation
+          setState(() {
+            _imageFile = null;
+          });
+          // Update controllers with confirmed data
+          _fillControllers(state.customer);
           ToastUtils.showToast(context, state.message);
+        } else if (state is ProfileLoaded) {
+          // Ensure controllers are populated if we navigated here after a fetch
+          // and haven't typed anything yet (or if state just refreshed).
+          // We check if controllers are empty to avoid overwriting user input,
+          // OR if we strictly want to sync. Given ProfileUpdated handles the update case,
+          // this is mostly for initial load latency.
+          if (_fullNameController.text.isEmpty && _imageFile == null) {
+            _fillControllers(state.customer);
+          }
         } else if (state is ProfileError) {
           if (_isUpdateLoading) {
             Navigator.of(context).pop();
@@ -132,9 +157,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
               if (state is ProfileLoaded) {
                 customer = state.customer;
-                _fullNameController.text = customer.name;
-                _emailController.text = customer.email;
-                _phoneController.text = customer.phone;
               } else if (state is ProfileUpdating) {
                 customer = state.currentCustomer;
                 isUpdating = true;
@@ -191,7 +213,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                           : (customer?.profileImage != null
                                                 ? Image.network(
                                                     customer!.profileImage!,
+                                                    key: ValueKey(
+                                                      customer!.profileImage,
+                                                    ),
                                                     fit: BoxFit.cover,
+                                                    loadingBuilder:
+                                                        (
+                                                          context,
+                                                          child,
+                                                          loadingProgress,
+                                                        ) {
+                                                          if (loadingProgress ==
+                                                              null)
+                                                            return child;
+                                                          return const Center(
+                                                            child:
+                                                                CupertinoActivityIndicator(),
+                                                          );
+                                                        },
                                                     errorBuilder:
                                                         (
                                                           context,
@@ -262,7 +301,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             'Email',
                             _emailController,
                             enabled: false,
-                          ), // Email usually not editable here
+                          ),
                           const SizedBox(height: 20),
                           _buildInputField(
                             'Phone',

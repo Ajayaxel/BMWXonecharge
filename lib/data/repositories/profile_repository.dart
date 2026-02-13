@@ -40,7 +40,7 @@ class ProfileRepository {
       }
 
       final formData = FormData.fromMap(data);
-      final response = await apiClient.putMultipart(
+      final response = await apiClient.postMultipart(
         '/customer/profile',
         formData: formData,
       );
