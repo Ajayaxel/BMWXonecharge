@@ -390,6 +390,11 @@ class TicketDriver extends Equatable {
   final String? latitude;
   final String? longitude;
 
+  /// ISO-8601 string from the server (e.g. "2026-02-23T16:30:21+00:00").
+  /// Used to determine whether the stored coordinates are fresh enough to show
+  /// on the map, or stale/hardcoded data that should be ignored.
+  final String? lastLocationUpdatedAt;
+
   const TicketDriver({
     this.id,
     this.name,
@@ -397,6 +402,7 @@ class TicketDriver extends Equatable {
     this.image,
     this.latitude,
     this.longitude,
+    this.lastLocationUpdatedAt,
   });
 
   factory TicketDriver.fromJson(Map<String, dynamic> json) {
@@ -407,11 +413,20 @@ class TicketDriver extends Equatable {
       image: json['image'],
       latitude: json['latitude']?.toString(),
       longitude: json['longitude']?.toString(),
+      lastLocationUpdatedAt: json['last_location_updated_at']?.toString(),
     );
   }
 
   @override
-  List<Object?> get props => [id, name, phone, image, latitude, longitude];
+  List<Object?> get props => [
+    id,
+    name,
+    phone,
+    image,
+    latitude,
+    longitude,
+    lastLocationUpdatedAt,
+  ];
 }
 
 class TicketInvoice extends Equatable {

@@ -9,6 +9,7 @@ import 'dart:math' as math;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:onecharge/models/ticket_model.dart';
 import 'package:onecharge/logic/blocs/ticket/ticket_bloc.dart';
+import 'package:onecharge/logic/blocs/ticket/ticket_event.dart';
 import 'package:onecharge/logic/blocs/ticket/ticket_state.dart';
 
 class TrackingMapScreen extends StatefulWidget {
@@ -34,57 +35,44 @@ class _TrackingMapScreenState extends State<TrackingMapScreen> {
   Timer? _animTimer;
   Ticket? _currentTicket;
 
-  static const LatLng _center = LatLng(25.2048, 55.2708); // User Location
-
-  static const List<LatLng> _routePath = [
-    LatLng(25.2158, 55.2858), // Start
-    LatLng(25.2145, 55.2840),
-    LatLng(25.2132, 55.2818),
-    LatLng(25.2115, 55.2795),
-    LatLng(25.2098, 55.2770),
-    LatLng(25.2082, 55.2748),
-    LatLng(25.2065, 55.2725),
-    LatLng(25.2048, 55.2708), // End
-  ];
-
   final Set<Marker> _markers = {};
   final Set<Polyline> _polylines = {};
 
-  double _getDistance(LatLng p1, LatLng p2) {
-    return math.sqrt(
-      math.pow(p1.latitude - p2.latitude, 2) +
-          math.pow(p1.longitude - p2.longitude, 2),
-    );
+  /// Safely parses a nullable string to a double.
+  /// Returns null if the string is null, empty, or not a valid number,
+  /// or if it is exactly 0.0 (which indicates an unset location).
+  double? _safeParseLatLng(String? value) {
+    if (value == null || value.isEmpty || value == 'null') return null;
+    final parsed = double.tryParse(value);
+    if (parsed == null || parsed == 0.0) return null;
+    return parsed;
   }
 
-  LatLng _calculatePosition(double progress) {
-    if (progress <= 0) return _routePath.first;
-    if (progress >= 1) return _routePath.last;
-
-    double totalDist = 0;
-    for (int i = 0; i < _routePath.length - 1; i++) {
-      totalDist += _getDistance(_routePath[i], _routePath[i + 1]);
+  /// Gets the driver's real LatLng from the current ticket driver info.
+  /// Returns null if the driver location is not available.
+  LatLng? get _driverLatLng {
+    final lat = _safeParseLatLng(_currentTicket?.driver?.latitude);
+    final lng = _safeParseLatLng(_currentTicket?.driver?.longitude);
+    if (lat != null && lng != null) {
+      return LatLng(lat, lng);
     }
+    return null;
+  }
 
-    double targetDist = totalDist * progress;
-    double currentDist = 0;
-
-    for (int i = 0; i < _routePath.length - 1; i++) {
-      double segmentDist = _getDistance(_routePath[i], _routePath[i + 1]);
-      if (currentDist + segmentDist >= targetDist) {
-        double segmentProgress = (targetDist - currentDist) / segmentDist;
-        return LatLng(
-          _routePath[i].latitude +
-              (_routePath[i + 1].latitude - _routePath[i].latitude) *
-                  segmentProgress,
-          _routePath[i].longitude +
-              (_routePath[i + 1].longitude - _routePath[i].longitude) *
-                  segmentProgress,
-        );
-      }
-      currentDist += segmentDist;
+  /// Gets the customer's ticket/destination LatLng.
+  /// Returns null if the ticket location is not available.
+  LatLng? get _destinationLatLng {
+    final lat = _safeParseLatLng(_currentTicket?.latitude);
+    final lng = _safeParseLatLng(_currentTicket?.longitude);
+    if (lat != null && lng != null) {
+      return LatLng(lat, lng);
     }
-    return _routePath.last;
+    return null;
+  }
+
+  /// Returns the best initial camera target: driver location > ticket location > null
+  LatLng? get _bestInitialTarget {
+    return _driverLatLng ?? _destinationLatLng;
   }
 
   @override
@@ -95,6 +83,20 @@ class _TrackingMapScreenState extends State<TrackingMapScreen> {
     _currentTicket = widget.ticket;
     _addCustomMarkers();
     _addPolyline();
+
+    // Immediately fetch the latest driver location from the API when the map
+    // opens. This ensures markers and polyline show up right away even before
+    // the next driver.location.updated socket event fires.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _currentTicket != null) {
+        print(
+          '🗺️ [TrackingMap] Fetching latest driver location from API for ticket ${_currentTicket!.id}',
+        );
+        context.read<TicketBloc>().add(
+          FetchDriverLocationRequested(_currentTicket!.id),
+        );
+      }
+    });
   }
 
   @override
@@ -124,6 +126,26 @@ class _TrackingMapScreenState extends State<TrackingMapScreen> {
   void dispose() {
     _animTimer?.cancel();
     super.dispose();
+  }
+
+  /// Returns true if the driver's lastLocationUpdatedAt timestamp is within
+  /// [maxAgeMinutes] minutes. Prevents stale DB coordinates (e.g. hardcoded
+  /// San Francisco stored days ago) from being shown on the map.
+  bool _isLocationFresh(String? lastUpdatedAt, {int maxAgeMinutes = 30}) {
+    if (lastUpdatedAt == null || lastUpdatedAt.isEmpty) return false;
+    try {
+      final lastUpdated = DateTime.parse(lastUpdatedAt).toUtc();
+      final ageMinutes = DateTime.now()
+          .toUtc()
+          .difference(lastUpdated)
+          .inMinutes;
+      print(
+        '⏱️ [TrackingMap] Driver location age: $ageMinutes min (max: $maxAgeMinutes)',
+      );
+      return ageMinutes <= maxAgeMinutes;
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<Uint8List> _getBytesFromAsset(String path, int width) async {
@@ -166,7 +188,7 @@ class _TrackingMapScreenState extends State<TrackingMapScreen> {
   Future<void> _addCustomMarkers() async {
     final Uint8List markerIconBytes = await _getBytesFromAsset(
       'assets/home/mapcars.png',
-      100, // Set to 40 for a balanced look
+      100,
     );
     final BitmapDescriptor carIcon = BitmapDescriptor.fromBytes(
       markerIconBytes,
@@ -174,141 +196,103 @@ class _TrackingMapScreenState extends State<TrackingMapScreen> {
 
     final BitmapDescriptor blackMarker = await _getBlackCircleMarker();
 
-    // Current agent position: use real location if available, else interpolate
-    LatLng movingPos;
-    if (_currentTicket?.driver?.latitude != null &&
-        _currentTicket?.driver?.longitude != null) {
-      movingPos = LatLng(
-        double.parse(_currentTicket!.driver!.latitude!),
-        double.parse(_currentTicket!.driver!.longitude!),
-      );
-    } else {
-      movingPos = _calculatePosition(_currentProgress);
-    }
-
-    // Add ambient cars
-    final carPositions = [
-      const LatLng(25.2028, 55.2668),
-      const LatLng(25.1988, 55.2788),
-      const LatLng(25.2128, 55.2828),
-    ];
+    // Get real driver position from ticket data
+    final LatLng? movingPos = _driverLatLng;
+    // Get real destination position from ticket data
+    final LatLng? destination = _destinationLatLng;
 
     setState(() {
       _markers.clear();
 
-      // Moving Agent
-      _markers.add(
-        Marker(
-          markerId: const MarkerId('agent_car'),
-          position: movingPos,
-          icon: carIcon,
-          anchor: const Offset(0.5, 0.5),
-        ),
-      );
-
-      for (int i = 0; i < carPositions.length; i++) {
+      // Only add the driver marker if we have a real location
+      if (movingPos != null) {
         _markers.add(
           Marker(
-            markerId: MarkerId('car_$i'),
-            position: carPositions[i],
+            markerId: const MarkerId('agent_car'),
+            position: movingPos,
             icon: carIcon,
             anchor: const Offset(0.5, 0.5),
           ),
         );
       }
 
-      // Add user marker
-      LatLng destination = _center;
-      if (_currentTicket?.latitude != null &&
-          _currentTicket?.longitude != null) {
-        destination = LatLng(
-          double.parse(_currentTicket!.latitude!),
-          double.parse(_currentTicket!.longitude!),
+      // Only add the destination marker if we have a real location
+      if (destination != null) {
+        _markers.add(
+          Marker(
+            markerId: const MarkerId('destination'),
+            position: destination,
+            icon: blackMarker,
+            anchor: const Offset(0.5, 0.5),
+          ),
         );
       }
-
-      _markers.add(
-        Marker(
-          markerId: const MarkerId('destination'),
-          position: destination,
-          icon: blackMarker,
-          anchor: const Offset(0.5, 0.5),
-        ),
-      );
     });
   }
 
   void _updateCameraBounds() {
-    LatLng movingPos;
-    if (_currentTicket?.driver?.latitude != null &&
-        _currentTicket?.driver?.longitude != null) {
-      movingPos = LatLng(
-        double.parse(_currentTicket!.driver!.latitude!),
-        double.parse(_currentTicket!.driver!.longitude!),
-      );
-    } else {
-      movingPos = _calculatePosition(_currentProgress);
-    }
+    final LatLng? movingPos = _driverLatLng;
+    final LatLng? destination = _destinationLatLng;
 
-    LatLng destination = _center;
-    if (_currentTicket?.latitude != null && _currentTicket?.longitude != null) {
-      destination = LatLng(
-        double.parse(_currentTicket!.latitude!),
-        double.parse(_currentTicket!.longitude!),
-      );
-    }
-
-    double minLat = math.min(movingPos.latitude, destination.latitude);
-    double maxLat = math.max(movingPos.latitude, destination.latitude);
-    double minLng = math.min(movingPos.longitude, destination.longitude);
-    double maxLng = math.max(movingPos.longitude, destination.longitude);
-
-    if (minLat == maxLat && minLng == maxLng) {
+    // If we only have one location, zoom to that
+    if (movingPos != null && destination == null) {
       _controller.future.then((controller) {
         controller.animateCamera(CameraUpdate.newLatLngZoom(movingPos, 14));
       });
       return;
     }
 
-    LatLngBounds bounds = LatLngBounds(
-      southwest: LatLng(minLat, minLng),
-      northeast: LatLng(maxLat, maxLng),
-    );
+    if (movingPos == null && destination != null) {
+      _controller.future.then((controller) {
+        controller.animateCamera(CameraUpdate.newLatLngZoom(destination, 14));
+      });
+      return;
+    }
 
-    _controller.future.then((controller) {
-      controller.animateCamera(CameraUpdate.newLatLngBounds(bounds, 80));
-    });
+    // If we have both locations, fit bounds
+    if (movingPos != null && destination != null) {
+      if (movingPos.latitude == destination.latitude &&
+          movingPos.longitude == destination.longitude) {
+        _controller.future.then((controller) {
+          controller.animateCamera(CameraUpdate.newLatLngZoom(movingPos, 14));
+        });
+        return;
+      }
+
+      double minLat = math.min(movingPos.latitude, destination.latitude);
+      double maxLat = math.max(movingPos.latitude, destination.latitude);
+      double minLng = math.min(movingPos.longitude, destination.longitude);
+      double maxLng = math.max(movingPos.longitude, destination.longitude);
+
+      LatLngBounds bounds = LatLngBounds(
+        southwest: LatLng(minLat, minLng),
+        northeast: LatLng(maxLat, maxLng),
+      );
+
+      _controller.future.then((controller) {
+        controller.animateCamera(CameraUpdate.newLatLngBounds(bounds, 80));
+      });
+    }
+    // If neither location is available, do nothing — keep the current view
   }
 
   void _addPolyline() {
-    LatLng movingPos;
-    if (_currentTicket?.driver?.latitude != null &&
-        _currentTicket?.driver?.longitude != null) {
-      movingPos = LatLng(
-        double.parse(_currentTicket!.driver!.latitude!),
-        double.parse(_currentTicket!.driver!.longitude!),
-      );
-    } else {
-      movingPos = _calculatePosition(_currentProgress);
-    }
-
-    LatLng destination = _center;
-    if (_currentTicket?.latitude != null && _currentTicket?.longitude != null) {
-      destination = LatLng(
-        double.parse(_currentTicket!.latitude!),
-        double.parse(_currentTicket!.longitude!),
-      );
-    }
+    final LatLng? movingPos = _driverLatLng;
+    final LatLng? destination = _destinationLatLng;
 
     _polylines.clear();
-    _polylines.add(
-      Polyline(
-        polylineId: const PolylineId('path'),
-        points: [movingPos, destination],
-        color: Colors.black,
-        width: 4,
-      ),
-    );
+
+    // Only draw a polyline if we have both real locations
+    if (movingPos != null && destination != null) {
+      _polylines.add(
+        Polyline(
+          polylineId: const PolylineId('path'),
+          points: [movingPos, destination],
+          color: Colors.black,
+          width: 4,
+        ),
+      );
+    }
   }
 
   @override
@@ -347,27 +331,54 @@ class _TrackingMapScreenState extends State<TrackingMapScreen> {
           _updateCameraBounds();
         } else if (state is DriverLocationLoaded) {
           if (state.driver != null) {
-            setState(() {
-              // Update local ticket with new driver info
-              if (_currentTicket != null) {
-                _currentTicket = _currentTicket!.copyWith(driver: state.driver);
-              }
+            final incomingDriver = state.driver!;
 
-              // Priority 1: If we have a driver, we are no longer "finding"
+            // Check if the location timestamp is recent enough to trust.
+            // If the driver location was stored days ago (e.g. hardcoded San
+            // Francisco), we only take the driver identity (name/image) and
+            // intentionally discard the stale coordinates.
+            final bool fresh = _isLocationFresh(
+              incomingDriver.lastLocationUpdatedAt,
+            );
+
+            final TicketDriver safeDriver;
+            if (fresh) {
+              print(
+                '✅ [TrackingMap] Driver location is fresh — using coordinates: '
+                'lat=${incomingDriver.latitude}, lng=${incomingDriver.longitude}',
+              );
+              safeDriver = incomingDriver;
+            } else {
+              print(
+                '🚫 [TrackingMap] Driver location is STALE '
+                '(${incomingDriver.lastLocationUpdatedAt}) — discarding coordinates.',
+              );
+              // Preserve any real GPS already in _currentTicket.driver
+              final existing = _currentTicket?.driver;
+              safeDriver = TicketDriver(
+                id: incomingDriver.id,
+                name: incomingDriver.name,
+                image: incomingDriver.image,
+                phone: incomingDriver.phone,
+                latitude: existing?.latitude, // keep real GPS if we have it
+                longitude: existing?.longitude, // keep real GPS if we have it
+                lastLocationUpdatedAt: incomingDriver.lastLocationUpdatedAt,
+              );
+            }
+
+            setState(() {
+              if (_currentTicket != null) {
+                _currentTicket = _currentTicket!.copyWith(driver: safeDriver);
+              }
               if (_currentStage == 'finding' || _currentStage == 'none') {
                 _currentStage = 'reaching';
               }
-
-              // Priority 2: Check for arrival
               final status = _currentTicket?.status?.toLowerCase() ?? '';
-
               if (status == 'completed' || status == 'resolved') {
                 _currentStage = 'resolved';
               } else if (status == 'cancelled' || status == 'rejected') {
                 _currentStage = 'none';
-                if (Navigator.canPop(context)) {
-                  Navigator.pop(context); // Close map if cancelled
-                }
+                if (Navigator.canPop(context)) Navigator.pop(context);
               } else if (status == 'at_location' ||
                   status == 'in_progress' ||
                   status == 'reached' ||
@@ -389,16 +400,14 @@ class _TrackingMapScreenState extends State<TrackingMapScreen> {
           children: [
             GoogleMap(
               initialCameraPosition: CameraPosition(
-                target: (_currentTicket?.driver?.latitude != null)
-                    ? LatLng(
-                        double.parse(_currentTicket!.driver!.latitude!),
-                        double.parse(_currentTicket!.driver!.longitude!),
-                      )
-                    : _center,
+                // Use real driver location if available, else use ticket/customer
+                // location, else default to a safe fallback (0,0 avoided).
+                target: _bestInitialTarget ?? const LatLng(25.2048, 55.2708),
                 zoom: 14,
               ),
               onMapCreated: (GoogleMapController controller) {
                 _controller.complete(controller);
+                // After map is created, move camera to the real location
                 Future.delayed(const Duration(milliseconds: 300), () {
                   if (mounted) _updateCameraBounds();
                 });

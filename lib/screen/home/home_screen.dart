@@ -72,6 +72,27 @@ class HomeScreenState extends State<HomeScreen> {
   Ticket? _currentTicket;
   bool _isConnectingRealtime = false;
 
+  /// Returns true if the driver's last location update is within the last
+  /// [maxAgeMinutes] minutes (default: 30), meaning it is fresh enough to use.
+  /// This prevents us from using stale/hardcoded coordinates stored days ago.
+  bool _isLocationFresh(String? lastUpdatedAt, {int maxAgeMinutes = 30}) {
+    if (lastUpdatedAt == null || lastUpdatedAt.isEmpty) return false;
+    try {
+      final lastUpdated = DateTime.parse(lastUpdatedAt).toUtc();
+      final now = DateTime.now().toUtc();
+      final ageMinutes = now.difference(lastUpdated).inMinutes;
+      print(
+        '⏱️ [HomeScreen] Driver location age: $ageMinutes minutes (max: $maxAgeMinutes)',
+      );
+      return ageMinutes <= maxAgeMinutes;
+    } catch (e) {
+      print(
+        '⚠️ [HomeScreen] Failed to parse last_location_updated_at: $lastUpdatedAt',
+      );
+      return false;
+    }
+  }
+
   void _initRealtimeService(int customerId, {Ticket? ticket}) async {
     print(
       '🔌 [HomeScreen] Initializing RealtimeService for Customer ID: $customerId',
@@ -116,50 +137,57 @@ class HomeScreenState extends State<HomeScreen> {
         onTicketAssigned: (data) {
           if (mounted) {
             print('🚗 [RealtimeService CALLBACK] Ticket Assigned data: $data');
-            // If data is a Map, parse it
             if (data is Map<String, dynamic>) {
+              // Use lat/lng ONLY if last_location_updated_at is within 30 minutes.
+              // This prevents stale/hardcoded database coordinates from appearing on the map.
+              final String? lastUpdatedAt = data['last_location_updated_at']
+                  ?.toString();
+              final bool locationFresh = _isLocationFresh(lastUpdatedAt);
+
+              String? driverLat;
+              String? driverLng;
+              if (locationFresh) {
+                driverLat = data['latitude']?.toString();
+                driverLng = data['longitude']?.toString();
+                print(
+                  '✅ [HomeScreen] Driver assigned with fresh location: lat=$driverLat, lng=$driverLng',
+                );
+              } else {
+                print(
+                  '🚫 [HomeScreen] Driver assigned but location is stale ($lastUpdatedAt) — waiting for real-time GPS.',
+                );
+              }
+
               final driver = TicketDriver(
                 id: data['driver_id'],
                 name: data['driver_name'],
-                latitude: data['latitude']?.toString(),
-                longitude: data['longitude']?.toString(),
                 image: data['driver_image'],
+                latitude: driverLat,
+                longitude: driverLng,
               );
 
-              // Immediately update driver location in bloc
-              context.read<TicketBloc>().add(UpdateDriverLocation(driver));
+              if (locationFresh && driverLat != null) {
+                context.read<TicketBloc>().add(UpdateDriverLocation(driver));
+              }
 
               setState(() {
                 _currentServiceStage = 'reaching';
-                // Update local ticket with basic driver info
                 if (_currentTicket != null) {
                   _currentTicket = _currentTicket!.copyWith(
                     status: 'assigned',
                     driver: driver,
                   );
-                  // Directly update BLoC state without fetching from API
                   context.read<TicketBloc>().add(
                     UpdateTicketDetails(_currentTicket!),
                   );
                 } else if (data['ticket_id'] != null) {
                   print(
-                    'ℹ️ [HomeScreen] Ticket object was null but assigned event received for Ticket ID: ${data['ticket_id']}',
+                    'ℹ️ [HomeScreen] No ticket object, received assigned for Ticket ID: ${data['ticket_id']}',
                   );
-                  // We could potentially fetch ticket details here if needed
                 }
               });
-
-              print(
-                '🎯 [HomeScreen] Current Stage: $_currentServiceStage, Driver: ${driver.name}',
-              );
             } else {
-              // Fallback if data is not a map
-              setState(() {
-                _currentServiceStage = 'reaching';
-              });
-              print(
-                '🎯 [HomeScreen] Current Stage: $_currentServiceStage (Fallback)',
-              );
+              setState(() => _currentServiceStage = 'reaching');
             }
           }
         },
@@ -174,14 +202,64 @@ class HomeScreenState extends State<HomeScreen> {
               '📋 [RealtimeService] Status Changed: $status for Ticket #$ticketId',
             );
 
-            // 1. First, tell the BLoC so the Tracking Map gets the update BEFORE we nullify it locally
-            if (_currentTicket != null && ticketId != null) {
+            // Use lat/lng from status_changed event ONLY if the location is fresh.
+            // (e.g. status_changed for 'assigned' carries driver location, but it
+            //  might be a stale DB value stored days ago — check the timestamp!)
+            final String? lastUpdatedAt = data['last_location_updated_at']
+                ?.toString();
+            final bool locationFresh = _isLocationFresh(lastUpdatedAt);
+
+            if ((status == 'assigned' || status == 'reaching') &&
+                data['driver_id'] != null &&
+                _currentTicket != null) {
+              final existingDriver = _currentTicket!.driver;
+
+              String? newLat;
+              String? newLng;
+              if (locationFresh) {
+                newLat = data['latitude']?.toString();
+                newLng = data['longitude']?.toString();
+                print(
+                  '✅ [HomeScreen] Using fresh driver location from status_changed: lat=$newLat, lng=$newLng',
+                );
+              } else {
+                // Keep any real GPS we already received; don't overwrite with stale data
+                newLat = existingDriver?.latitude;
+                newLng = existingDriver?.longitude;
+                print(
+                  '🚫 [HomeScreen] Ignoring stale location in status_changed ($lastUpdatedAt), keeping existing GPS.',
+                );
+              }
+
+              final updatedDriver = TicketDriver(
+                id: data['driver_id'],
+                name: data['driver_name'] ?? existingDriver?.name,
+                image: data['driver_image'] ?? existingDriver?.image,
+                latitude: newLat,
+                longitude: newLng,
+              );
+              final updatedTicket = _currentTicket!.copyWith(
+                status: status,
+                driver: updatedDriver,
+              );
+              _currentTicket = updatedTicket;
+              context.read<TicketBloc>().add(
+                UpdateTicketDetails(updatedTicket),
+              );
+
+              // If we have fresh location, push it to the map immediately
+              if (locationFresh && newLat != null) {
+                context.read<TicketBloc>().add(
+                  UpdateDriverLocation(updatedDriver),
+                );
+              }
+            } else if (_currentTicket != null && ticketId != null) {
               final updatedTicket = _currentTicket!.copyWith(status: status);
               context.read<TicketBloc>().add(
                 UpdateTicketDetails(updatedTicket),
               );
             }
-            // 2. Then update HomeScreen's local state
+
             setState(() {
               if (status == 'assigned' || status == 'reaching') {
                 _currentServiceStage = 'reaching';
@@ -192,10 +270,9 @@ class HomeScreenState extends State<HomeScreen> {
                 _currentServiceStage = 'solving';
                 _serviceProgress = 1.0;
               } else if (status == 'completed' || status == 'resolved') {
-                _currentServiceStage = 'resolved'; // Keeps the banner visible
+                _currentServiceStage = 'resolved';
                 _stopPolling();
                 _realtimeService?.disconnect();
-                // We keep _currentTicket around so the banner has ticket info
               } else if (status == 'cancelled' || status == 'rejected') {
                 _currentServiceStage = 'none';
                 _stopPolling();
@@ -212,11 +289,25 @@ class HomeScreenState extends State<HomeScreen> {
         onDriverLocationUpdated: (data) {
           if (mounted && data is Map<String, dynamic>) {
             print('📍 [RealtimeService] Driver Location Updated: $data');
+            // Support multiple key formats for driver lat/lng
+            final String? lat =
+                (data['latitude'] ??
+                        data['driver_latitude'] ??
+                        data['driver']?['latitude'])
+                    ?.toString();
+            final String? lng =
+                (data['longitude'] ??
+                        data['driver_longitude'] ??
+                        data['driver']?['longitude'])
+                    ?.toString();
+            print(
+              '📍 [HomeScreen] Driver real-time location: lat=$lat, lng=$lng',
+            );
             final driver = TicketDriver(
               id: data['driver_id'],
               name: data['driver_name'],
-              latitude: data['latitude']?.toString(),
-              longitude: data['longitude']?.toString(),
+              latitude: lat,
+              longitude: lng,
             );
             context.read<TicketBloc>().add(UpdateDriverLocation(driver));
           }
@@ -475,9 +566,22 @@ class HomeScreenState extends State<HomeScreen> {
 
     // Start Real-time WebSocket Service
     if (ticket != null) {
-      // Immediately use the driver location provided from the socket or initial ticket data
+      // ⚠️ Do NOT push ticket.driver's lat/lng here — it is the last stored DB value
+      // which may be stale (e.g. hardcoded San Francisco). Real-time GPS position
+      // will arrive via driver.location.updated socket events. We only set the
+      // driver's identity (name, id, image) so the UI card shows correctly.
       if (ticket.driver != null && mounted) {
-        context.read<TicketBloc>().add(UpdateDriverLocation(ticket.driver!));
+        final driverIdentityOnly = TicketDriver(
+          id: ticket.driver!.id,
+          name: ticket.driver!.name,
+          image: ticket.driver!.image,
+          phone: ticket.driver!.phone,
+          latitude: null, // intentionally null — wait for real-time GPS
+          longitude: null, // intentionally null — wait for real-time GPS
+        );
+        context.read<TicketBloc>().add(
+          UpdateDriverLocation(driverIdentityOnly),
+        );
       }
 
       _initRealtimeService(ticket.customerId, ticket: ticket);

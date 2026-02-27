@@ -59,6 +59,8 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
   final ImagePicker _picker = ImagePicker();
   final List<File> _selectedFiles = [];
   OverlayEntry? _toastEntry;
+  final TextEditingController _parkingLocationController =
+      TextEditingController();
   IssueSubType? _selectedChargeUnit;
   final ValueNotifier<String> _selectedPaymentMethodNotifier =
       ValueNotifier<String>("cod");
@@ -144,6 +146,7 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
   void dispose() {
     _issueController.dispose();
     _slotController.dispose();
+    _parkingLocationController.dispose();
     _redeemCodeController.dispose();
     _companyCodeController.dispose();
     _selectedPaymentMethodNotifier.dispose();
@@ -1050,6 +1053,44 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
                         ],
                       ],
                       const SizedBox(height: 16),
+
+                      const SizedBox(height: 16),
+
+                      const Text(
+                        "Parking Location",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w500,
+                          fontFamily: 'Lufga',
+                          color: Colors.black,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        height: 52,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFE0E0E0)),
+                        ),
+                        child: TextField(
+                          controller: _parkingLocationController,
+                          decoration: const InputDecoration(
+                            hintText:
+                                "Enter parking location (e.g., Level 2, B21)",
+                            hintStyle: TextStyle(
+                              color: Color(0xFFBDBDBD),
+                              fontFamily: 'Lufga',
+                              fontSize: 14,
+                            ),
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 14,
+                            ),
+                          ),
+                        ),
+                      ),
 
                       const SizedBox(height: 16),
 
