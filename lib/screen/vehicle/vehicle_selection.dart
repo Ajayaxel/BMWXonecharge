@@ -7,9 +7,13 @@ import 'package:onecharge/logic/blocs/brand/brand_bloc.dart';
 import 'package:onecharge/logic/blocs/brand/brand_state.dart';
 import 'package:onecharge/logic/blocs/vehicle_model/vehicle_model_bloc.dart';
 import 'package:onecharge/logic/blocs/vehicle_model/vehicle_model_state.dart';
+import 'package:onecharge/logic/blocs/vehicle_model/vehicle_model_event.dart';
 import 'package:onecharge/logic/blocs/charging_type/charging_type_bloc.dart';
 import 'package:onecharge/logic/blocs/charging_type/charging_type_state.dart';
+import 'package:onecharge/logic/blocs/charging_type/charging_type_event.dart';
+import 'package:onecharge/logic/blocs/brand/brand_event.dart';
 import 'package:onecharge/models/vehicle_model.dart';
+import 'package:onecharge/core/config/app_config.dart';
 import 'package:onecharge/models/charging_type_model.dart';
 import 'package:onecharge/models/add_vehicle_model.dart';
 import 'package:onecharge/logic/blocs/add_vehicle/add_vehicle_bloc.dart';
@@ -30,12 +34,52 @@ class _VehicleSelectionState extends State<VehicleSelection> {
   String selectedVehicleType = 'Sedan';
   VehicleModel? selectedVehicle; // Track selected vehicle
   final TextEditingController searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
 
   final List<String> vehicleTypes = ['Sedan', 'SUV'];
 
   @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+
+    // Ensure data is loaded if user arrives here directly (e.g. from login)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final brandState = context.read<BrandBloc>().state;
+      if (brandState is! BrandLoaded) {
+        context.read<BrandBloc>().add(FetchBrands());
+      }
+
+      final vehicleModelState = context.read<VehicleModelBloc>().state;
+      if (vehicleModelState is! VehicleModelLoaded) {
+        context.read<VehicleModelBloc>().add(FetchVehicleModels());
+      }
+
+      final chargingTypeState = context.read<ChargingTypeBloc>().state;
+      if (chargingTypeState is! ChargingTypeLoaded) {
+        context.read<ChargingTypeBloc>().add(FetchChargingTypes());
+      }
+    });
+  }
+
+  void _onScroll() {
+    if (_isBottom) {
+      context.read<VehicleModelBloc>().add(LoadMoreVehicleModels());
+    }
+  }
+
+  bool get _isBottom {
+    if (!_scrollController.hasClients) return false;
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final currentScroll = _scrollController.offset;
+    return currentScroll >= (maxScroll * 0.9);
+  }
+
+  @override
   void dispose() {
     searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -44,591 +88,533 @@ class _VehicleSelectionState extends State<VehicleSelection> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Title
-                      SizedBox(
-                        width: double.infinity,
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            const Text(
-                              "Select your vehicle",
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w600,
+        child: CustomScrollView(
+          controller: _scrollController,
+          slivers: [
+            // Title & Search
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildHeader(),
+                    const SizedBox(height: 16),
+                    _buildSearchBar(),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Brands',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildBrandGrid(),
+                    const SizedBox(height: 16),
+                    const Text(
+                      "Vehicles",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w400,
+                        color: Colors.black,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildVehicleTypeFilters(),
+                    const SizedBox(height: 16),
+                  ],
+                ),
+              ),
+            ),
+
+            // Vehicle List
+            BlocBuilder<VehicleModelBloc, VehicleModelState>(
+              buildWhen: (previous, current) {
+                return previous.models.length != current.models.length ||
+                    previous.runtimeType != current.runtimeType ||
+                    previous.totalCount != current.totalCount;
+              },
+              builder: (context, state) {
+                final filteredModels = state.models.where((model) {
+                  bool matchesBrand =
+                      selectedBrand == null ||
+                      model.brand?.name == selectedBrand;
+                  bool matchesSearch =
+                      searchController.text.isEmpty ||
+                      model.name.toLowerCase().contains(
+                        searchController.text.toLowerCase(),
+                      );
+                  bool matchesType = false;
+                  if (model.vehicleCategory != null) {
+                    matchesType =
+                        model.vehicleCategory!.name.toLowerCase() ==
+                        selectedVehicleType.toLowerCase();
+                  }
+                  return matchesBrand && matchesSearch && matchesType;
+                }).toList();
+
+                if (state is VehicleModelInitial ||
+                    (state is VehicleModelLoading && filteredModels.isEmpty)) {
+                  final skeletonCount = state.totalCount > 0
+                      ? state.totalCount
+                      : 3;
+                  return SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    sliver: SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) => _buildSkeletonItem(),
+                        childCount: skeletonCount.clamp(1, 6),
+                      ),
+                    ),
+                  );
+                }
+
+                if (state is VehicleModelError && filteredModels.isEmpty) {
+                  return SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: _buildErrorState(state.message),
+                  );
+                }
+
+                if (filteredModels.isEmpty) {
+                  return SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: _buildEmptyState(),
+                  );
+                }
+
+                return SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        if (index < filteredModels.length) {
+                          final vehicle = filteredModels[index];
+                          final isSelected = selectedVehicle == vehicle;
+                          return RepaintBoundary(
+                            child: _buildVehicleItem(vehicle, isSelected),
+                          );
+                        } else {
+                          return const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 20),
+                            child: Center(
+                              child: CircularProgressIndicator(
                                 color: Colors.black,
                               ),
                             ),
-                            Positioned(
-                              right: 0,
-                              child: GestureDetector(
-                                onTap: () {
-                                  Navigator.pushReplacement(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => const HomeScreen(),
-                                    ),
-                                  );
-                                },
-                                child: const Padding(
-                                  padding: EdgeInsets.symmetric(
-                                    vertical: 8,
-                                    horizontal: 4,
-                                  ),
-                                  child: Text(
-                                    "skip",
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w400,
-                                      color: Colors.black,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Search Bar
-                      Container(
-                        height: 56,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF5F5F5),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: TextField(
-                          controller: searchController,
-                          onChanged: (value) {
-                            setState(() {
-                              // Trigger rebuild to update filtered vehicles
-                            });
-                          },
-                          decoration: InputDecoration(
-                            hintText: 'Search Vehicles',
-                            hintStyle: TextStyle(
-                              color: Colors.grey.shade400,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w400,
-                            ),
-                            prefixIcon: Icon(
-                              Icons.search,
-                              color: Colors.grey.shade600,
-                              size: 24,
-                            ),
-                            border: InputBorder.none,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 16,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Brands Label
-                      const Text(
-                        'Brands',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Brand Grid
-                      BlocBuilder<BrandBloc, BrandState>(
-                        builder: (context, state) {
-                          if (state is BrandLoading) {
-                            return SizedBox(
-                              height: 110,
-                              child: ListView.builder(
-                                scrollDirection: Axis.horizontal,
-                                itemCount: 4,
-                                itemBuilder: (context, index) {
-                                  return Padding(
-                                    padding: const EdgeInsets.only(right: 15),
-                                    child: Shimmer.fromColors(
-                                      baseColor: Colors.grey.shade300,
-                                      highlightColor: Colors.grey.shade100,
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Container(
-                                            width: 77,
-                                            height: 77,
-                                            decoration: BoxDecoration(
-                                              shape: BoxShape.circle,
-                                              color: Colors.white,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 5),
-                                          Container(
-                                            width: 50,
-                                            height: 14,
-                                            decoration: BoxDecoration(
-                                              color: Colors.white,
-                                              borderRadius:
-                                                  BorderRadius.circular(4),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                            );
-                          } else if (state is BrandError) {
-                            return SizedBox(
-                              height: 110,
-                              child: Center(
-                                child: Text(
-                                  state.message,
-                                  style: const TextStyle(color: Colors.red),
-                                ),
-                              ),
-                            );
-                          } else if (state is BrandLoaded) {
-                            final brands = state.brands;
-                            return SizedBox(
-                              height: 110,
-                              child: GridView.builder(
-                                scrollDirection: Axis.horizontal,
-                                physics: const BouncingScrollPhysics(),
-                                gridDelegate:
-                                    const SliverGridDelegateWithFixedCrossAxisCount(
-                                      crossAxisCount: 1,
-                                      mainAxisSpacing: 15,
-                                      mainAxisExtent: 80,
-                                    ),
-                                itemCount: brands.length,
-                                itemBuilder: (context, index) {
-                                  final brand = brands[index];
-                                  final isSelected =
-                                      selectedBrand == brand.name;
-
-                                  return GestureDetector(
-                                    onTap: () {
-                                      setState(() {
-                                        selectedBrand = brand.name;
-                                      });
-                                    },
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        // Brand Logo Avatar
-                                        FittedBox(
-                                          fit: BoxFit.scaleDown,
-                                          child: Container(
-                                            width: 77,
-                                            height: 77,
-                                            decoration: BoxDecoration(
-                                              shape: BoxShape.circle,
-                                              color: const Color(0xFFF5F5F5),
-                                              border: Border.all(
-                                                color: isSelected
-                                                    ? Colors.black
-                                                    : Colors.transparent,
-                                                width: 2,
-                                              ),
-                                            ),
-                                            child: Center(
-                                              child: Image.network(
-                                                brand.image,
-                                                width: 36,
-                                                height: 36,
-                                                fit: BoxFit.contain,
-                                                errorBuilder:
-                                                    (
-                                                      context,
-                                                      error,
-                                                      stackTrace,
-                                                    ) {
-                                                      // Fallback to icon if image not found
-                                                      return Icon(
-                                                        Icons.directions_car,
-                                                        size: 40,
-                                                        color: Colors
-                                                            .grey
-                                                            .shade400,
-                                                      );
-                                                    },
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(height: 5),
-
-                                        // Brand Name
-                                        Text(
-                                          brand.name,
-                                          style: const TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w500,
-                                            color: Colors.black,
-                                          ),
-                                          textAlign: TextAlign.center,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                },
-                              ),
-                            );
-                          }
-                          return const SizedBox.shrink();
-                        },
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Vehicles Label
-                      const Text(
-                        "Vehicles",
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w400,
-                          color: Colors.black,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Vehicle Type Filters
-                      Row(
-                        children: vehicleTypes.map((type) {
-                          final isSelected = selectedVehicleType == type;
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 12),
-                            child: GestureDetector(
-                              onTap: () {
-                                setState(() {
-                                  selectedVehicleType = type;
-                                });
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 20,
-                                  vertical: 10,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: isSelected
-                                      ? Colors.black
-                                      : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(24),
-                                  border: Border.all(
-                                    color: isSelected
-                                        ? Colors.black
-                                        : const Color(0xFFE0E0E0),
-                                    width: 1.5,
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      type == 'Sedan'
-                                          ? Icons.directions_car
-                                          : Icons.directions_car,
-                                      color: isSelected
-                                          ? Colors.white
-                                          : Colors.black,
-                                      size: 20,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      type,
-                                      style: TextStyle(
-                                        color: isSelected
-                                            ? Colors.white
-                                            : Colors.black,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
                           );
-                        }).toList(),
-                      ),
-                      const SizedBox(height: 16),
+                        }
+                      },
+                      childCount:
+                          filteredModels.length +
+                          (state is VehicleModelPaginationLoading ? 1 : 0),
+                    ),
+                  ),
+                );
+              },
+            ),
+            const SliverToBoxAdapter(child: SizedBox(height: 40)),
+          ],
+        ),
+      ),
+    );
+  }
 
-                      // Vehicle List with Smooth Animation
-                      BlocBuilder<VehicleModelBloc, VehicleModelState>(
-                        builder: (context, state) {
-                          List<VehicleModel> filteredModels = [];
-
-                          if (state is VehicleModelLoaded) {
-                            filteredModels = state.models.where((model) {
-                              // Filter by brand
-                              bool matchesBrand =
-                                  selectedBrand == null ||
-                                  model.brand?.name == selectedBrand;
-
-                              // Filter by search query
-                              bool matchesSearch =
-                                  searchController.text.isEmpty ||
-                                  model.name.toLowerCase().contains(
-                                    searchController.text.toLowerCase(),
-                                  );
-
-                              // Filter by vehicle type (Sedan/SUV)
-                              bool matchesType = false;
-                              if (model.vehicleCategory != null) {
-                                // Compare backend category with selected type (case-insensitive)
-                                matchesType =
-                                    model.vehicleCategory!.name.toLowerCase() ==
-                                    selectedVehicleType.toLowerCase();
-                              }
-
-                              return matchesBrand &&
-                                  matchesSearch &&
-                                  matchesType;
-                            }).toList();
-                          }
-
-                          return AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 300),
-                            transitionBuilder:
-                                (Widget child, Animation<double> animation) {
-                                  return FadeTransition(
-                                    opacity: animation,
-                                    child: SlideTransition(
-                                      position:
-                                          Tween<Offset>(
-                                            begin: const Offset(0.0, 0.1),
-                                            end: Offset.zero,
-                                          ).animate(
-                                            CurvedAnimation(
-                                              parent: animation,
-                                              curve: Curves.easeOutCubic,
-                                            ),
-                                          ),
-                                      child: child,
-                                    ),
-                                  );
-                                },
-                            child: (state is VehicleModelLoading)
-                                ? Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 20,
-                                    ),
-                                    child: Column(
-                                      children: List.generate(3, (index) {
-                                        return Padding(
-                                          padding: const EdgeInsets.only(
-                                            bottom: 16,
-                                          ),
-                                          child: Shimmer.fromColors(
-                                            baseColor: Colors.grey.shade300,
-                                            highlightColor:
-                                                Colors.grey.shade100,
-                                            child: Container(
-                                              height: 141,
-                                              decoration: BoxDecoration(
-                                                color: Colors.white,
-                                                borderRadius:
-                                                    BorderRadius.circular(6),
-                                              ),
-                                            ),
-                                          ),
-                                        );
-                                      }),
-                                    ),
-                                  )
-                                : (state is VehicleModelError)
-                                ? Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 40,
-                                    ),
-                                    child: Center(
-                                      child: Text(
-                                        state.message,
-                                        style: const TextStyle(
-                                          color: Colors.red,
-                                        ),
-                                      ),
-                                    ),
-                                  )
-                                : filteredModels.isEmpty
-                                ? Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 40,
-                                    ),
-                                    child: Center(
-                                      child: Text(
-                                        "No vehicles available",
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          color: Colors.grey.shade600,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ),
-                                  )
-                                : Column(
-                                    key: ValueKey<String>(
-                                      selectedVehicleType +
-                                          (selectedBrand ?? "all") +
-                                          searchController.text,
-                                    ),
-                                    children: filteredModels.map((vehicle) {
-                                      final isSelected =
-                                          selectedVehicle == vehicle;
-
-                                      return Padding(
-                                        padding: const EdgeInsets.only(
-                                          bottom: 16,
-                                        ),
-                                        child: GestureDetector(
-                                          onTap: () {
-                                            setState(() {
-                                              selectedVehicle = vehicle;
-                                            });
-                                            _showVehicleNumberBottomSheet();
-                                          },
-                                          child: Container(
-                                            height: 141,
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFFF5F5F5),
-                                              borderRadius:
-                                                  BorderRadius.circular(6),
-                                              border: Border.all(
-                                                color: isSelected
-                                                    ? Colors.black
-                                                    : Colors.transparent,
-                                                width: 2.5,
-                                              ),
-                                            ),
-                                            child: Stack(
-                                              children: [
-                                                // Vehicle Name
-                                                Positioned(
-                                                  left: 20,
-                                                  top: 20,
-                                                  child: Column(
-                                                    crossAxisAlignment:
-                                                        CrossAxisAlignment
-                                                            .start,
-                                                    children: [
-                                                      Text(
-                                                        vehicle.name.split(
-                                                          ' ',
-                                                        )[0],
-                                                        style: const TextStyle(
-                                                          fontSize: 24,
-                                                          fontWeight:
-                                                              FontWeight.w500,
-                                                          color: Colors.black,
-                                                        ),
-                                                      ),
-                                                      if (vehicle.name
-                                                              .split(' ')
-                                                              .length >
-                                                          1)
-                                                        Text(
-                                                          vehicle.name
-                                                              .split(' ')
-                                                              .sublist(1)
-                                                              .join(' '),
-                                                          style:
-                                                              const TextStyle(
-                                                                fontSize: 24,
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .w500,
-                                                                color: Colors
-                                                                    .black,
-                                                              ),
-                                                        ),
-                                                    ],
-                                                  ),
-                                                ),
-
-                                                // Vehicle Image
-                                                Positioned(
-                                                  right: 0,
-                                                  bottom: 5,
-                                                  top: 5,
-                                                  child:
-                                                      vehicle.image.startsWith(
-                                                        'http',
-                                                      )
-                                                      ? Image.network(
-                                                          vehicle.image,
-                                                          fit: BoxFit.contain,
-                                                          height: 142,
-                                                          errorBuilder:
-                                                              (
-                                                                context,
-                                                                error,
-                                                                stackTrace,
-                                                              ) {
-                                                                return Center(
-                                                                  child: Icon(
-                                                                    Icons
-                                                                        .directions_car,
-                                                                    size: 80,
-                                                                    color: Colors
-                                                                        .grey
-                                                                        .shade400,
-                                                                  ),
-                                                                );
-                                                              },
-                                                        )
-                                                      : Image.asset(
-                                                          vehicle.image,
-                                                          fit: BoxFit.contain,
-                                                          height: 142,
-                                                          errorBuilder:
-                                                              (
-                                                                context,
-                                                                error,
-                                                                stackTrace,
-                                                              ) {
-                                                                return Center(
-                                                                  child: Icon(
-                                                                    Icons
-                                                                        .directions_car,
-                                                                    size: 80,
-                                                                    color: Colors
-                                                                        .grey
-                                                                        .shade400,
-                                                                  ),
-                                                                );
-                                                              },
-                                                        ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      );
-                                    }).toList(),
-                                  ),
-                          );
-                        },
-                      ),
-                    ],
+  Widget _buildHeader() {
+    return SizedBox(
+      width: double.infinity,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          const Text(
+            "Select your vehicle",
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Colors.black,
+            ),
+          ),
+          Positioned(
+            right: 0,
+            child: GestureDetector(
+              onTap: () {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => const HomeScreen()),
+                );
+              },
+              child: const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                child: Text(
+                  "skip",
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w400,
+                    color: Colors.black,
                   ),
                 ),
               ),
             ),
-          ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return Container(
+      height: 56,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF5F5F5),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: TextField(
+        controller: searchController,
+        onChanged: (value) {
+          setState(() {});
+        },
+        decoration: InputDecoration(
+          hintText: 'Search Vehicles',
+          hintStyle: TextStyle(
+            color: Colors.grey.shade400,
+            fontSize: 16,
+            fontWeight: FontWeight.w400,
+          ),
+          prefixIcon: Icon(Icons.search, color: Colors.grey.shade600, size: 24),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 16,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBrandGrid() {
+    return BlocBuilder<BrandBloc, BrandState>(
+      builder: (context, state) {
+        if (state is BrandLoading || state is BrandInitial) {
+          return SizedBox(
+            height: 110,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: 4,
+              itemBuilder: (context, index) {
+                return Padding(
+                  padding: const EdgeInsets.only(right: 15),
+                  child: Shimmer.fromColors(
+                    baseColor: Colors.grey.shade300,
+                    highlightColor: Colors.grey.shade100,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 77,
+                          height: 77,
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        Container(
+                          width: 50,
+                          height: 14,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          );
+        } else if (state is BrandLoaded) {
+          final brands = state.brands;
+          return SizedBox(
+            height: 110,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              itemCount: brands.length,
+              itemBuilder: (context, index) {
+                final brand = brands[index];
+                final isSelected = selectedBrand == brand.name;
+                return GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      selectedBrand = brand.name;
+                    });
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 15),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 77,
+                          height: 77,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: const Color(0xFFF5F5F5),
+                            border: Border.all(
+                              color: isSelected
+                                  ? Colors.black
+                                  : Colors.transparent,
+                              width: 2,
+                            ),
+                          ),
+                          child: Center(
+                            child: Image.network(
+                              brand.image,
+                              width: 36,
+                              height: 36,
+                              fit: BoxFit.contain,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Icon(
+                                  Icons.directions_car,
+                                  size: 40,
+                                  color: Colors.grey.shade400,
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          brand.name,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.black,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          );
+        }
+        return const SizedBox.shrink();
+      },
+    );
+  }
+
+  Widget _buildVehicleTypeFilters() {
+    return Row(
+      children: vehicleTypes.map((type) {
+        final isSelected = selectedVehicleType == type;
+        return Padding(
+          padding: const EdgeInsets.only(right: 12),
+          child: GestureDetector(
+            onTap: () {
+              setState(() {
+                selectedVehicleType = type;
+              });
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              decoration: BoxDecoration(
+                color: isSelected ? Colors.black : Colors.transparent,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: isSelected ? Colors.black : const Color(0xFFE0E0E0),
+                  width: 1.5,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.directions_car,
+                    color: isSelected ? Colors.white : Colors.black,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    type,
+                    style: TextStyle(
+                      color: isSelected ? Colors.white : Colors.black,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildSkeletonItem() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Shimmer.fromColors(
+        baseColor: Colors.grey.shade300,
+        highlightColor: Colors.grey.shade100,
+        child: Container(
+          height: 141,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(6),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorState(String message) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 40),
+      child: Center(
+        child: Text(message, style: const TextStyle(color: Colors.red)),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 40),
+      child: Center(
+        child: Text(
+          "No vehicles available",
+          style: TextStyle(
+            fontSize: 16,
+            color: Colors.grey.shade600,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVehicleItem(VehicleModel vehicle, bool isSelected) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            selectedVehicle = vehicle;
+          });
+          _showVehicleNumberBottomSheet();
+        },
+        child: Container(
+          height: 141,
+          decoration: BoxDecoration(
+            color: const Color(0xFFF5F5F5),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(
+              color: isSelected ? Colors.black : Colors.transparent,
+              width: 2.5,
+            ),
+          ),
+          child: Stack(
+            children: [
+              Positioned(
+                left: 20,
+                top: 20,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      vehicle.name.split(' ')[0],
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black,
+                      ),
+                    ),
+                    if (vehicle.name.split(' ').length > 1)
+                      Text(
+                        vehicle.name.split(' ').sublist(1).join(' '),
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.black,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              Positioned(
+                right: 0,
+                bottom: 5,
+                top: 5,
+                child: () {
+                  final img = vehicle.vehicleImage.trim();
+                  if (img.isEmpty) {
+                    return Center(
+                      child: Icon(
+                        Icons.directions_car,
+                        size: 80,
+                        color: Colors.grey.shade400,
+                      ),
+                    );
+                  }
+
+                  if (img.startsWith('http')) {
+                    return Image.network(
+                      img,
+                      fit: BoxFit.contain,
+                      height: 142,
+                      errorBuilder: (context, error, stackTrace) => Icon(
+                        Icons.directions_car,
+                        size: 80,
+                        color: Colors.grey.shade400,
+                      ),
+                    );
+                  }
+
+                  if (img.startsWith('assets/')) {
+                    return Image.asset(
+                      img,
+                      fit: BoxFit.contain,
+                      height: 142,
+                      errorBuilder: (context, error, stackTrace) => Icon(
+                        Icons.directions_car,
+                        size: 80,
+                        color: Colors.grey.shade400,
+                      ),
+                    );
+                  }
+
+                  // Clean path and prepend storage URL
+                  String path = img;
+                  while (path.startsWith('/') ||
+                      path.startsWith('public/') ||
+                      path.startsWith('storage/')) {
+                    if (path.startsWith('/')) path = path.substring(1);
+                    if (path.startsWith('public/'))
+                      path = path.replaceFirst('public/', '');
+                    if (path.startsWith('storage/'))
+                      path = path.replaceFirst('storage/', '');
+                  }
+
+                  return Image.network(
+                    '${AppConfig.storageUrl}$path',
+                    fit: BoxFit.contain,
+                    height: 142,
+                    errorBuilder: (context, error, stackTrace) => Icon(
+                      Icons.directions_car,
+                      size: 80,
+                      color: Colors.grey.shade400,
+                    ),
+                  );
+                }(),
+              ),
+            ],
+          ),
         ),
       ),
     );

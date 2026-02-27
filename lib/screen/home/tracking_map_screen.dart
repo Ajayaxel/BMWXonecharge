@@ -6,15 +6,21 @@ import 'dart:async';
 import 'dart:ui' as ui;
 import 'package:flutter/services.dart';
 import 'dart:math' as math;
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:onecharge/models/ticket_model.dart';
+import 'package:onecharge/logic/blocs/ticket/ticket_bloc.dart';
+import 'package:onecharge/logic/blocs/ticket/ticket_state.dart';
 
 class TrackingMapScreen extends StatefulWidget {
   final String stage;
   final double progress;
+  final Ticket? ticket;
 
   const TrackingMapScreen({
     super.key,
     required this.stage,
     required this.progress,
+    this.ticket,
   });
 
   @override
@@ -26,6 +32,7 @@ class _TrackingMapScreenState extends State<TrackingMapScreen> {
   late double _currentProgress;
   late String _currentStage;
   Timer? _animTimer;
+  Ticket? _currentTicket;
 
   static const LatLng _center = LatLng(25.2048, 55.2708); // User Location
 
@@ -80,79 +87,43 @@ class _TrackingMapScreenState extends State<TrackingMapScreen> {
     return _routePath.last;
   }
 
-  List<LatLng> _getRemainingPath(LatLng currentPos) {
-    if (_currentProgress >= 1.0) return [_routePath.last];
-
-    List<LatLng> points = [currentPos];
-
-    double totalDist = 0;
-    for (int i = 0; i < _routePath.length - 1; i++) {
-      totalDist += _getDistance(_routePath[i], _routePath[i + 1]);
-    }
-    double targetDist = totalDist * _currentProgress;
-    double currentDist = 0;
-    int nextPointIndex = 1;
-
-    for (int i = 0; i < _routePath.length - 1; i++) {
-      double segmentDist = _getDistance(_routePath[i], _routePath[i + 1]);
-      if (currentDist + segmentDist >= targetDist) {
-        nextPointIndex = i + 1;
-        break;
-      }
-      currentDist += segmentDist;
-    }
-
-    for (int i = nextPointIndex; i < _routePath.length; i++) {
-      points.add(_routePath[i]);
-    }
-    return points;
-  }
-
   @override
   void initState() {
     super.initState();
     _currentProgress = widget.progress;
     _currentStage = widget.stage;
-    _startFastTracking();
+    _currentTicket = widget.ticket;
+    _addCustomMarkers();
+    _addPolyline();
+  }
+
+  @override
+  void didUpdateWidget(TrackingMapScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.stage != widget.stage) {
+      setState(() {
+        _currentStage = widget.stage;
+      });
+    }
+    if (oldWidget.progress != widget.progress) {
+      setState(() {
+        _currentProgress = widget.progress;
+      });
+    }
+    if (oldWidget.ticket != widget.ticket) {
+      setState(() {
+        _currentTicket = widget.ticket;
+      });
+      _addCustomMarkers();
+      _addPolyline();
+      _updateCameraBounds();
+    }
   }
 
   @override
   void dispose() {
     _animTimer?.cancel();
     super.dispose();
-  }
-
-  void _startFastTracking() {
-    // 10 second reach = 1.0 / (10 seconds * 10 updates per second) = 0.01 per 100ms
-    _animTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
-      if (!mounted) return;
-
-      setState(() {
-        if (_currentProgress < 1.0) {
-          _currentProgress += 0.01;
-          if (_currentProgress >= 0.3 && _currentStage == 'assigned') {
-            _currentStage = 'reaching';
-          }
-          if (_currentProgress >= 0.7 && _currentStage == 'reaching') {
-            _currentStage = 'solving';
-          }
-        } else {
-          _currentProgress = 1.0;
-          timer.cancel();
-
-          // Wait 2 seconds at 'solving' then show 'resolved'
-          Future.delayed(const Duration(seconds: 2), () {
-            if (mounted) {
-              setState(() {
-                _currentStage = 'resolved';
-              });
-            }
-          });
-        }
-        _addCustomMarkers();
-        _addPolyline();
-      });
-    });
   }
 
   Future<Uint8List> _getBytesFromAsset(String path, int width) async {
@@ -203,8 +174,17 @@ class _TrackingMapScreenState extends State<TrackingMapScreen> {
 
     final BitmapDescriptor blackMarker = await _getBlackCircleMarker();
 
-    // Current agent position interpolated by progress along the route
-    final LatLng movingPos = _calculatePosition(_currentProgress);
+    // Current agent position: use real location if available, else interpolate
+    LatLng movingPos;
+    if (_currentTicket?.driver?.latitude != null &&
+        _currentTicket?.driver?.longitude != null) {
+      movingPos = LatLng(
+        double.parse(_currentTicket!.driver!.latitude!),
+        double.parse(_currentTicket!.driver!.longitude!),
+      );
+    } else {
+      movingPos = _calculatePosition(_currentProgress);
+    }
 
     // Add ambient cars
     final carPositions = [
@@ -238,10 +218,19 @@ class _TrackingMapScreenState extends State<TrackingMapScreen> {
       }
 
       // Add user marker
+      LatLng destination = _center;
+      if (_currentTicket?.latitude != null &&
+          _currentTicket?.longitude != null) {
+        destination = LatLng(
+          double.parse(_currentTicket!.latitude!),
+          double.parse(_currentTicket!.longitude!),
+        );
+      }
+
       _markers.add(
         Marker(
           markerId: const MarkerId('destination'),
-          position: _center,
+          position: destination,
           icon: blackMarker,
           anchor: const Offset(0.5, 0.5),
         ),
@@ -249,62 +238,202 @@ class _TrackingMapScreenState extends State<TrackingMapScreen> {
     });
   }
 
+  void _updateCameraBounds() {
+    LatLng movingPos;
+    if (_currentTicket?.driver?.latitude != null &&
+        _currentTicket?.driver?.longitude != null) {
+      movingPos = LatLng(
+        double.parse(_currentTicket!.driver!.latitude!),
+        double.parse(_currentTicket!.driver!.longitude!),
+      );
+    } else {
+      movingPos = _calculatePosition(_currentProgress);
+    }
+
+    LatLng destination = _center;
+    if (_currentTicket?.latitude != null && _currentTicket?.longitude != null) {
+      destination = LatLng(
+        double.parse(_currentTicket!.latitude!),
+        double.parse(_currentTicket!.longitude!),
+      );
+    }
+
+    double minLat = math.min(movingPos.latitude, destination.latitude);
+    double maxLat = math.max(movingPos.latitude, destination.latitude);
+    double minLng = math.min(movingPos.longitude, destination.longitude);
+    double maxLng = math.max(movingPos.longitude, destination.longitude);
+
+    if (minLat == maxLat && minLng == maxLng) {
+      _controller.future.then((controller) {
+        controller.animateCamera(CameraUpdate.newLatLngZoom(movingPos, 14));
+      });
+      return;
+    }
+
+    LatLngBounds bounds = LatLngBounds(
+      southwest: LatLng(minLat, minLng),
+      northeast: LatLng(maxLat, maxLng),
+    );
+
+    _controller.future.then((controller) {
+      controller.animateCamera(CameraUpdate.newLatLngBounds(bounds, 80));
+    });
+  }
+
   void _addPolyline() {
-    final LatLng currentPos = _calculatePosition(_currentProgress);
-    final List<LatLng> pathPoints = _getRemainingPath(currentPos);
+    LatLng movingPos;
+    if (_currentTicket?.driver?.latitude != null &&
+        _currentTicket?.driver?.longitude != null) {
+      movingPos = LatLng(
+        double.parse(_currentTicket!.driver!.latitude!),
+        double.parse(_currentTicket!.driver!.longitude!),
+      );
+    } else {
+      movingPos = _calculatePosition(_currentProgress);
+    }
+
+    LatLng destination = _center;
+    if (_currentTicket?.latitude != null && _currentTicket?.longitude != null) {
+      destination = LatLng(
+        double.parse(_currentTicket!.latitude!),
+        double.parse(_currentTicket!.longitude!),
+      );
+    }
 
     _polylines.clear();
     _polylines.add(
       Polyline(
         polylineId: const PolylineId('path'),
-        points: pathPoints,
+        points: [movingPos, destination],
         color: Colors.black,
-        width: 3,
+        width: 4,
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Stack(
-        children: [
-          GoogleMap(
-            initialCameraPosition: const CameraPosition(
-              target: _center,
-              zoom: 14,
-            ),
-            onMapCreated: (GoogleMapController controller) {
-              _controller.complete(controller);
-            },
-            markers: _markers,
-            polylines: _polylines,
-            zoomControlsEnabled: false,
-            myLocationEnabled: false,
-          ),
+    return BlocListener<TicketBloc, TicketState>(
+      listener: (context, state) {
+        if (state is TicketDetailSuccess) {
+          setState(() {
+            _currentTicket = state.ticket;
+            final status = state.ticket.status?.toLowerCase() ?? '';
 
-          // Custom header toast
-          ServiceNotificationOverlay(
-            stage: _currentStage,
-            progress: _currentProgress,
-            onDismiss: () => Navigator.pop(context),
-            onSolved: () => Navigator.pop(context),
-            onTap: () {}, // Already on map
-          ),
+            if (state.ticket.driver != null ||
+                status == 'assigned' ||
+                status == 'reaching') {
+              _currentStage = 'reaching';
+              _currentProgress = 0.5;
+            }
+            if (status == 'solving' ||
+                status == 'in_progress' ||
+                status == 'at_location' ||
+                status == 'reached') {
+              _currentStage = 'solving';
+              _currentProgress = 1.0;
+            }
+            if (status == 'completed' || status == 'resolved') {
+              _currentStage = 'resolved';
+            } else if (status == 'cancelled' || status == 'rejected') {
+              _currentStage = 'none';
+              if (Navigator.canPop(context)) {
+                Navigator.pop(context); // Close map if cancelled
+              }
+            }
+          });
+          _addCustomMarkers();
+          _addPolyline();
+          _updateCameraBounds();
+        } else if (state is DriverLocationLoaded) {
+          if (state.driver != null) {
+            setState(() {
+              // Update local ticket with new driver info
+              if (_currentTicket != null) {
+                _currentTicket = _currentTicket!.copyWith(driver: state.driver);
+              }
 
-          // Bottom Button
-          Positioned(
-            bottom: 40,
-            left: 20,
-            right: 20,
-            child: OneBtn(
-              onPressed: () {
-                Navigator.pop(context);
+              // Priority 1: If we have a driver, we are no longer "finding"
+              if (_currentStage == 'finding' || _currentStage == 'none') {
+                _currentStage = 'reaching';
+              }
+
+              // Priority 2: Check for arrival
+              final status = _currentTicket?.status?.toLowerCase() ?? '';
+
+              if (status == 'completed' || status == 'resolved') {
+                _currentStage = 'resolved';
+              } else if (status == 'cancelled' || status == 'rejected') {
+                _currentStage = 'none';
+                if (Navigator.canPop(context)) {
+                  Navigator.pop(context); // Close map if cancelled
+                }
+              } else if (status == 'at_location' ||
+                  status == 'in_progress' ||
+                  status == 'reached' ||
+                  status == 'solving') {
+                _currentStage = 'solving';
+                _currentProgress = 1.0;
+              } else if (status == 'assigned' || status == 'reaching') {
+                _currentProgress = 0.5;
+              }
+            });
+            _addCustomMarkers();
+            _addPolyline();
+            _updateCameraBounds();
+          }
+        }
+      },
+      child: Scaffold(
+        body: Stack(
+          children: [
+            GoogleMap(
+              initialCameraPosition: CameraPosition(
+                target: (_currentTicket?.driver?.latitude != null)
+                    ? LatLng(
+                        double.parse(_currentTicket!.driver!.latitude!),
+                        double.parse(_currentTicket!.driver!.longitude!),
+                      )
+                    : _center,
+                zoom: 14,
+              ),
+              onMapCreated: (GoogleMapController controller) {
+                _controller.complete(controller);
+                Future.delayed(const Duration(milliseconds: 300), () {
+                  if (mounted) _updateCameraBounds();
+                });
               },
-              text: "Back to home",
+              markers: _markers,
+              polylines: _polylines,
+              zoomControlsEnabled: false,
+              myLocationEnabled: false,
             ),
-          ),
-        ],
+
+            // Custom header toast
+            if (_currentStage != 'none' && _currentStage != 'reached')
+              ServiceNotificationOverlay(
+                stage: _currentStage,
+                progress: _currentProgress,
+                ticket: _currentTicket,
+                onDismiss: () => Navigator.pop(context),
+                onSolved: () => Navigator.pop(context, true),
+                onTap: () {}, // Already on map
+              ),
+
+            // Bottom Button
+            Positioned(
+              bottom: 40,
+              left: 20,
+              right: 20,
+              child: OneBtn(
+                onPressed: () {
+                  Navigator.pop(context);
+                },
+                text: "Back to home",
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -1,16 +1,18 @@
 import 'package:dio/dio.dart';
-import 'package:onecharge/core/storage/token_storage.dart';
+import 'package:flutter/foundation.dart';
+import '../../core/storage/secure_storage_service.dart';
 
 class ApiClient {
   late Dio _dio;
-  static const String baseUrl = 'https://app.onecharge.io/api';
+  final SecureStorageService _storage;
+  static const String baseUrl = "https://app.onecharge.io/api";
 
-  ApiClient() {
+  ApiClient(this._storage) {
     _dio = Dio(
       BaseOptions(
         baseUrl: baseUrl,
-        connectTimeout: const Duration(seconds: 30),
-        receiveTimeout: const Duration(seconds: 30),
+        connectTimeout: const Duration(seconds: 40),
+        receiveTimeout: const Duration(seconds: 60),
         validateStatus: (status) {
           return status != null && status < 500;
         },
@@ -25,9 +27,10 @@ class ApiClient {
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
-          // Skip adding token for login endpoint
-          if (options.path != '/customer/login') {
-            final token = await TokenStorage.readToken();
+          // Skip adding token for login and forgot-password endpoints
+          if (options.path != '/customer/login' &&
+              options.path != '/customer/forgot-password') {
+            final token = await _storage.getAccessToken();
             if (token != null && token.isNotEmpty) {
               options.headers['Authorization'] = 'Bearer $token';
               print('🔑 [ApiClient] Token added to request: ${options.path}');
@@ -50,21 +53,28 @@ class ApiClient {
       ),
     );
 
-    // Add logging interceptor
-    _dio.interceptors.add(
-      LogInterceptor(requestBody: true, responseBody: true),
-    );
+    // Add logging interceptor only in debug mode to save CPU in production
+    if (kDebugMode) {
+      _dio.interceptors.add(
+        LogInterceptor(requestBody: true, responseBody: true),
+      );
+    }
   }
 
   Future<Response> get(
     String path, {
     Map<String, dynamic>? queryParameters,
+    CancelToken? cancelToken,
     int retries = 3,
   }) async {
     int attempt = 0;
     while (attempt < retries) {
       try {
-        final response = await _dio.get(path, queryParameters: queryParameters);
+        final response = await _dio.get(
+          path,
+          queryParameters: queryParameters,
+          cancelToken: cancelToken,
+        );
         return response;
       } on DioException catch (e) {
         attempt++;
@@ -94,26 +104,16 @@ class ApiClient {
     String path, {
     dynamic data,
     Map<String, dynamic>? queryParameters,
+    CancelToken? cancelToken,
     String? baseUrl,
   }) async {
     try {
-      final dio = baseUrl != null
-          ? Dio(
-              BaseOptions(
-                baseUrl: baseUrl,
-                connectTimeout: const Duration(seconds: 30),
-                receiveTimeout: const Duration(seconds: 30),
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Accept': 'application/json',
-                },
-              ),
-            )
-          : _dio;
-      final response = await dio.post(
+      // Dio automatically uses absolute URL if path starts with http
+      final response = await _dio.post(
         path,
         data: data,
         queryParameters: queryParameters,
+        cancelToken: cancelToken,
       );
       return response;
     } on DioException catch (e) {
@@ -125,12 +125,14 @@ class ApiClient {
     String path, {
     dynamic data,
     Map<String, dynamic>? queryParameters,
+    CancelToken? cancelToken,
   }) async {
     try {
       final response = await _dio.put(
         path,
         data: data,
         queryParameters: queryParameters,
+        cancelToken: cancelToken,
       );
       return response;
     } on DioException catch (e) {
@@ -142,12 +144,14 @@ class ApiClient {
     String path, {
     dynamic data,
     Map<String, dynamic>? queryParameters,
+    CancelToken? cancelToken,
   }) async {
     try {
       final response = await _dio.delete(
         path,
         data: data,
         queryParameters: queryParameters,
+        cancelToken: cancelToken,
       );
       return response;
     } on DioException catch (e) {
@@ -161,18 +165,12 @@ class ApiClient {
     Map<String, dynamic>? queryParameters,
   }) async {
     try {
-      final dio = Dio(
-        BaseOptions(
-          baseUrl: baseUrl,
-          connectTimeout: const Duration(seconds: 30),
-          receiveTimeout: const Duration(seconds: 30),
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-          },
-        ),
+      // If path is not absolute, combine with baseUrl
+      final fullPath = path.startsWith('http') ? path : '$baseUrl$path';
+      final response = await _dio.get(
+        fullPath,
+        queryParameters: queryParameters,
       );
-      final response = await dio.get(path, queryParameters: queryParameters);
       return response;
     } on DioException catch (e) {
       throw _handleError(e);
@@ -202,7 +200,7 @@ class ApiClient {
   }) async {
     try {
       // Get token for multipart request
-      final token = await TokenStorage.readToken();
+      final token = await _storage.getAccessToken();
       final headers = <String, dynamic>{'Accept': 'application/json'};
       if (token != null && token.isNotEmpty) {
         headers['Authorization'] = 'Bearer $token';
@@ -225,7 +223,7 @@ class ApiClient {
   }) async {
     try {
       // Get token for multipart request
-      final token = await TokenStorage.readToken();
+      final token = await _storage.getAccessToken();
       final headers = <String, dynamic>{'Accept': 'application/json'};
       if (token != null && token.isNotEmpty) {
         headers['Authorization'] = 'Bearer $token';

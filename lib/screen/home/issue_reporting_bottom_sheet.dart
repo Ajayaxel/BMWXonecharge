@@ -21,6 +21,9 @@ import 'package:onecharge/models/issue_category_model.dart';
 import 'package:onecharge/models/ticket_model.dart';
 import 'package:onecharge/core/storage/vehicle_storage.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:onecharge/logic/blocs/redeem_code/redeem_code_bloc.dart';
+import 'package:onecharge/logic/blocs/redeem_code/redeem_code_event.dart';
+import 'package:onecharge/logic/blocs/redeem_code/redeem_code_state.dart';
 
 class IssueReportingBottomSheet extends StatefulWidget {
   final String vehicleName;
@@ -57,7 +60,11 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
   final List<File> _selectedFiles = [];
   OverlayEntry? _toastEntry;
   IssueSubType? _selectedChargeUnit;
-  String _selectedPaymentMethod = "cod"; // "online" or "cod"
+  final ValueNotifier<String> _selectedPaymentMethodNotifier =
+      ValueNotifier<String>("cod");
+  final TextEditingController _companyCodeController = TextEditingController();
+  final TextEditingController _redeemCodeController = TextEditingController();
+  String? _appliedRedeemCode;
 
   @override
   void initState() {
@@ -137,6 +144,9 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
   void dispose() {
     _issueController.dispose();
     _slotController.dispose();
+    _redeemCodeController.dispose();
+    _companyCodeController.dispose();
+    _selectedPaymentMethodNotifier.dispose();
     _toastEntry?.remove();
     super.dispose();
   }
@@ -590,207 +600,96 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
             topRight: Radius.circular(24),
           ),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 12),
-            // Drag Handle
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2),
+        child: GestureDetector(
+          onTap: () => FocusScope.of(context).unfocus(),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 12),
+              // Drag Handle
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: EdgeInsets.fromLTRB(
-                  16,
-                  0,
-                  16,
-                  MediaQuery.of(context).padding.bottom + 16,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        GestureDetector(
-                          onTap: () => Navigator.pop(context),
-                          child: const Icon(Icons.arrow_back_ios, size: 20),
-                        ),
-                        const SizedBox(width: 10),
-                        Text(
-                          "$_selectedCategory Booking",
-                          style: const TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w700,
-                            fontFamily: 'Lufga',
-                            color: Colors.black,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Categories Horizontal Scroll
-                    BlocBuilder<IssueCategoryBloc, IssueCategoryState>(
-                      builder: (context, state) {
-                        if (state is IssueCategoryLoaded) {
-                          final categories = state.categories
-                              .where((c) => c.name != null)
-                              .toList();
-
-                          // Set initial category if not set
-                          if (_selectedCategoryObj == null &&
-                              categories.isNotEmpty) {
-                            final initialCat = widget.initialCategory != null
-                                ? categories.firstWhere(
-                                    (c) =>
-                                        c.name?.toLowerCase() ==
-                                        widget.initialCategory!
-                                            .toLowerCase()
-                                            .replaceAll('\n', ' '),
-                                    orElse: () => categories.first,
-                                  )
-                                : categories.first;
-                            WidgetsBinding.instance.addPostFrameCallback((_) {
-                              setState(() {
-                                _selectedCategoryObj = initialCat;
-                                _selectedCategory = initialCat.name ?? '';
-                                if (initialCat.subTypes.isNotEmpty) {
-                                  _selectedChargeUnit =
-                                      initialCat.subTypes.first;
-                                }
-                              });
-                            });
-                          }
-                        }
-                        return const SizedBox.shrink();
-                      },
-                    ),
-                    const Text(
-                      "Location",
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w500,
-                        fontFamily: 'Lufga',
-                        color: Colors.black,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 12,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF5F5F5),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
+              const SizedBox(height: 16),
+              Expanded(
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    0,
+                    16,
+                    MediaQuery.of(context).viewInsets.bottom +
+                        MediaQuery.of(context).padding.bottom +
+                        16,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
                         children: [
-                          const Icon(
-                            Icons.location_on_outlined,
-                            color: Colors.black,
-                            size: 22,
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              _currentAddress,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                color: Color(0xFF757575),
-                                fontFamily: 'Lufga',
-                                height: 1.3,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
                           GestureDetector(
-                            onTap: () async {
-                              final result =
-                                  await Navigator.push<LocationModel>(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          const MyLocationScreen(
-                                            isPicker: true,
-                                          ),
-                                    ),
-                                  );
-                              if (result != null) {
-                                setState(() {
-                                  _currentAddress = result.address;
-                                  _currentLatitude = result.latitude;
-                                  _currentLongitude = result.longitude;
-                                });
-                              }
-                            },
-                            child: const Icon(
-                              Icons.edit_outlined,
+                            onTap: () => Navigator.pop(context),
+                            child: const Icon(Icons.arrow_back_ios, size: 20),
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            "$_selectedCategory Booking",
+                            style: const TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w700,
+                              fontFamily: 'Lufga',
                               color: Colors.black,
-                              size: 20,
                             ),
                           ),
                         ],
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    if (!(_selectedCategory.toLowerCase().contains(
-                          'charging',
-                        ) &&
-                        _selectedCategory.toLowerCase().contains(
-                          'station',
-                        ))) ...[
-                      BlocBuilder<TicketBloc, TicketState>(
+                      const SizedBox(height: 16),
+
+                      // Categories Horizontal Scroll
+                      BlocBuilder<IssueCategoryBloc, IssueCategoryState>(
                         builder: (context, state) {
-                          return SizedBox(
-                            width: double.infinity,
-                            height: 52,
-                            child: OutlinedButton(
-                              onPressed: state is TicketLoading
-                                  ? null
-                                  : () => _submitTicket(isInstant: true),
-                              style: OutlinedButton.styleFrom(
-                                side: const BorderSide(
-                                  color: Colors.black,
-                                  width: 1.5,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                backgroundColor: Colors.white,
-                              ),
-                              child: state is TicketLoading
-                                  ? const CupertinoActivityIndicator()
-                                  : const Text(
-                                      "Instant Booking",
-                                      style: TextStyle(
-                                        color: Colors.black,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w700,
-                                        fontFamily: 'Lufga',
-                                      ),
-                                    ),
-                            ),
-                          );
+                          if (state is IssueCategoryLoaded) {
+                            final categories = state.categories
+                                .where((c) => c.name != null)
+                                .toList();
+
+                            // Set initial category if not set
+                            if (_selectedCategoryObj == null &&
+                                categories.isNotEmpty) {
+                              final initialCat = widget.initialCategory != null
+                                  ? categories.firstWhere(
+                                      (c) =>
+                                          c.name?.toLowerCase() ==
+                                          widget.initialCategory!
+                                              .toLowerCase()
+                                              .replaceAll('\n', ' '),
+                                      orElse: () => categories.first,
+                                    )
+                                  : categories.first;
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                setState(() {
+                                  _selectedCategoryObj = initialCat;
+                                  _selectedCategory = initialCat.name ?? '';
+                                  if (initialCat.subTypes.isNotEmpty) {
+                                    _selectedChargeUnit =
+                                        initialCat.subTypes.first;
+                                  }
+                                });
+                              });
+                            }
+                          }
+                          return const SizedBox.shrink();
                         },
                       ),
-                      const SizedBox(height: 16),
-                    ],
-
-                    if (_selectedCategoryObj != null &&
-                        _selectedCategoryObj!.subTypes.isNotEmpty) ...[
-                      Text(
-                        _selectedCategoryObj?.id == 6
-                            ? "Quick Services"
-                            : "Select charge Unit",
+                      const Text(
+                        "Location",
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w500,
@@ -799,31 +698,190 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 2,
-                              crossAxisSpacing: 12,
-                              mainAxisSpacing: 12,
-                              mainAxisExtent: 170,
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF5F5F5),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.location_on_outlined,
+                              color: Colors.black,
+                              size: 22,
                             ),
-                        padding: EdgeInsets.zero,
-                        itemCount: _selectedCategoryObj!.subTypes.length,
-                        itemBuilder: (context, index) {
-                          final subType = _selectedCategoryObj!.subTypes[index];
-                          final isSelected =
-                              _selectedChargeUnit?.id == subType.id;
-                          return _buildChargeUnitCard(subType, isSelected);
-                        },
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                _currentAddress,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: Color(0xFF757575),
+                                  fontFamily: 'Lufga',
+                                  height: 1.3,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            GestureDetector(
+                              onTap: () async {
+                                final result =
+                                    await Navigator.push<LocationModel>(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            const MyLocationScreen(
+                                              isPicker: true,
+                                            ),
+                                      ),
+                                    );
+                                if (result != null) {
+                                  setState(() {
+                                    _currentAddress = result.name.isNotEmpty
+                                        ? result.name
+                                        : result.address;
+                                    _currentLatitude = result.latitude;
+                                    _currentLongitude = result.longitude;
+                                  });
+                                }
+                              },
+                              child: const Icon(
+                                Icons.edit_outlined,
+                                color: Colors.black,
+                                size: 20,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      // Show description field for "Other" category even if it has subTypes
-                      if (_selectedCategoryObj?.id == 6) ...[
+                      const SizedBox(height: 16),
+                      if (!(_selectedCategory.toLowerCase().contains(
+                            'charging',
+                          ) &&
+                          _selectedCategory.toLowerCase().contains(
+                            'station',
+                          ))) ...[
+                        BlocBuilder<TicketBloc, TicketState>(
+                          builder: (context, state) {
+                            return SizedBox(
+                              width: double.infinity,
+                              height: 52,
+                              child: OutlinedButton(
+                                onPressed: state is TicketLoading
+                                    ? null
+                                    : () => _submitTicket(isInstant: true),
+                                style: OutlinedButton.styleFrom(
+                                  side: const BorderSide(
+                                    color: Colors.black,
+                                    width: 1.5,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  backgroundColor: Colors.white,
+                                ),
+                                child: state is TicketLoading
+                                    ? const CupertinoActivityIndicator()
+                                    : const Text(
+                                        "Instant Booking",
+                                        style: TextStyle(
+                                          color: Colors.black,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w700,
+                                          fontFamily: 'Lufga',
+                                        ),
+                                      ),
+                              ),
+                            );
+                          },
+                        ),
                         const SizedBox(height: 16),
+                      ],
+
+                      if (_selectedCategoryObj != null &&
+                          _selectedCategoryObj!.subTypes.isNotEmpty) ...[
                         Text(
+                          _selectedCategoryObj?.id == 6
+                              ? "Quick Services"
+                              : "Select charge Unit",
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w500,
+                            fontFamily: 'Lufga',
+                            color: Colors.black,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        GridView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 2,
+                                crossAxisSpacing: 12,
+                                mainAxisSpacing: 12,
+                                mainAxisExtent: 170,
+                              ),
+                          padding: EdgeInsets.zero,
+                          itemCount: _selectedCategoryObj!.subTypes.length,
+                          itemBuilder: (context, index) {
+                            final subType =
+                                _selectedCategoryObj!.subTypes[index];
+                            final isSelected =
+                                _selectedChargeUnit?.id == subType.id;
+                            return _buildChargeUnitCard(subType, isSelected);
+                          },
+                        ),
+                        // Show description field for "Other" category even if it has subTypes
+                        if (_selectedCategoryObj?.id == 6) ...[
+                          const SizedBox(height: 16),
+                          Text(
+                            "Describe your issue",
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              fontFamily: 'Lufga',
+                              color: Colors.black,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: const Color(0xFFE0E0E0),
+                              ),
+                            ),
+                            child: TextField(
+                              controller: _issueController,
+                              decoration: const InputDecoration(
+                                hintText: "Type your issue",
+                                hintStyle: TextStyle(
+                                  color: Color(0xFFBDBDBD),
+                                  fontFamily: 'Lufga',
+                                  fontSize: 14,
+                                ),
+                                border: InputBorder.none,
+                                contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 12,
+                                ),
+                              ),
+                              onChanged: (_) {
+                                setState(() {}); // Update border color
+                              },
+                            ),
+                          ),
+                        ],
+                      ] else ...[
+                        const Text(
                           "Describe your issue",
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
                             fontFamily: 'Lufga',
@@ -839,461 +897,509 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
                           ),
                           child: TextField(
                             controller: _issueController,
-                            decoration: const InputDecoration(
+                            decoration: InputDecoration(
                               hintText: "Type your issue",
-                              hintStyle: TextStyle(
+                              hintStyle: const TextStyle(
                                 color: Color(0xFFBDBDBD),
                                 fontFamily: 'Lufga',
                                 fontSize: 14,
                               ),
                               border: InputBorder.none,
-                              contentPadding: EdgeInsets.symmetric(
+                              contentPadding: const EdgeInsets.symmetric(
                                 horizontal: 16,
                                 vertical: 12,
                               ),
                             ),
                             onChanged: (_) {
-                              setState(() {}); // Update border color
+                              if (_selectedCategoryObj?.id == 6) {
+                                setState(() {}); // Update border color
+                              }
                             },
                           ),
                         ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          "Upload your issue",
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            fontFamily: 'Lufga',
+                            color: Colors.black,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        GestureDetector(
+                          onTap: _pickMedia,
+                          child: SizedBox(
+                            width: double.infinity,
+                            child: CustomPaint(
+                              painter: DashedBorderPainter(),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                  horizontal: 20,
+                                ),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: Column(
+                                  children: [
+                                    Container(
+                                      width: 48,
+                                      height: 48,
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFF7F7F7),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: const Icon(
+                                        Icons.add_box_outlined,
+                                        color: Colors.black,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    const Text(
+                                      "Add photos or short video",
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w600,
+                                        fontFamily: 'Lufga',
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    const Text(
+                                      "Click here to upload images or videos related to the issue",
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Color(0xFF9E9E9E),
+                                        fontFamily: 'Lufga',
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        if (_selectedFiles.isNotEmpty) ...[
+                          const SizedBox(height: 16),
+                          SizedBox(
+                            height: 90,
+                            child: ListView.builder(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: _selectedFiles.length,
+                              itemBuilder: (context, index) {
+                                final file = _selectedFiles[index];
+                                final isVideo =
+                                    file.path.toLowerCase().endsWith('.mp4') ||
+                                    file.path.toLowerCase().endsWith('.mov');
+                                return Container(
+                                  width: 90,
+                                  margin: const EdgeInsets.only(right: 12),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(12),
+                                    image: !isVideo
+                                        ? DecorationImage(
+                                            image: FileImage(file),
+                                            fit: BoxFit.cover,
+                                          )
+                                        : null,
+                                    color: isVideo
+                                        ? Colors.black87
+                                        : Colors.grey[200],
+                                  ),
+                                  child: Stack(
+                                    children: [
+                                      if (isVideo)
+                                        const Center(
+                                          child: Icon(
+                                            Icons.play_circle_fill,
+                                            color: Colors.white,
+                                            size: 30,
+                                          ),
+                                        ),
+                                      Positioned(
+                                        top: 4,
+                                        right: 4,
+                                        child: GestureDetector(
+                                          onTap: () {
+                                            setState(() {
+                                              _selectedFiles.removeAt(index);
+                                            });
+                                          },
+                                          child: Container(
+                                            padding: const EdgeInsets.all(4),
+                                            decoration: const BoxDecoration(
+                                              color: Colors.black54,
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: const Icon(
+                                              Icons.close,
+                                              color: Colors.white,
+                                              size: 14,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
                       ],
-                    ] else ...[
+                      const SizedBox(height: 16),
+
+                      const SizedBox(height: 16),
+
                       const Text(
-                        "Describe your issue",
+                        "Select Slot",
                         style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w500,
                           fontFamily: 'Lufga',
                           color: Colors.black,
                         ),
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 12),
                       Container(
+                        height: 52,
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(color: const Color(0xFFE0E0E0)),
                         ),
                         child: TextField(
-                          controller: _issueController,
-                          decoration: InputDecoration(
-                            hintText: "Type your issue",
-                            hintStyle: const TextStyle(
+                          controller: _slotController,
+                          readOnly: true,
+                          onTap: () {
+                            _showSlotPicker(context);
+                          },
+                          decoration: const InputDecoration(
+                            hintText: "Select Slot",
+                            hintStyle: TextStyle(
                               color: Color(0xFFBDBDBD),
                               fontFamily: 'Lufga',
                               fontSize: 14,
                             ),
                             border: InputBorder.none,
-                            contentPadding: const EdgeInsets.symmetric(
+                            contentPadding: EdgeInsets.symmetric(
                               horizontal: 16,
-                              vertical: 12,
+                              vertical: 14,
                             ),
                           ),
-                          onChanged: (_) {
-                            if (_selectedCategoryObj?.id == 6) {
-                              setState(() {}); // Update border color
-                            }
-                          },
                         ),
                       ),
                       const SizedBox(height: 16),
+                      _buildRedeemCodeSection(),
+                      const SizedBox(height: 16),
+
+                      // Payment Method Selection
                       const Text(
-                        "Upload your issue",
+                        "Payment Method",
                         style: TextStyle(
-                          fontSize: 16,
+                          fontSize: 18,
                           fontWeight: FontWeight.w600,
                           fontFamily: 'Lufga',
                           color: Colors.black,
                         ),
                       ),
-                      const SizedBox(height: 10),
-                      GestureDetector(
-                        onTap: _pickMedia,
-                        child: SizedBox(
-                          width: double.infinity,
-                          child: CustomPaint(
-                            painter: DashedBorderPainter(),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 16,
-                                horizontal: 20,
-                              ),
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: Column(
-                                children: [
-                                  Container(
-                                    width: 48,
-                                    height: 48,
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFF7F7F7),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: const Icon(
-                                      Icons.add_box_outlined,
-                                      color: Colors.black,
-                                    ),
+                      const SizedBox(height: 12),
+
+                      // Payment Method Selection Content
+                      ValueListenableBuilder<String>(
+                        valueListenable: _selectedPaymentMethodNotifier,
+                        builder: (context, selectedMethod, child) {
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Pay By Company
+                              GestureDetector(
+                                onTap: () {
+                                  _selectedPaymentMethodNotifier.value = "cod";
+                                  // Auto-focus the company code field after a short delay for the expansion animation
+                                  Future.delayed(
+                                    const Duration(milliseconds: 400),
+                                    () {
+                                      if (mounted) {
+                                        FocusScope.of(context).nextFocus();
+                                      }
+                                    },
+                                  );
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 20,
+                                    vertical: 16,
                                   ),
-                                  const SizedBox(height: 16),
-                                  const Text(
-                                    "Add photos or short video",
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w600,
-                                      fontFamily: 'Lufga',
-                                    ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF5F5F5),
+                                    borderRadius: BorderRadius.circular(12),
                                   ),
-                                  const SizedBox(height: 8),
-                                  const Text(
-                                    "Click here to upload images or videos related to the issue",
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Color(0xFF9E9E9E),
-                                      fontFamily: 'Lufga',
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      if (_selectedFiles.isNotEmpty) ...[
-                        const SizedBox(height: 16),
-                        SizedBox(
-                          height: 90,
-                          child: ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            itemCount: _selectedFiles.length,
-                            itemBuilder: (context, index) {
-                              final file = _selectedFiles[index];
-                              final isVideo =
-                                  file.path.toLowerCase().endsWith('.mp4') ||
-                                  file.path.toLowerCase().endsWith('.mov');
-                              return Container(
-                                width: 90,
-                                margin: const EdgeInsets.only(right: 12),
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(12),
-                                  image: !isVideo
-                                      ? DecorationImage(
-                                          image: FileImage(file),
-                                          fit: BoxFit.cover,
-                                        )
-                                      : null,
-                                  color: isVideo
-                                      ? Colors.black87
-                                      : Colors.grey[200],
-                                ),
-                                child: Stack(
-                                  children: [
-                                    if (isVideo)
-                                      const Center(
-                                        child: Icon(
-                                          Icons.play_circle_fill,
-                                          color: Colors.white,
-                                          size: 30,
-                                        ),
-                                      ),
-                                    Positioned(
-                                      top: 4,
-                                      right: 4,
-                                      child: GestureDetector(
-                                        onTap: () {
-                                          setState(() {
-                                            _selectedFiles.removeAt(index);
-                                          });
-                                        },
-                                        child: Container(
-                                          padding: const EdgeInsets.all(4),
-                                          decoration: const BoxDecoration(
-                                            color: Colors.black54,
-                                            shape: BoxShape.circle,
-                                          ),
-                                          child: const Icon(
-                                            Icons.close,
-                                            color: Colors.white,
-                                            size: 14,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ],
-                    ],
-                    const SizedBox(height: 16),
-
-                    const SizedBox(height: 16),
-
-                    const Text(
-                      "Select Slot",
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w500,
-                        fontFamily: 'Lufga',
-                        color: Colors.black,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      height: 52,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFE0E0E0)),
-                      ),
-                      child: TextField(
-                        controller: _slotController,
-                        readOnly: true,
-                        onTap: () {
-                          _showSlotPicker(context);
-                        },
-                        decoration: const InputDecoration(
-                          hintText: "Select Slot",
-                          hintStyle: TextStyle(
-                            color: Color(0xFFBDBDBD),
-                            fontFamily: 'Lufga',
-                            fontSize: 14,
-                          ),
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 14,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Payment Method Selection
-                    const Text(
-                      "Payment Method",
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        fontFamily: 'Lufga',
-                        color: Colors.black,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-
-                    // Pay by cash
-                    GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _selectedPaymentMethod = "cod";
-                        });
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 16,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF5F5F5),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          children: [
-                            const Text(
-                              "Pay by cash",
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
-                                fontFamily: 'Lufga',
-                                color: Colors.black,
-                              ),
-                            ),
-                            const Spacer(),
-                            // Radio Button
-                            Container(
-                              width: 24,
-                              height: 24,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: _selectedPaymentMethod == "cod"
-                                      ? Colors.black
-                                      : const Color(0xFFD0D0D0),
-                                  width: 2,
-                                ),
-                              ),
-                              child: _selectedPaymentMethod == "cod"
-                                  ? Center(
-                                      child: Container(
-                                        width: 12,
-                                        height: 12,
-                                        decoration: const BoxDecoration(
-                                          shape: BoxShape.circle,
+                                  child: Row(
+                                    children: [
+                                      const Text(
+                                        "Pay By Company",
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w500,
+                                          fontFamily: 'Lufga',
                                           color: Colors.black,
                                         ),
                                       ),
-                                    )
-                                  : null,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-
-                    // Online payment
-                    GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _selectedPaymentMethod = "online";
-                        });
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 16,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF5F5F5),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          children: [
-                            const Text(
-                              "online payment",
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
-                                fontFamily: 'Lufga',
-                                color: Colors.black,
-                              ),
-                            ),
-                            const Spacer(),
-                            // Radio Button
-                            Container(
-                              width: 24,
-                              height: 24,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: _selectedPaymentMethod == "online"
-                                      ? Colors.black
-                                      : const Color(0xFFD0D0D0),
-                                  width: 2,
+                                      const Spacer(),
+                                      // Radio Button
+                                      Container(
+                                        width: 24,
+                                        height: 24,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: selectedMethod == "cod"
+                                                ? Colors.black
+                                                : const Color(0xFFD0D0D0),
+                                            width: 2,
+                                          ),
+                                        ),
+                                        child: selectedMethod == "cod"
+                                            ? Center(
+                                                child: Container(
+                                                  width: 12,
+                                                  height: 12,
+                                                  decoration:
+                                                      const BoxDecoration(
+                                                        shape: BoxShape.circle,
+                                                        color: Colors.black,
+                                                      ),
+                                                ),
+                                              )
+                                            : null,
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
-                              child: _selectedPaymentMethod == "online"
-                                  ? Center(
-                                      child: Container(
-                                        width: 12,
-                                        height: 12,
-                                        decoration: const BoxDecoration(
-                                          shape: BoxShape.circle,
+
+                              // Animated Input Section
+                              AnimatedSize(
+                                duration: const Duration(milliseconds: 300),
+                                curve: Curves.easeInOut,
+                                child: selectedMethod == "cod"
+                                    ? Padding(
+                                        padding: const EdgeInsets.only(
+                                          top: 12.0,
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Container(
+                                              decoration: BoxDecoration(
+                                                color: Colors.white,
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                                border: Border.all(
+                                                  color: const Color(
+                                                    0xFFE0E0E0,
+                                                  ),
+                                                ),
+                                              ),
+                                              child: TextField(
+                                                controller:
+                                                    _companyCodeController,
+                                                autofocus: false,
+                                                decoration:
+                                                    const InputDecoration(
+                                                      hintText:
+                                                          "Company Code / ID",
+                                                      hintStyle: TextStyle(
+                                                        color: Color(
+                                                          0xFFBDBDBD,
+                                                        ),
+                                                        fontFamily: 'Lufga',
+                                                        fontSize: 14,
+                                                      ),
+                                                      border: InputBorder.none,
+                                                      contentPadding:
+                                                          EdgeInsets.symmetric(
+                                                            horizontal: 16,
+                                                            vertical: 14,
+                                                          ),
+                                                    ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      )
+                                    : const SizedBox.shrink(),
+                              ),
+
+                              const SizedBox(height: 12),
+
+                              // Pay Now
+                              GestureDetector(
+                                onTap: () {
+                                  _selectedPaymentMethodNotifier.value =
+                                      "online";
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 20,
+                                    vertical: 16,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF5F5F5),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Text(
+                                        "Pay Now",
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w500,
+                                          fontFamily: 'Lufga',
                                           color: Colors.black,
                                         ),
                                       ),
-                                    )
-                                  : null,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-
-                    BlocListener<TicketBloc, TicketState>(
-                      listener: (context, state) {
-                        if (state is TicketSuccess) {
-                          final requiresPayment =
-                              state.response.data?.paymentRequired == true &&
-                              state.response.data?.paymentUrl != null;
-
-                          if (requiresPayment) {
-                            // Close the issue reporting sheet first
-                            Navigator.pop(context);
-
-                            // Then show payment bottom sheet with payment breakdown
-                            showModalBottomSheet(
-                              context: context,
-                              isScrollControlled: true,
-                              backgroundColor: Colors.transparent,
-                              builder: (context) => PaymentBottomSheet(
-                                vehicleName: widget.vehicleName,
-                                vehiclePlate: widget.vehiclePlate,
-                                locationAddress: _currentAddress,
-                                locationCity: "",
-                                date:
-                                    state.response.data?.ticket?.bookingType ==
-                                        "instant"
-                                    ? "Today"
-                                    : DateFormat(
-                                        'MMM dd',
-                                      ).format(_selectedDateTime),
-                                time:
-                                    state.response.data?.ticket?.bookingType ==
-                                        "instant"
-                                    ? "Instant"
-                                    : DateFormat(
-                                        'hh:mm a',
-                                      ).format(_selectedDateTime),
-                                paymentBreakdown:
-                                    state.response.data?.paymentBreakdown,
-                                paymentUrl: state.response.data?.paymentUrl,
-                                intentionId: state.response.data?.intentionId,
+                                      const Spacer(),
+                                      // Radio Button
+                                      Container(
+                                        width: 24,
+                                        height: 24,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: selectedMethod == "online"
+                                                ? Colors.black
+                                                : const Color(0xFFD0D0D0),
+                                            width: 2,
+                                          ),
+                                        ),
+                                        child: selectedMethod == "online"
+                                            ? Center(
+                                                child: Container(
+                                                  width: 12,
+                                                  height: 12,
+                                                  decoration:
+                                                      const BoxDecoration(
+                                                        shape: BoxShape.circle,
+                                                        color: Colors.black,
+                                                      ),
+                                                ),
+                                              )
+                                            : null,
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ),
-                            );
-                          } else {
-                            // No online payment required (e.g., COD or Free)
-                            final breakdown =
-                                state.response.data?.paymentBreakdown;
-                            final invoice =
-                                state.response.data?.ticket?.invoice;
-                            final totalAmount =
-                                breakdown?.totalAmount ?? invoice?.totalAmount;
-
-                            if (totalAmount != null && totalAmount > 0) {
-                              final currency =
-                                  breakdown?.currency ??
-                                  invoice?.currency ??
-                                  "AED";
-                              HomeScreenState.activeState?.showToast(
-                                "Ticket created successfully! Total Amount: ${totalAmount.toStringAsFixed(2)} $currency",
-                              );
-                            }
-
-                            // Return to home and show service notification flow
-                            HomeScreenState.activeState?.startServiceFlow(
-                              ticket: state.response.data?.ticket,
-                            );
-                            Navigator.pop(context);
-                          }
-                        } else if (state is TicketError) {
-                          _showToast(_formatErrorMessage(state.message));
-                        }
-                      },
-                      child: BlocBuilder<TicketBloc, TicketState>(
-                        builder: (context, ticketState) {
-                          return OneBtn(
-                            onPressed: ticketState is TicketLoading
-                                ? null
-                                : () async {
-                                    _submitTicket(isInstant: false);
-                                  },
-                            text: "Submit Service",
-                            isLoading: ticketState is TicketLoading,
+                            ],
                           );
                         },
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 32),
+
+                      BlocListener<TicketBloc, TicketState>(
+                        listener: (context, state) {
+                          if (state is TicketSuccess) {
+                            final requiresPayment =
+                                state.response.data?.paymentRequired == true &&
+                                state.response.data?.paymentUrl != null;
+
+                            if (requiresPayment) {
+                              // Close the issue reporting sheet first
+                              Navigator.pop(context);
+
+                              // Then show payment bottom sheet with payment breakdown
+                              showModalBottomSheet(
+                                context: context,
+                                isScrollControlled: true,
+                                backgroundColor: Colors.transparent,
+                                builder: (context) => PaymentBottomSheet(
+                                  vehicleName: widget.vehicleName,
+                                  vehiclePlate: widget.vehiclePlate,
+                                  locationAddress: _currentAddress,
+                                  locationCity: "",
+                                  date:
+                                      state
+                                              .response
+                                              .data
+                                              ?.ticket
+                                              ?.bookingType ==
+                                          "instant"
+                                      ? "Today"
+                                      : DateFormat(
+                                          'MMM dd',
+                                        ).format(_selectedDateTime),
+                                  time:
+                                      state
+                                              .response
+                                              .data
+                                              ?.ticket
+                                              ?.bookingType ==
+                                          "instant"
+                                      ? "Instant"
+                                      : DateFormat(
+                                          'hh:mm a',
+                                        ).format(_selectedDateTime),
+                                  paymentBreakdown:
+                                      state.response.data?.paymentBreakdown,
+                                  paymentUrl: state.response.data?.paymentUrl,
+                                  intentionId: state.response.data?.intentionId,
+                                ),
+                              );
+                            } else {
+                              // No online payment required (e.g., COD or Free)
+                              final breakdown =
+                                  state.response.data?.paymentBreakdown;
+                              final invoice =
+                                  state.response.data?.ticket?.invoice;
+                              final totalAmount =
+                                  breakdown?.totalAmount ??
+                                  invoice?.totalAmount;
+
+                              if (totalAmount != null && totalAmount > 0) {
+                                final currency =
+                                    breakdown?.currency ??
+                                    invoice?.currency ??
+                                    "AED";
+                                HomeScreenState.activeState?.showToast(
+                                  "Ticket created successfully! Total Amount: ${totalAmount.toStringAsFixed(2)} $currency",
+                                );
+                              }
+
+                              // Return to home and show service notification flow
+                              HomeScreenState.activeState?.startServiceFlow(
+                                ticket: state.response.data?.ticket,
+                              );
+                              Navigator.pop(context);
+                            }
+                          } else if (state is TicketError) {
+                            _showToast(_formatErrorMessage(state.message));
+                          }
+                        },
+                        child: BlocBuilder<TicketBloc, TicketState>(
+                          builder: (context, ticketState) {
+                            return OneBtn(
+                              onPressed: ticketState is TicketLoading
+                                  ? null
+                                  : () async {
+                                      _submitTicket(isInstant: false);
+                                    },
+                              text: "Submit Service",
+                              isLoading: ticketState is TicketLoading,
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1351,8 +1457,10 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
       latitude: _currentLatitude,
       longitude: _currentLongitude,
       attachments: _selectedFiles.isNotEmpty ? _selectedFiles : null,
-      redeemCode: null, // Can be added later if needed
-      paymentMethod: _selectedPaymentMethod == "cod" ? "cod" : null,
+      redeemCode: _appliedRedeemCode,
+      paymentMethod: _selectedPaymentMethodNotifier.value == "cod"
+          ? "cod"
+          : null,
       bookingType: isInstant ? "instant" : "scheduled",
       scheduledAt: isInstant
           ? DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now().toUtc())
@@ -1374,6 +1482,194 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
       return 'assets/icon/batteryboost.png';
     }
     return '';
+  }
+
+  Widget _buildRedeemCodeSection() {
+    return BlocConsumer<RedeemCodeBloc, RedeemCodeState>(
+      listener: (context, state) {
+        if (state is RedeemCodeSuccess) {
+          setState(() {
+            _appliedRedeemCode = _redeemCodeController.text.trim();
+          });
+          _showToast(state.response.message);
+        } else if (state is RedeemCodeFailure) {
+          _showToast(state.message);
+        }
+      },
+      builder: (context, state) {
+        final bool isApplied = state is RedeemCodeSuccess;
+        final bool isLoading = state is RedeemCodeLoading;
+        final bool canApply = _redeemCodeController.text.trim().isNotEmpty;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "Apply Redeem Code",
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w500,
+                fontFamily: 'Lufga',
+                color: Colors.black,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              height: 52,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isApplied
+                      ? Colors.green
+                      : (state is RedeemCodeFailure
+                            ? Colors.red
+                            : const Color(0xFFE0E0E0)),
+                  width: isApplied || state is RedeemCodeFailure ? 1.5 : 1,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _redeemCodeController,
+                      enabled: !isApplied && !isLoading,
+                      onChanged: (value) => setState(() {}),
+                      textCapitalization: TextCapitalization.characters,
+                      decoration: const InputDecoration(
+                        hintText: "Enter code here",
+                        hintStyle: TextStyle(
+                          color: Color(0xFFBDBDBD),
+                          fontFamily: 'Lufga',
+                          fontSize: 14,
+                        ),
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.symmetric(horizontal: 16),
+                      ),
+                      style: const TextStyle(
+                        fontFamily: 'Lufga',
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  if (isApplied)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 4),
+                      child: TextButton(
+                        onPressed: isLoading
+                            ? null
+                            : () {
+                                context.read<RedeemCodeBloc>().add(
+                                  ResetRedeemCode(),
+                                );
+                                setState(() {
+                                  _redeemCodeController.clear();
+                                  _appliedRedeemCode = null;
+                                });
+                              },
+                        child: const Text(
+                          "Remove",
+                          style: TextStyle(
+                            color: Colors.red,
+                            fontWeight: FontWeight.w700,
+                            fontFamily: 'Lufga',
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: SizedBox(
+                        height: 36,
+                        child: ElevatedButton(
+                          onPressed: !canApply || isLoading
+                              ? null
+                              : () {
+                                  // Close keyboard
+                                  FocusScope.of(context).unfocus();
+                                  context.read<RedeemCodeBloc>().add(
+                                    ValidateRedeemCode(
+                                      _redeemCodeController.text.trim(),
+                                    ),
+                                  );
+                                },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.black,
+                            foregroundColor: Colors.white,
+                            disabledBackgroundColor: Colors.grey[300],
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                          ),
+                          child: isLoading
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white,
+                                    ),
+                                  ),
+                                )
+                              : const Text(
+                                  "Apply",
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    fontFamily: 'Lufga',
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            if (isApplied)
+              Padding(
+                padding: const EdgeInsets.only(top: 8, left: 4),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.check_circle,
+                      color: Colors.green,
+                      size: 14,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      "Code applied successfully!",
+                      style: const TextStyle(
+                        color: Colors.green,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Lufga',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            if (state is RedeemCodeFailure)
+              Padding(
+                padding: const EdgeInsets.only(top: 8, left: 4),
+                child: Text(
+                  state.message,
+                  style: const TextStyle(
+                    color: Colors.red,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    fontFamily: 'Lufga',
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
   }
 
   Widget _buildChargeUnitCard(IssueSubType subType, bool isSelected) {

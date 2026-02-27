@@ -71,3 +71,12 @@ class InvoiceDownloadError extends TicketState {
   @override
   List<Object> get props => [message];
 }
+
+class DriverLocationLoaded extends TicketState {
+  final TicketDriver? driver;
+
+  const DriverLocationLoaded(this.driver);
+
+  @override
+  List<Object> get props => [driver ?? 'none'];
+}

@@ -31,13 +31,13 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageStarted: (String url) {
-            print('Payment WebView URL: $url');
+            print('🌐 [PaymentWebView] Page Started: $url');
             setState(() {
               _isLoading = true;
             });
           },
           onPageFinished: (String url) {
-            print('Payment WebView Finished URL: $url');
+            print('🌐 [PaymentWebView] Page Finished: $url');
             setState(() {
               _isLoading = false;
             });
@@ -47,19 +47,26 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
             final success = uri.queryParameters['success'] == 'true';
             final approved =
                 uri.queryParameters['txn_response_code'] == 'APPROVED';
+
             // Some integrations use a 'success' part in the path or 'payment-success'
             final pathContainsSuccess =
                 url.contains('success') || url.contains('payment-success');
 
+            print(
+              '🔍 [PaymentWebView] Checking status: success=$success, approved=$approved, pathContainsSuccess=$pathContainsSuccess',
+            );
+
             if (success || approved || pathContainsSuccess) {
-              print('Payment Status: SUCCESS');
+              print('✅ [PaymentWebView] Payment Status detected as SUCCESS');
               _handlePaymentSuccess();
             } else if (url.contains('cancel') ||
                 url.contains('payment-cancel')) {
-              print('Payment Status: CANCELED');
+              print('⚠️ [PaymentWebView] Payment Status detected as CANCELED');
               _handlePaymentCancel();
             } else {
-              print('Payment Status: PENDING/UNKNOWN (Current URL: $url)');
+              print(
+                'ℹ️ [PaymentWebView] Payment Status still PENDING or Unknown (URL: $url)',
+              );
             }
           },
           onWebResourceError: (WebResourceError error) {

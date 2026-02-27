@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:onecharge/models/ticket_model.dart';
+import 'package:onecharge/core/config/app_config.dart';
 
 class ServiceNotificationOverlay extends StatefulWidget {
   final String
@@ -64,7 +65,7 @@ class _ServiceNotificationOverlayState extends State<ServiceNotificationOverlay>
   }
 
   Widget _buildFindingAgent() {
-    final issueCategory = widget.ticket?.issueCategory?.name ?? '';
+    final issueCategory = widget.ticket?.issueCategory?.name ?? 'Service';
     final ticketId = widget.ticket?.ticketId;
 
     return Container(
@@ -82,9 +83,9 @@ class _ServiceNotificationOverlayState extends State<ServiceNotificationOverlay>
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
-                  "Finding your agent",
-                  style: TextStyle(
+                Text(
+                  "Finding agent for $issueCategory",
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
@@ -93,26 +94,15 @@ class _ServiceNotificationOverlayState extends State<ServiceNotificationOverlay>
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  issueCategory.isNotEmpty
-                      ? "Your $issueCategory request has been\nreceived. An agent will be assigned shortly."
-                      : "Your request has been received. An\nagent will be assigned shortly.",
+                  ticketId != null
+                      ? "Ticket: #$ticketId\nFinding the best driver for you."
+                      : "Please wait, our driver will be\nassigned to you shortly.",
                   style: const TextStyle(
                     color: Colors.white70,
                     fontSize: 13,
                     fontFamily: 'Lufga',
                   ),
                 ),
-                if (ticketId != null) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    "Ticket: $ticketId",
-                    style: const TextStyle(
-                      color: Colors.white60,
-                      fontSize: 11,
-                      fontFamily: 'Lufga',
-                    ),
-                  ),
-                ],
               ],
             ),
           ),
@@ -133,6 +123,9 @@ class _ServiceNotificationOverlayState extends State<ServiceNotificationOverlay>
   Widget _buildAgentAssigned() {
     final bool isReaching = widget.stage == 'reaching';
     final bool isSolving = widget.stage == 'solving';
+    final String driverName = widget.ticket?.driver?.name ?? 'Agent';
+    final String issueName = widget.ticket?.issueCategory?.name ?? 'Service';
+    final String ticketId = widget.ticket?.ticketId ?? '';
 
     return Container(
       key: const ValueKey('assigned'),
@@ -153,11 +146,9 @@ class _ServiceNotificationOverlayState extends State<ServiceNotificationOverlay>
                   children: [
                     Text(
                       isSolving
-                          ? widget.ticket?.issueCategory != null
-                                ? "Your Agent solving\nthe ${widget.ticket!.issueCategory!.name} issue"
-                                : "Your Agent solving the issue"
+                          ? "Solving $issueName Issue"
                           : isReaching
-                          ? "Reach In 5min"
+                          ? "$driverName is Coming"
                           : "Agent Assigned",
                       style: const TextStyle(
                         color: Colors.white,
@@ -171,12 +162,10 @@ class _ServiceNotificationOverlayState extends State<ServiceNotificationOverlay>
                     const SizedBox(height: 4),
                     Text(
                       isSolving
-                          ? "Please wait a moment"
+                          ? "Ticket #$ticketId - In progress"
                           : isReaching
-                          ? "meet at location"
-                          : widget.ticket?.driver?.name != null
-                          ? "${widget.ticket!.driver!.name} will reach you shortly"
-                          : "Agent will reach you shortly",
+                          ? "Ticket #$ticketId - On the way"
+                          : "Ticket #$ticketId - ${widget.ticket?.driver?.name ?? ''} assigned",
                       style: const TextStyle(
                         color: Colors.white70,
                         fontSize: 13,
@@ -190,10 +179,11 @@ class _ServiceNotificationOverlayState extends State<ServiceNotificationOverlay>
                 alignment: Alignment.center,
                 children: [
                   Image.asset(
-                    'assets/vehicle/bmwI5.png', // Placeholder for white car image in toast
+                    'assets/vehicle/bmwI5.png',
                     height: 50,
                     width: 100,
                     fit: BoxFit.contain,
+                    errorBuilder: (c, e, s) => const SizedBox(width: 100),
                   ),
                   Positioned(
                     right: 8,
@@ -203,21 +193,28 @@ class _ServiceNotificationOverlayState extends State<ServiceNotificationOverlay>
                       height: 32,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
+                        color: Colors.grey[800],
                         border: Border.all(color: Colors.black, width: 2),
                         image: widget.ticket?.driver?.image != null
                             ? DecorationImage(
                                 image: NetworkImage(
-                                  widget.ticket!.driver!.image!,
+                                  widget.ticket!.driver!.image!.startsWith(
+                                        'http',
+                                      )
+                                      ? widget.ticket!.driver!.image!
+                                      : '${AppConfig.storageUrl}${widget.ticket!.driver!.image!}',
                                 ),
                                 fit: BoxFit.cover,
                               )
-                            : const DecorationImage(
-                                image: NetworkImage(
-                                  'https://i.pravatar.cc/150?u=agent',
-                                ),
-                                fit: BoxFit.cover,
-                              ),
+                            : null,
                       ),
+                      child: widget.ticket?.driver?.image == null
+                          ? const Icon(
+                              Icons.person,
+                              color: Colors.white,
+                              size: 18,
+                            )
+                          : null,
                     ),
                   ),
                 ],
@@ -238,7 +235,7 @@ class _ServiceNotificationOverlayState extends State<ServiceNotificationOverlay>
                 ),
               ),
               FractionallySizedBox(
-                widthFactor: widget.progress,
+                widthFactor: widget.progress > 0 ? widget.progress : 0.05,
                 child: Container(
                   height: 4,
                   decoration: BoxDecoration(
@@ -249,11 +246,12 @@ class _ServiceNotificationOverlayState extends State<ServiceNotificationOverlay>
               ),
               Positioned(
                 left:
-                    (MediaQuery.of(context).size.width - 72) * widget.progress -
+                    (MediaQuery.of(context).size.width - 72) *
+                        (widget.progress > 0 ? widget.progress : 0.05) -
                     10,
                 top: -8,
                 child: Image.asset(
-                  'assets/login/carimage.png', // Small car icon for the bar
+                  'assets/login/carimage.png',
                   height: 20,
                   width: 30,
                   errorBuilder: (c, e, s) => const Icon(
@@ -299,70 +297,41 @@ class _ServiceNotificationOverlayState extends State<ServiceNotificationOverlay>
                         height: 1.3,
                       ),
                     ),
-                    if (widget.ticket?.ticketId != null) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        "Ticket: ${widget.ticket!.ticketId}",
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 12,
-                          fontFamily: 'Lufga',
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               ),
               Image.asset(
                 'assets/issue/isuuesoluved.png',
-                height: 60,
-                width: 60,
+                height: 80,
+                width: 110,
+                fit: BoxFit.contain,
                 errorBuilder: (c, e, s) =>
                     const Icon(Icons.task_alt, color: Colors.white, size: 60),
               ),
             ],
           ),
           const SizedBox(height: 24),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: widget.onDismiss,
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Colors.white24),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text(
-                    "Not Solved",
-                    style: TextStyle(color: Colors.white, fontFamily: 'Lufga'),
-                  ),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: widget.onSolved,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: Colors.black,
+                padding: const EdgeInsets.symmetric(vertical: 18),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: widget.onSolved,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: Colors.black,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text(
-                    "Solved",
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'Lufga',
-                    ),
-                  ),
+              child: const Text(
+                "Submit Feedback",
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                  fontFamily: 'Lufga',
                 ),
               ),
-            ],
+            ),
           ),
         ],
       ),

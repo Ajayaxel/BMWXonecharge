@@ -7,10 +7,9 @@ import 'package:onecharge/screen/home/profile_screen.dart';
 import 'package:onecharge/screen/home/recent_bookings_screen.dart';
 import 'package:onecharge/screen/home/terms_conditions_screen.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:onecharge/logic/blocs/auth/auth_bloc.dart';
-import 'package:onecharge/logic/blocs/auth/auth_event.dart';
-import 'package:onecharge/logic/blocs/auth/auth_state.dart';
-import 'package:onecharge/screen/login/phone_login.dart';
+import 'package:onecharge/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:onecharge/features/auth/presentation/bloc/auth_event.dart';
+import 'package:onecharge/features/auth/presentation/bloc/auth_state.dart';
 import 'package:onecharge/test/testlogin.dart';
 import 'package:onecharge/logic/blocs/vehicle_list/vehicle_list_bloc.dart';
 import 'package:onecharge/logic/blocs/vehicle_list/vehicle_list_state.dart';
@@ -23,6 +22,7 @@ import 'package:onecharge/logic/blocs/delete_vehicle/delete_vehicle_state.dart';
 import 'package:onecharge/core/storage/token_storage.dart';
 import 'package:onecharge/logic/blocs/profile/profile_bloc.dart';
 import 'package:onecharge/logic/blocs/profile/profile_state.dart';
+import 'package:onecharge/models/location_model.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -171,7 +171,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 _isDeleteLoading = false;
               }
               _showToast('Vehicle removed successfully');
-              context.read<VehicleListBloc>().add(FetchVehicles());
+              // context.read<VehicleListBloc>().add(FetchVehicles());
+              // We'll handle this in the onDelete confirm dialog to be faster,
+              // or just keep it as a local event here.
+              // Actually, already done in BlocListener below? No.
             } else if (state is DeleteVehicleError) {
               if (_isDeleteLoading) {
                 Navigator.of(context).pop();
@@ -280,6 +283,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               BlocBuilder<VehicleListBloc, VehicleListState>(
                 builder: (context, state) {
                   if (state is VehicleListLoading) {
+                    final skeletonCount = state.totalCount > 0
+                        ? state.totalCount
+                        : 2;
                     return Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: SingleChildScrollView(
@@ -287,7 +293,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         physics: const NeverScrollableScrollPhysics(),
                         child: Row(
                           children: List.generate(
-                            2,
+                            skeletonCount.clamp(1, 4),
                             (index) => Container(
                               width: MediaQuery.of(context).size.width * 0.44,
                               height: 210,
@@ -436,13 +442,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _buildMenuItem(
                 Icons.location_on_outlined,
                 'Location',
-                onTap: () {
-                  Navigator.push(
+                onTap: () async {
+                  final result = await Navigator.push<LocationModel>(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const MyLocationScreen(),
+                      builder: (context) =>
+                          const MyLocationScreen(isPicker: true),
                     ),
                   );
+                  if (result != null) {
+                    if (context.mounted) {
+                      Navigator.pop(context, result);
+                    }
+                  }
                 },
               ),
 
@@ -480,7 +492,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     context: context,
                     builder: (context) => BlocListener<AuthBloc, AuthState>(
                       listener: (context, state) {
-                        if (state is AuthLoggedOut) {
+                        if (state is Unauthenticated) {
                           Navigator.pop(context);
                           Navigator.pushAndRemoveUntil(
                             context,
@@ -489,7 +501,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             ),
                             (route) => false,
                           );
-                        } else if (state is AuthError) {
+                        } else if (state is AuthFailure) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(content: Text(state.message)),
                           );
@@ -641,8 +653,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
             isDestructiveAction: true,
             onPressed: () {
               Navigator.pop(context);
+              // Call delete API
               context.read<DeleteVehicleBloc>().add(
                 DeleteVehicleRequested(vehicle.id),
+              );
+              // Locally remove to show instant feedback and avoid unnecessary API re-fetch
+              context.read<VehicleListBloc>().add(
+                RemoveVehicleFromList(vehicle.id),
               );
             },
             child: const Text(

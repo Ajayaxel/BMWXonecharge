@@ -10,23 +10,19 @@ class MyApp extends StatelessWidget {
       title: 'OneCharge',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
+        primaryColor: Colors.black,
         scaffoldBackgroundColor: Colors.white,
         fontFamily: 'Lufga',
+        brightness: Brightness.light,
       ),
+      darkTheme: ThemeData(
+        primaryColor: Colors.black,
+        scaffoldBackgroundColor: Colors.white,
+        fontFamily: 'Lufga',
+        brightness: Brightness.light, // Keep light aesthetics as per design
+      ),
+      themeMode: ThemeMode.light, // Explicitly force light mode for now
       home: const SplashScreen(),
-    );    
+    );
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -30,6 +30,12 @@ class VehicleModel extends Equatable {
     );
   }
 
+  // Getter to provide fallback logic
+  String get vehicleImage {
+    if (image.isNotEmpty) return image;
+    return brand?.image ?? '';
+  }
+
   @override
   List<Object?> get props => [id, name, brandId, image, brand, vehicleCategory];
 }
@@ -37,15 +43,20 @@ class VehicleModel extends Equatable {
 class ModelBrand extends Equatable {
   final int id;
   final String name;
+  final String image;
 
-  const ModelBrand({required this.id, required this.name});
+  const ModelBrand({required this.id, required this.name, required this.image});
 
   factory ModelBrand.fromJson(Map<String, dynamic> json) {
-    return ModelBrand(id: json['id'] ?? 0, name: json['name'] ?? '');
+    return ModelBrand(
+      id: json['id'] ?? 0,
+      name: json['name'] ?? '',
+      image: json['image'] ?? '',
+    );
   }
 
   @override
-  List<Object?> get props => [id, name];
+  List<Object?> get props => [id, name, image];
 }
 
 class VehicleCategory extends Equatable {

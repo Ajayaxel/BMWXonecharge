@@ -7,4 +7,12 @@ abstract class VehicleModelEvent extends Equatable {
   List<Object?> get props => [];
 }
 
-class FetchVehicleModels extends VehicleModelEvent {}
+class FetchVehicleModels extends VehicleModelEvent {
+  final bool isRefresh;
+  const FetchVehicleModels({this.isRefresh = false});
+
+  @override
+  List<Object?> get props => [isRefresh];
+}
+
+class LoadMoreVehicleModels extends VehicleModelEvent {}

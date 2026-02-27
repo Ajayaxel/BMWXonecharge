@@ -2,15 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:onecharge/const/onebtn.dart';
-import 'package:onecharge/logic/blocs/auth/auth_bloc.dart';
-import 'package:onecharge/logic/blocs/auth/auth_event.dart';
-import 'package:onecharge/logic/blocs/auth/auth_state.dart';
-import 'package:onecharge/models/register_model.dart';
-import 'package:onecharge/screen/login/user_info.dart';
+import 'package:onecharge/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:onecharge/features/auth/presentation/bloc/auth_event.dart';
+import 'package:onecharge/features/auth/presentation/bloc/auth_state.dart';
 import 'package:onecharge/screen/login/otp_verification_screen.dart';
 import 'package:onecharge/test/testlogin.dart';
 import 'package:intl_phone_field/intl_phone_field.dart';
 import 'package:intl_phone_field/country_picker_dialog.dart';
+import 'package:intl_phone_field/countries.dart' as intl;
 
 class Testregister extends StatefulWidget {
   const Testregister({super.key});
@@ -32,7 +31,7 @@ class _TestregisterState extends State<Testregister> {
   bool _obscureConfirmPassword = true;
 
   OverlayEntry? _overlayEntry;
-  String _selectedCountryCode = '+91';
+  String _selectedCountryCode = '+971';
 
   @override
   void dispose() {
@@ -50,18 +49,25 @@ class _TestregisterState extends State<Testregister> {
       return;
     }
 
-    final registerRequest = RegisterRequest(
-      name: _nameController.text.trim(),
-      email: _emailController.text.trim(),
-      phone: _selectedCountryCode + _phoneController.text.trim(),
-      password: _passwordController.text,
-      passwordConfirmation: _confirmPasswordController.text,
+    context.read<AuthBloc>().add(
+      RegisterRequested(
+        name: _nameController.text.trim(),
+        email: _emailController.text.trim(),
+        phone: _selectedCountryCode + _phoneController.text.trim(),
+        password: _passwordController.text,
+      ),
     );
-
-    context.read<AuthBloc>().add(RegisterRequested(registerRequest));
   }
 
   void _showTopError(String message) {
+    _showTopToast(message, isError: true);
+  }
+
+  void _showTopSuccess(String message) {
+    _showTopToast(message, isError: false);
+  }
+
+  void _showTopToast(String message, {required bool isError}) {
     _overlayEntry?.remove();
     _overlayEntry = null;
 
@@ -80,7 +86,7 @@ class _TestregisterState extends State<Testregister> {
             ),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: Colors.black,
+              color: isError ? Colors.black : const Color(0xFF2E7D32),
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: Colors.white24),
               boxShadow: const [
@@ -94,12 +100,20 @@ class _TestregisterState extends State<Testregister> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.error_outline, color: Colors.white, size: 20),
+                Icon(
+                  isError ? Icons.error_outline : Icons.check_circle_outline,
+                  color: Colors.white,
+                  size: 20,
+                ),
                 const SizedBox(width: 8),
                 Flexible(
                   child: Text(
                     message,
-                    style: const TextStyle(color: Colors.white),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
               ],
@@ -132,24 +146,27 @@ class _TestregisterState extends State<Testregister> {
 
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
-        if (state is AuthSuccess) {
+        if (state is Authenticated) {
           Navigator.pushAndRemoveUntil(
             context,
             MaterialPageRoute(builder: (_) => const Testlogin()),
             (route) => false,
           );
         } else if (state is AuthOtpRequired) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => OtpVerificationScreen(
-                email: state.email,
-                isTestRegister: true,
+          if (ModalRoute.of(context)?.isCurrent ?? false) {
+            _showTopSuccess("Please verify to continue.");
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => OtpVerificationScreen(
+                  email: state.email,
+                  isTestRegister: true,
+                ),
               ),
-            ),
-          );
-        } else if (state is AuthError) {
-          _showTopError(state.message.replaceAll('Exception: ', ''));
+            );
+          }
+        } else if (state is AuthFailure) {
+          _showTopError(state.message);
         }
       },
       child: Scaffold(
@@ -209,8 +226,8 @@ class _TestregisterState extends State<Testregister> {
                         padding: const EdgeInsets.only(
                           left: 16,
                           right: 16,
-                          top: 30,
-                          bottom: 30,
+                          top: 20,
+                          bottom: 15,
                         ),
                         child: Form(
                           key: _formKey,
@@ -234,7 +251,7 @@ class _TestregisterState extends State<Testregister> {
                                   color: Colors.black54,
                                 ),
                               ),
-                              const SizedBox(height: 24),
+                              const SizedBox(height: 16),
 
                               // Name Field
                               TextFormField(
@@ -278,6 +295,11 @@ class _TestregisterState extends State<Testregister> {
                               IntlPhoneField(
                                 controller: _phoneController,
                                 initialCountryCode: 'AE',
+                                countries: [
+                                  intl.countries.firstWhere(
+                                    (c) => c.code == 'AE',
+                                  ),
+                                ],
                                 pickerDialogStyle: PickerDialogStyle(
                                   backgroundColor: Colors.white,
                                 ),
@@ -384,7 +406,7 @@ class _TestregisterState extends State<Testregister> {
                                 ),
                               ),
 
-                              const SizedBox(height: 32),
+                              const SizedBox(height: 20),
 
                               // Register Button
                               BlocBuilder<AuthBloc, AuthState>(
@@ -396,7 +418,7 @@ class _TestregisterState extends State<Testregister> {
                                   );
                                 },
                               ),
-                              const SizedBox(height: 16),
+                              const SizedBox(height: 12),
 
                               // Login Link
                               Center(

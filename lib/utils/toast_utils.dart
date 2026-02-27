@@ -30,12 +30,15 @@ class ToastUtils {
               );
             },
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              constraints: BoxConstraints(
+                maxWidth: MediaQuery.of(context).size.width - 40,
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
               decoration: BoxDecoration(
                 color: isError
-                    ? Colors.red.withOpacity(0.9)
-                    : Colors.black.withOpacity(0.9),
-                borderRadius: BorderRadius.circular(10),
+                    ? Colors.red.withOpacity(0.95)
+                    : Colors.black.withOpacity(0.95),
+                borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withOpacity(0.3),
@@ -52,14 +55,16 @@ class ToastUtils {
                     color: Colors.white,
                     size: 20,
                   ),
-                  const SizedBox(width: 10),
-                  Text(
-                    message,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      fontFamily: 'Lufga',
+                  const SizedBox(width: 12),
+                  Flexible(
+                    child: Text(
+                      message,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        fontFamily: 'Lufga',
+                      ),
                     ),
                   ),
                 ],

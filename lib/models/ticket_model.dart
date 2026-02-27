@@ -161,6 +161,46 @@ class Ticket extends Equatable {
     this.updatedAt,
   });
 
+  Ticket copyWith({
+    int? id,
+    String? ticketId,
+    int? customerId,
+    String? paymentMethod,
+    String? bookingType,
+    String? scheduledAt,
+    TicketIssueCategory? issueCategory,
+    TicketIssueCategorySubType? issueCategorySubType,
+    String? location,
+    String? latitude,
+    String? longitude,
+    String? status,
+    TicketDriver? driver,
+    List<String>? attachments,
+    TicketInvoice? invoice,
+    String? createdAt,
+    String? updatedAt,
+  }) {
+    return Ticket(
+      id: id ?? this.id,
+      ticketId: ticketId ?? this.ticketId,
+      customerId: customerId ?? this.customerId,
+      paymentMethod: paymentMethod ?? this.paymentMethod,
+      bookingType: bookingType ?? this.bookingType,
+      scheduledAt: scheduledAt ?? this.scheduledAt,
+      issueCategory: issueCategory ?? this.issueCategory,
+      issueCategorySubType: issueCategorySubType ?? this.issueCategorySubType,
+      location: location ?? this.location,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      status: status ?? this.status,
+      driver: driver ?? this.driver,
+      attachments: attachments ?? this.attachments,
+      invoice: invoice ?? this.invoice,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
   factory Ticket.fromJson(Map<String, dynamic> json) {
     // Handle location field - it can be either a String or a Map
     String? locationString;
@@ -347,20 +387,31 @@ class TicketDriver extends Equatable {
   final String? name;
   final String? phone;
   final String? image;
+  final String? latitude;
+  final String? longitude;
 
-  const TicketDriver({this.id, this.name, this.phone, this.image});
+  const TicketDriver({
+    this.id,
+    this.name,
+    this.phone,
+    this.image,
+    this.latitude,
+    this.longitude,
+  });
 
   factory TicketDriver.fromJson(Map<String, dynamic> json) {
     return TicketDriver(
       id: json['id'],
       name: json['name'],
-      phone: json['phone'],
+      phone: json['phone']?.toString(),
       image: json['image'],
+      latitude: json['latitude']?.toString(),
+      longitude: json['longitude']?.toString(),
     );
   }
 
   @override
-  List<Object?> get props => [id, name, phone, image];
+  List<Object?> get props => [id, name, phone, image, latitude, longitude];
 }
 
 class TicketInvoice extends Equatable {

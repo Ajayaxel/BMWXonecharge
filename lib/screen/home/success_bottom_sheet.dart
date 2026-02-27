@@ -58,6 +58,9 @@ class SuccessBottomSheet extends StatelessWidget {
           const SizedBox(height: 48),
           OneBtn(
             onPressed: () {
+              print(
+                '🎉 [SuccessBottomSheet] Done pressed. Navigating to Home and starting service flow.',
+              );
               HomeScreenState.activeState?.startServiceFlow();
               HomeScreenState.activeState?.showToast("Payment Successful!");
               Navigator.of(context).popUntil((route) => route.isFirst);

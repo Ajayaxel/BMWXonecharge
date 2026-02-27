@@ -7,7 +7,7 @@ class AddVehicleBloc extends Bloc<AddVehicleEvent, AddVehicleState> {
   final VehicleRepository vehicleRepository;
 
   AddVehicleBloc({required this.vehicleRepository})
-      : super(AddVehicleInitial()) {
+    : super(AddVehicleInitial()) {
     on<AddVehicleRequested>(_onAddVehicleRequested);
   }
 
@@ -18,19 +18,25 @@ class AddVehicleBloc extends Bloc<AddVehicleEvent, AddVehicleState> {
     emit(AddVehicleLoading());
     try {
       final response = await vehicleRepository.addVehicle(event.request);
-      
+
       // Print the API response to console
       print('✅ [AddVehicleBloc] Vehicle added successfully!');
       print('📦 [AddVehicleBloc] Response: ${response.message}');
       print('🚗 [AddVehicleBloc] Vehicle ID: ${response.data.id}');
-      print('🔢 [AddVehicleBloc] Vehicle Number: ${response.data.vehicleNumber}');
-      print('🏷️ [AddVehicleBloc] Vehicle Type: ${response.data.vehicleType?.name ?? 'N/A'}');
+      print(
+        '🔢 [AddVehicleBloc] Vehicle Number: ${response.data.vehicleNumber}',
+      );
+      print(
+        '🏷️ [AddVehicleBloc] Vehicle Type: ${response.data.vehicleType?.name ?? 'N/A'}',
+      );
       print('🏭 [AddVehicleBloc] Brand: ${response.data.brand?.name ?? 'N/A'}');
       print('🚙 [AddVehicleBloc] Model: ${response.data.model?.name ?? 'N/A'}');
-      print('⚡ [AddVehicleBloc] Charging Type: ${response.data.chargingType?.name ?? 'N/A'}');
+      print(
+        '⚡ [AddVehicleBloc] Charging Type: ${response.data.chargingType?.name ?? 'N/A'}',
+      );
       print('📅 [AddVehicleBloc] Created At: ${response.data.createdAt}');
       print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      
+
       emit(AddVehicleSuccess(response));
     } catch (e) {
       print('❌ [AddVehicleBloc] Error adding vehicle: $e');

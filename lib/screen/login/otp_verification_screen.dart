@@ -3,12 +3,11 @@ import 'package:flutter/services.dart';
 import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:onecharge/const/onebtn.dart';
-import 'package:onecharge/logic/blocs/auth/auth_bloc.dart';
-import 'package:onecharge/logic/blocs/auth/auth_event.dart';
-import 'package:onecharge/logic/blocs/auth/auth_state.dart';
+import 'package:onecharge/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:onecharge/features/auth/presentation/bloc/auth_event.dart';
+import 'package:onecharge/features/auth/presentation/bloc/auth_state.dart';
 
 import 'package:onecharge/screen/vehicle/vehicle_selection.dart';
-import 'package:onecharge/screen/login/phone_login.dart';
 import 'package:onecharge/test/testlogin.dart';
 
 class OtpVerificationScreen extends StatefulWidget {
@@ -146,9 +145,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
       return;
     }
 
-    context.read<AuthBloc>().add(
-      VerifyOtpRequested(email: widget.email, otp: otp),
-    );
+    context.read<AuthBloc>().add(VerifyOtpRequested(widget.email, otp));
   }
 
   @override
@@ -165,7 +162,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
 
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
-        if (state is AuthSuccess) {
+        if (state is Authenticated) {
           _showToast("Verification Successful!");
           if (widget.isTestRegister) {
             Navigator.pushAndRemoveUntil(
@@ -182,7 +179,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
           }
         } else if (state is AuthOtpResent) {
           _showToast("OTP Resent Successfully");
-        } else if (state is AuthError) {
+        } else if (state is AuthFailure) {
           _showToast(state.message);
         }
       },
@@ -262,9 +259,9 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    "Enter the code sent to ${widget.email}",
-                    style: const TextStyle(
+                  const Text(
+                    "Enter the code sent to your registered\nemail and phone number",
+                    style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w400,
                       color: Colors.black54,

@@ -38,3 +38,30 @@ class DownloadInvoiceRequested extends TicketEvent {
   @override
   List<Object> get props => [ticketId];
 }
+
+class FetchDriverLocationRequested extends TicketEvent {
+  final int ticketId;
+
+  const FetchDriverLocationRequested(this.ticketId);
+
+  @override
+  List<Object> get props => [ticketId];
+}
+
+class UpdateDriverLocation extends TicketEvent {
+  final TicketDriver driver;
+
+  const UpdateDriverLocation(this.driver);
+
+  @override
+  List<Object> get props => [driver];
+}
+
+class UpdateTicketDetails extends TicketEvent {
+  final Ticket ticket;
+
+  const UpdateTicketDetails(this.ticket);
+
+  @override
+  List<Object> get props => [ticket];
+}

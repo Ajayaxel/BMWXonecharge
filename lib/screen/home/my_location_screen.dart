@@ -22,8 +22,12 @@ class _MyLocationScreenState extends State<MyLocationScreen> {
   @override
   void initState() {
     super.initState();
-    // Fetch locations when the screen is initialized
-    context.read<LocationBloc>().add(FetchLocations());
+    // Locations are loaded globally, so we no longer force a fetch on screen load.
+    // If the list is empty, it will rely on the global state or explicit load actions.
+    final bloc = context.read<LocationBloc>();
+    if (bloc.state is! LocationsLoaded) {
+      bloc.add(FetchLocations());
+    }
   }
 
   @override

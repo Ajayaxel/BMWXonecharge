@@ -1,23 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:onecharge/screen/home/issue_reporting_bottom_sheet.dart';
 import 'package:onecharge/screen/home/widgets/service_notification.dart';
-import 'package:onecharge/screen/home/widgets/service_summary_bottom_sheet.dart';
+import 'package:onecharge/screen/home/widgets/feedback_bottom_sheet.dart';
 import 'package:onecharge/screen/home/settings_screen.dart';
 import 'package:onecharge/screen/home/tracking_map_screen.dart';
+import 'package:onecharge/logic/services/realtime_service.dart';
 import 'package:onecharge/screen/vehicle/vehicle_selection.dart';
 import 'package:onecharge/const/onebtn.dart';
 import 'dart:async';
+import 'dart:developer' as developer;
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:onecharge/logic/blocs/issue_category/issue_category_bloc.dart';
 import 'package:onecharge/logic/blocs/issue_category/issue_category_state.dart';
 import 'package:onecharge/logic/blocs/issue_category/issue_category_event.dart';
-import 'package:onecharge/logic/blocs/auth/auth_bloc.dart';
-import 'package:onecharge/logic/blocs/auth/auth_state.dart';
+import 'package:onecharge/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:onecharge/features/auth/presentation/bloc/auth_state.dart';
 import 'package:onecharge/logic/blocs/vehicle_list/vehicle_list_bloc.dart';
-import 'package:onecharge/logic/blocs/vehicle_list/vehicle_list_state.dart';
 import 'package:onecharge/logic/blocs/vehicle_list/vehicle_list_event.dart';
+import 'package:onecharge/logic/blocs/vehicle_list/vehicle_list_state.dart';
 import 'package:onecharge/models/vehicle_list_model.dart';
 import 'package:onecharge/models/ticket_model.dart';
 import 'package:onecharge/core/storage/vehicle_storage.dart';
@@ -30,6 +32,19 @@ import 'package:onecharge/logic/blocs/location/location_bloc.dart';
 import 'package:onecharge/logic/blocs/location/location_state.dart';
 import 'package:onecharge/logic/blocs/profile/profile_bloc.dart';
 import 'package:onecharge/logic/blocs/profile/profile_state.dart';
+import 'package:onecharge/core/carplay/carplay_service.dart';
+import 'package:onecharge/logic/blocs/ticket/ticket_bloc.dart';
+import 'package:onecharge/logic/blocs/ticket/ticket_event.dart';
+import 'package:onecharge/logic/blocs/ticket/ticket_state.dart';
+import 'package:intl/intl.dart';
+import 'package:onecharge/logic/blocs/brand/brand_event.dart';
+import 'package:onecharge/logic/blocs/vehicle_model/vehicle_model_event.dart';
+import 'package:onecharge/logic/blocs/charging_type/charging_type_event.dart';
+import 'package:onecharge/logic/blocs/profile/profile_event.dart';
+import 'package:onecharge/logic/blocs/location/location_event.dart';
+import 'package:onecharge/logic/blocs/brand/brand_bloc.dart';
+import 'package:onecharge/logic/blocs/vehicle_model/vehicle_model_bloc.dart';
+import 'package:onecharge/logic/blocs/charging_type/charging_type_bloc.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -50,9 +65,175 @@ class HomeScreenState extends State<HomeScreen> {
   String _currentServiceStage = 'none';
   double _serviceProgress = 0.0;
   Timer? _serviceTimer;
+  Timer? _pollingTimer;
+  RealtimeService? _realtimeService;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   Ticket? _currentTicket;
+  bool _isConnectingRealtime = false;
+
+  void _initRealtimeService(int customerId, {Ticket? ticket}) async {
+    print(
+      '🔌 [HomeScreen] Initializing RealtimeService for Customer ID: $customerId',
+    );
+    if (_isConnectingRealtime) {
+      developer.log(
+        '⏭️ [HomeScreen] Skipping duplicate realtime init',
+        name: 'HomeScreen',
+      );
+      print(
+        '⏭️ [HomeScreen] Realtime connection already in progress, skipping.',
+      );
+      return;
+    }
+    _isConnectingRealtime = true;
+    try {
+      final token = await TokenStorage.readToken();
+      if (token == null) {
+        print('❌ [HomeScreen] Token is null, cannot start RealtimeService');
+        return;
+      }
+
+      print('🔌 [HomeScreen] Disconnecting old RealtimeService instance...');
+      _realtimeService?.disconnect();
+
+      _realtimeService = RealtimeService(
+        customerId: customerId,
+        token: token,
+        onTicketOffered: (data) {
+          if (mounted) {
+            print('🎫 [RealtimeService CALLBACK] Ticket Offered: $data');
+            // Only go to 'finding' if we aren't already further ahead
+            if (_currentServiceStage == 'none' ||
+                _currentServiceStage == 'finding') {
+              setState(() {
+                _currentServiceStage = 'finding';
+              });
+              print('🎯 [HomeScreen] Stage updated to: finding');
+            }
+          }
+        },
+        onTicketAssigned: (data) {
+          if (mounted) {
+            print('🚗 [RealtimeService CALLBACK] Ticket Assigned data: $data');
+            // If data is a Map, parse it
+            if (data is Map<String, dynamic>) {
+              final driver = TicketDriver(
+                id: data['driver_id'],
+                name: data['driver_name'],
+                latitude: data['latitude']?.toString(),
+                longitude: data['longitude']?.toString(),
+                image: data['driver_image'],
+              );
+
+              // Immediately update driver location in bloc
+              context.read<TicketBloc>().add(UpdateDriverLocation(driver));
+
+              setState(() {
+                _currentServiceStage = 'reaching';
+                // Update local ticket with basic driver info
+                if (_currentTicket != null) {
+                  _currentTicket = _currentTicket!.copyWith(
+                    status: 'assigned',
+                    driver: driver,
+                  );
+                  // Directly update BLoC state without fetching from API
+                  context.read<TicketBloc>().add(
+                    UpdateTicketDetails(_currentTicket!),
+                  );
+                } else if (data['ticket_id'] != null) {
+                  print(
+                    'ℹ️ [HomeScreen] Ticket object was null but assigned event received for Ticket ID: ${data['ticket_id']}',
+                  );
+                  // We could potentially fetch ticket details here if needed
+                }
+              });
+
+              print(
+                '🎯 [HomeScreen] Current Stage: $_currentServiceStage, Driver: ${driver.name}',
+              );
+            } else {
+              // Fallback if data is not a map
+              setState(() {
+                _currentServiceStage = 'reaching';
+              });
+              print(
+                '🎯 [HomeScreen] Current Stage: $_currentServiceStage (Fallback)',
+              );
+            }
+          }
+        },
+        onTicketStatusChanged: (data) {
+          if (mounted && data is Map<String, dynamic>) {
+            final String status = data['status']?.toString() ?? '';
+            final int? ticketId = data['ticket_id'] is int
+                ? data['ticket_id']
+                : int.tryParse(data['ticket_id']?.toString() ?? '');
+
+            print(
+              '📋 [RealtimeService] Status Changed: $status for Ticket #$ticketId',
+            );
+
+            // 1. First, tell the BLoC so the Tracking Map gets the update BEFORE we nullify it locally
+            if (_currentTicket != null && ticketId != null) {
+              final updatedTicket = _currentTicket!.copyWith(status: status);
+              context.read<TicketBloc>().add(
+                UpdateTicketDetails(updatedTicket),
+              );
+            }
+            // 2. Then update HomeScreen's local state
+            setState(() {
+              if (status == 'assigned' || status == 'reaching') {
+                _currentServiceStage = 'reaching';
+                _serviceProgress = 0.5;
+              } else if (status == 'in_progress' ||
+                  status == 'solving' ||
+                  status == 'at_location') {
+                _currentServiceStage = 'solving';
+                _serviceProgress = 1.0;
+              } else if (status == 'completed' || status == 'resolved') {
+                _currentServiceStage = 'resolved'; // Keeps the banner visible
+                _stopPolling();
+                _realtimeService?.disconnect();
+                // We keep _currentTicket around so the banner has ticket info
+              } else if (status == 'cancelled' || status == 'rejected') {
+                _currentServiceStage = 'none';
+                _stopPolling();
+                _realtimeService?.disconnect();
+                _currentTicket = null;
+              } else {
+                if (_currentTicket != null) {
+                  _currentTicket = _currentTicket!.copyWith(status: status);
+                }
+              }
+            });
+          }
+        },
+        onDriverLocationUpdated: (data) {
+          if (mounted && data is Map<String, dynamic>) {
+            print('📍 [RealtimeService] Driver Location Updated: $data');
+            final driver = TicketDriver(
+              id: data['driver_id'],
+              name: data['driver_name'],
+              latitude: data['latitude']?.toString(),
+              longitude: data['longitude']?.toString(),
+            );
+            context.read<TicketBloc>().add(UpdateDriverLocation(driver));
+          }
+        },
+      );
+
+      await _realtimeService!.connectAndSubscribe();
+    } catch (e) {
+      developer.log(
+        '⚠️ [HomeScreen] Real-time service failed to start: $e',
+        name: 'HomeScreen',
+      );
+    } finally {
+      _isConnectingRealtime = false;
+    }
+  }
+
   String _userName = 'Mishal';
 
   @override
@@ -61,8 +242,22 @@ class HomeScreenState extends State<HomeScreen> {
     activeState = this;
     _loadUserName();
     _getCurrentLocation();
-    // Vehicles will be loaded via BLoC
-    context.read<VehicleListBloc>().add(FetchVehicles());
+    _fetchInitialData();
+    CarPlayService.setupHandler();
+  }
+
+  void _fetchInitialData() {
+    // These calls are now moved here from main.dart to prevent startup burst
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<VehicleListBloc>().add(const FetchVehicles());
+      context.read<BrandBloc>().add(FetchBrands());
+      context.read<VehicleModelBloc>().add(FetchVehicleModels());
+      context.read<IssueCategoryBloc>().add(FetchIssueCategories());
+      context.read<ChargingTypeBloc>().add(FetchChargingTypes());
+      context.read<ProfileBloc>().add(FetchProfile());
+      context.read<LocationBloc>().add(FetchLocations());
+    });
   }
 
   Future<void> _loadUserName() async {
@@ -151,6 +346,8 @@ class HomeScreenState extends State<HomeScreen> {
   void dispose() {
     activeState = null;
     _serviceTimer?.cancel();
+    _pollingTimer?.cancel();
+    _realtimeService?.disconnect();
     _searchController.dispose();
     _toastEntry?.remove();
     super.dispose();
@@ -238,52 +435,169 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   void startServiceFlow({Ticket? ticket}) {
+    print(
+      '🎬 [HomeScreen] startServiceFlow called. Ticket provided: ${ticket != null}',
+    );
+    // Stop any existing polling
+    _pollingTimer?.cancel();
+
+    // Determine initial stage based on ticket status
+    String initialStage = 'finding';
+    if (ticket != null) {
+      final status = ticket.status?.toLowerCase().trim();
+      print(
+        '📱 [HomeScreen] Starting flow for Ticket ID: ${ticket.id} (${ticket.ticketId}), Status: $status',
+      );
+
+      // Only jump to reaching if explicitly assigned or already in progress
+      if (status == 'assigned' ||
+          status == 'reaching' ||
+          status == 'at_location') {
+        initialStage = 'reaching';
+        print('🚀 [HomeScreen] Initial stage: reaching (Status: $status)');
+      } else {
+        initialStage = 'finding';
+        print('⏳ [HomeScreen] Initial stage: finding (Status: $status)');
+      }
+    } else {
+      print(
+        '⏳ [HomeScreen] No ticket object yet (likely post-payment). Defaulting stage to finding.',
+      );
+      initialStage = 'finding';
+    }
+
     setState(() {
-      _currentServiceStage = 'finding';
+      _currentServiceStage = initialStage;
       _serviceProgress = 0.0;
+
       _currentTicket = ticket;
     });
 
-    _serviceTimer?.cancel();
+    // Start Real-time WebSocket Service
+    if (ticket != null) {
+      // Immediately use the driver location provided from the socket or initial ticket data
+      if (ticket.driver != null && mounted) {
+        context.read<TicketBloc>().add(UpdateDriverLocation(ticket.driver!));
+      }
 
-    // Step 1: Finding (3s)
-    _serviceTimer = Timer(const Duration(seconds: 3), () {
-      setState(() {
-        _currentServiceStage = 'assigned';
-      });
+      _initRealtimeService(ticket.customerId, ticket: ticket);
+    } else {
+      // If ticket is null, we try to get customer ID from ProfileBloc state
+      final profileState = context.read<ProfileBloc>().state;
+      if (profileState is ProfileLoaded) {
+        print(
+          '👤 [HomeScreen] Found Customer ID from Profile: ${profileState.customer.id}',
+        );
+        _initRealtimeService(profileState.customer.id);
+      } else {
+        print(
+          '⚠️ [HomeScreen] Cannot start RealtimeService: Profile not loaded and no ticket provided.',
+        );
+      }
+    }
+  }
 
-      // Start the 10-second fast progression synchronized with map
-      _serviceTimer = Timer.periodic(const Duration(milliseconds: 100), (
-        timer,
-      ) {
-        if (!mounted) return;
+  void _stopPolling() {
+    _pollingTimer?.cancel();
+    _pollingTimer = null;
+  }
 
-        setState(() {
-          if (_serviceProgress < 1.0) {
-            _serviceProgress += 0.01; // 1.0 total over 10 seconds
+  void _updateStageFromTicket(Ticket ticket) {
+    if (!mounted) return;
 
-            if (_serviceProgress >= 0.3 && _currentServiceStage == 'assigned') {
-              _currentServiceStage = 'reaching';
-            }
-            if (_serviceProgress >= 0.7 && _currentServiceStage == 'reaching') {
-              _currentServiceStage = 'solving';
-            }
-          } else {
-            _serviceProgress = 1.0;
-            timer.cancel();
+    setState(() {
+      _currentTicket = ticket;
+      final status = ticket.status?.toLowerCase().trim();
 
-            // Wait 2 seconds at 'solving' then show 'resolved'
-            Future.delayed(const Duration(seconds: 2), () {
-              if (mounted) {
-                setState(() {
-                  _currentServiceStage = 'resolved';
-                });
-              }
-            });
-          }
-        });
-      });
+      // Priority 1: Check for completion or resolution ONLY
+      if (status == 'completed' || status == 'resolved') {
+        _realtimeService?.disconnect();
+        _currentServiceStage = 'resolved'; // Show the Submit Feedback banner
+        _stopPolling();
+        developer.log(
+          '🏁 [HomeScreen] Flow finished via status: $status',
+          name: 'HomeScreen',
+        );
+        return;
+      }
+
+      if (status == 'cancelled' || status == 'rejected') {
+        _realtimeService?.disconnect();
+        _currentServiceStage = 'none';
+        _stopPolling();
+        developer.log(
+          '❌ [HomeScreen] Flow finished via status: $status',
+          name: 'HomeScreen',
+        );
+        return;
+      }
+
+      // Priority 2: Stage transitions based on status
+      if (status == 'assigned' || status == 'reaching') {
+        _serviceProgress = 0.5;
+        // Only advance to reaching if we aren't already further ahead
+        if (_currentServiceStage == 'finding' ||
+            _currentServiceStage == 'none') {
+          _currentServiceStage = 'reaching';
+          print('🚀 [HomeScreen] Advanced to reaching stage (Status: $status)');
+        }
+      }
+
+      if (status == 'solving' ||
+          status == 'in_progress' ||
+          status == 'at_location' ||
+          status == 'reached') {
+        _currentServiceStage = 'solving';
+        _serviceProgress = 1.0;
+        print('🛠️ [HomeScreen] Stage: solving (Status: $status)');
+      }
     });
+  }
+
+  void handleCarPlayBooking(String categoryName) async {
+    // 1. Get vehicle info
+    final vehicleTypeId = await VehicleStorage.getVehicleTypeId();
+    final brandId = await VehicleStorage.getBrandId();
+    final modelId = await VehicleStorage.getModelId();
+    final vehiclePlate = await VehicleStorage.getVehicleNumber() ?? "";
+
+    if (vehicleTypeId == null || brandId == null || modelId == null) {
+      showToast("Please select a vehicle in the app first");
+      return;
+    }
+
+    // 2. Get category ID
+    final categoryState = context.read<IssueCategoryBloc>().state;
+    int? categoryId;
+    if (categoryState is IssueCategoryLoaded) {
+      final category = categoryState.categories.firstWhere(
+        (c) =>
+            c.name?.toLowerCase().contains(categoryName.toLowerCase()) ?? false,
+        orElse: () => categoryState.categories.first,
+      );
+      categoryId = category.id;
+    }
+
+    // 3. Dispatch event
+    final request = CreateTicketRequest(
+      issueCategoryId: categoryId ?? 1,
+      vehicleTypeId: vehicleTypeId,
+      brandId: brandId,
+      modelId: modelId,
+      numberPlate: vehiclePlate,
+      location: currentAddress,
+      latitude: _currentLatitude,
+      longitude: _currentLongitude,
+      bookingType: "instant",
+      scheduledAt: DateFormat(
+        'yyyy-MM-dd HH:mm:ss',
+      ).format(DateTime.now().toUtc()),
+      paymentMethod: "cod", // Default for CarPlay for now
+    );
+
+    if (mounted) {
+      context.read<TicketBloc>().add(CreateTicketRequested(request));
+    }
   }
 
   void _showVehicleSelectionBottomSheet(String category) {
@@ -292,99 +606,80 @@ class HomeScreenState extends State<HomeScreen> {
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (context) {
-        return BlocBuilder<VehicleListBloc, VehicleListState>(
-          builder: (context, state) {
-            if (state is VehicleListLoading) {
-              return Container(
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-                ),
-                padding: const EdgeInsets.all(20.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const SizedBox(height: 10),
-                    ...List.generate(
-                      3,
-                      (index) => Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: _buildShimmerCarItem(),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Shimmer.fromColors(
-                      baseColor: const Color(0xffE0E0E0),
-                      highlightColor: Colors.white,
-                      child: Container(
-                        height: 50,
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          padding: const EdgeInsets.all(20.00),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              BlocBuilder<VehicleListBloc, VehicleListState>(
+                buildWhen: (previous, current) => previous != current,
+                builder: (context, state) {
+                  if (state is VehicleListLoading) {
+                    final skeletonCount =
+                        (state.totalCount > 0 ? state.totalCount : 3).clamp(
+                          1,
+                          5,
+                        );
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(height: 10),
+                        ...List.generate(
+                          skeletonCount,
+                          (index) => Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: _buildShimmerCarItem(),
+                          ),
+                        ),
+                      ],
+                    );
+                  }
+
+                  if (state is VehicleListError) {
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 40),
+                        child: Text(
+                          'Error: ${state.message}',
+                          style: const TextStyle(fontFamily: 'Lufga'),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 10),
-                  ],
-                ),
-              );
-            }
+                    );
+                  }
 
-            if (state is VehicleListError) {
-              return Container(
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-                ),
-                padding: const EdgeInsets.all(20.00),
-                child: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 40),
-                    child: Text(
-                      'Error: ${state.message}',
-                      style: const TextStyle(fontFamily: 'Lufga'),
-                    ),
-                  ),
-                ),
-              );
-            }
+                  final vehicleList = state is VehicleListLoaded
+                      ? state.vehicles
+                      : <VehicleListItem>[];
 
-            final vehicleList = state is VehicleListLoaded
-                ? state.vehicles
-                : <VehicleListItem>[];
+                  if (vehicleList.isEmpty) {
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 20),
+                      child: Text(
+                        'No vehicles found. Please add a vehicle.',
+                        style: TextStyle(fontFamily: 'Lufga'),
+                      ),
+                    );
+                  }
 
-            return StatefulBuilder(
-              builder: (context, setSheetState) {
-                return Container(
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(20),
-                    ),
-                  ),
-                  padding: const EdgeInsets.all(20.00),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (vehicleList.isEmpty)
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 20),
-                          child: Text(
-                            'No vehicles found. Please add a vehicle.',
-                            style: TextStyle(fontFamily: 'Lufga'),
-                          ),
-                        )
-                      else
-                        ...List.generate(vehicleList.length, (index) {
+                  return StatefulBuilder(
+                    builder: (context, setListState) {
+                      return ListView.builder(
+                        padding: EdgeInsets.only(bottom: 16),
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: vehicleList.length,
+                        itemBuilder: (context, index) {
                           final vehicle = vehicleList[index];
                           final isSelected = selectedVehicleIndex == index;
                           return GestureDetector(
                             onTap: () async {
-                              setSheetState(() {
+                              setListState(() {
                                 selectedVehicleIndex = index;
                               });
-                              setState(() {});
 
                               // Save vehicle IDs to storage before opening Issue Reporting
                               await VehicleStorage.saveVehicleInfo(
@@ -397,7 +692,7 @@ class HomeScreenState extends State<HomeScreen> {
                               );
 
                               // Close current sheet and open Issue Reporting
-                              if (!mounted) return;
+                              if (!context.mounted) return;
                               Navigator.pop(context);
                               showModalBottomSheet(
                                 context: context,
@@ -414,7 +709,11 @@ class HomeScreenState extends State<HomeScreen> {
                               );
                             },
                             child: Padding(
-                              padding: const EdgeInsets.only(bottom: 12),
+                              padding: EdgeInsets.only(
+                                bottom: index == vehicleList.length - 1
+                                    ? 0
+                                    : 12,
+                              ),
                               child: _buildCarItem(
                                 title: vehicle.vehicleName,
                                 subtitle: vehicle.vehicleNumber,
@@ -423,30 +722,38 @@ class HomeScreenState extends State<HomeScreen> {
                               ),
                             ),
                           );
-                        }),
-                      const SizedBox(height: 16),
-                      // Add Vehicle Button
-                      OneBtn(
-                        text: "Add Vehicle",
-                        onPressed: () {
-                          // Close the bottom sheet
-                          Navigator.pop(context);
-                          // Navigate to Vehicle Selection screen
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const VehicleSelection(),
-                            ),
-                          );
                         },
-                      ),
-                      const SizedBox(height: 10),
-                    ],
-                  ),
-                );
-              },
-            );
-          },
+                      );
+                    },
+                  );
+                },
+              ),
+              const SizedBox(height: 8),
+              // Add Vehicle Button
+              OneBtn(
+                text: "Add Vehicle",
+                onPressed: () async {
+                  final homeContext = this.context;
+                  // Close the bottom sheet
+                  Navigator.pop(context);
+                  // Navigate to Vehicle Selection screen
+                  await Navigator.push(
+                    homeContext,
+                    MaterialPageRoute(
+                      builder: (context) => const VehicleSelection(),
+                    ),
+                  );
+                  // Refresh the vehicle list after returning
+                  if (homeContext.mounted) {
+                    homeContext.read<VehicleListBloc>().add(
+                      const FetchVehicles(forceRefresh: true),
+                    );
+                  }
+                },
+              ),
+              const SizedBox(height: 10),
+            ],
+          ),
         );
       },
     );
@@ -459,39 +766,40 @@ class HomeScreenState extends State<HomeScreen> {
     bool isSelected = false,
   }) {
     Widget imageWidget;
-    if (imageUrl != null && imageUrl.isNotEmpty) {
-      if (imageUrl.startsWith('http')) {
+    final String imgPath = imageUrl?.trim() ?? '';
+
+    if (imgPath.isNotEmpty) {
+      if (imgPath.startsWith('http')) {
         imageWidget = Image.network(
-          imageUrl,
+          imgPath,
           fit: BoxFit.contain,
           alignment: Alignment.centerRight,
-          width: 200,
           errorBuilder: (context, error, stackTrace) =>
-              const Icon(Icons.directions_car, size: 60, color: Colors.grey),
+              const Icon(Icons.directions_car, size: 50, color: Colors.grey),
         );
-      } else if (imageUrl.startsWith('assets/')) {
+      } else if (imgPath.startsWith('assets/')) {
         imageWidget = Image.asset(
-          imageUrl,
+          imgPath,
           fit: BoxFit.contain,
           alignment: Alignment.centerRight,
-          width: 200,
           errorBuilder: (context, error, stackTrace) =>
-              const Icon(Icons.directions_car, size: 60, color: Colors.grey),
+              const Icon(Icons.directions_car, size: 50, color: Colors.grey),
         );
       } else {
-        // Assuming the API returns relative paths, prepend base URL
-        final fullImageUrl = 'https://app.onecharge.io/storage/$imageUrl';
         imageWidget = Image.network(
-          fullImageUrl,
+          imgPath,
           fit: BoxFit.contain,
           alignment: Alignment.centerRight,
-          width: 200,
           errorBuilder: (context, error, stackTrace) =>
-              const Icon(Icons.directions_car, size: 60, color: Colors.grey),
+              const Icon(Icons.directions_car, size: 50, color: Colors.grey),
         );
       }
     } else {
-      imageWidget = const SizedBox.shrink();
+      imageWidget = const Icon(
+        Icons.directions_car,
+        size: 50,
+        color: Colors.grey,
+      );
     }
 
     return Container(
@@ -535,8 +843,7 @@ class HomeScreenState extends State<HomeScreen> {
               ],
             ),
           ),
-          if (imageUrl != null && imageUrl.isNotEmpty)
-            Positioned(right: 0, top: -20, bottom: -20, child: imageWidget),
+          Positioned(right: 0, top: 0, bottom: 0, child: imageWidget),
         ],
       ),
     );
@@ -604,12 +911,48 @@ class HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocListener<LocationBloc, LocationState>(
-      listener: (context, state) {
-        if (state is LocationAdded) {
-          showToast('Location added successfully');
-        }
-      },
+    return MultiBlocListener(
+      listeners: [
+        BlocListener<LocationBloc, LocationState>(
+          listener: (context, state) {
+            if (state is LocationAdded) {
+              showToast('Location added successfully');
+            }
+          },
+        ),
+        BlocListener<TicketBloc, TicketState>(
+          listener: (context, state) {
+            if (state is TicketSuccess) {
+              final requiresPayment =
+                  state.response.data?.paymentRequired == true &&
+                  state.response.data?.paymentUrl != null;
+
+              if (!requiresPayment) {
+                startServiceFlow(ticket: state.response.data?.ticket);
+                showToast("Booking Successful!");
+                CarPlayService.showBookingSuccess(
+                  latitude: double.tryParse(
+                    state.response.data?.ticket?.latitude ?? '',
+                  ),
+                  longitude: double.tryParse(
+                    state.response.data?.ticket?.longitude ?? '',
+                  ),
+                );
+              }
+            } else if (state is TicketDetailSuccess) {
+              _updateStageFromTicket(state.ticket);
+            } else if (state is DriverLocationLoaded) {
+              if (state.driver != null && _currentTicket != null) {
+                _updateStageFromTicket(
+                  _currentTicket!.copyWith(driver: state.driver),
+                );
+              }
+            } else if (state is TicketError) {
+              showToast("Error: ${state.message}");
+            }
+          },
+        ),
+      ],
       child: Scaffold(
         backgroundColor: Colors.white,
         body: SafeArea(
@@ -626,13 +969,22 @@ class HomeScreenState extends State<HomeScreen> {
                     Row(
                       children: [
                         GestureDetector(
-                          onTap: () {
-                            Navigator.push(
+                          onTap: () async {
+                            final result = await Navigator.push(
                               context,
                               MaterialPageRoute(
                                 builder: (context) => const SettingsScreen(),
                               ),
                             );
+                            if (result is LocationModel) {
+                              setState(() {
+                                currentAddress = result.name.isNotEmpty
+                                    ? result.name
+                                    : result.address;
+                                _currentLatitude = result.latitude;
+                                _currentLongitude = result.longitude;
+                              });
+                            }
                           },
                           child: BlocBuilder<ProfileBloc, ProfileState>(
                             builder: (context, state) {
@@ -663,9 +1015,8 @@ class HomeScreenState extends State<HomeScreen> {
                               BlocBuilder<AuthBloc, AuthState>(
                                 builder: (context, state) {
                                   String name = _userName;
-                                  if (state is AuthSuccess) {
-                                    name = state.loginResponse.customer.name
-                                        .split(' ')[0];
+                                  if (state is Authenticated) {
+                                    name = state.user.name.split(' ')[0];
                                   }
                                   return Text(
                                     'Hi $name',
@@ -693,7 +1044,9 @@ class HomeScreenState extends State<HomeScreen> {
                                       );
                                   if (result != null) {
                                     setState(() {
-                                      currentAddress = result.address;
+                                      currentAddress = result.name.isNotEmpty
+                                          ? result.name
+                                          : result.address;
                                       _currentLatitude = result.latitude;
                                       _currentLongitude = result.longitude;
                                     });
@@ -953,6 +1306,7 @@ class HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
               ),
+              // Floating Notification Overlay (PURELY REACTIVE)
               if (_currentServiceStage != 'none')
                 ServiceNotificationOverlay(
                   stage: _currentServiceStage,
@@ -962,35 +1316,58 @@ class HomeScreenState extends State<HomeScreen> {
                     showToast("Our customer support will contact you shortly");
                     setState(() {
                       _currentServiceStage = 'none';
-                      _serviceTimer?.cancel();
+                      _stopPolling();
                       _currentTicket = null;
                     });
-                  },
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => TrackingMapScreen(
-                          stage: _currentServiceStage,
-                          progress: _serviceProgress,
-                        ),
-                      ),
-                    );
                   },
                   onSolved: () {
-                    final ticketId = _currentTicket?.id;
+                    final tId = _currentTicket?.id;
                     setState(() {
                       _currentServiceStage = 'none';
-                      _serviceTimer?.cancel();
+                      _stopPolling();
                       _currentTicket = null;
                     });
-                    showModalBottomSheet(
-                      context: context,
-                      isScrollControlled: true,
-                      backgroundColor: Colors.transparent,
-                      builder: (context) =>
-                          ServiceSummaryBottomSheet(ticketId: ticketId),
-                    );
+                    if (tId != null) {
+                      showModalBottomSheet(
+                        context: context,
+                        isScrollControlled: true,
+                        backgroundColor: Colors.transparent,
+                        builder: (context) =>
+                            FeedbackBottomSheet(ticketId: tId),
+                      );
+                    }
+                  },
+                  onTap: () {
+                    if (_currentTicket != null) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => TrackingMapScreen(
+                            ticket: _currentTicket!,
+                            stage: _currentServiceStage,
+                            progress: _serviceProgress,
+                          ),
+                        ),
+                      ).then((showFeedback) {
+                        if (showFeedback == true && _currentTicket != null) {
+                          final tId = _currentTicket?.id;
+                          setState(() {
+                            _currentServiceStage = 'none';
+                            _stopPolling();
+                            _currentTicket = null;
+                          });
+                          if (tId != null) {
+                            showModalBottomSheet(
+                              context: context,
+                              isScrollControlled: true,
+                              backgroundColor: Colors.transparent,
+                              builder: (context) =>
+                                  FeedbackBottomSheet(ticketId: tId),
+                            );
+                          }
+                        }
+                      });
+                    }
                   },
                 ),
             ],

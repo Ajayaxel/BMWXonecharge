@@ -20,10 +20,12 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     emit(ChatLoading());
     try {
       final response = await chatRepository.getClientDetails();
-      emit(ClientDetailsLoaded(
-        clientData: response.data,
-        defaultMessage: response.data.clientData.defaultMessage,
-      ));
+      emit(
+        ClientDetailsLoaded(
+          clientData: response.data,
+          defaultMessage: response.data.clientData.defaultMessage,
+        ),
+      );
     } catch (e) {
       emit(ChatError(e.toString()));
     }
@@ -75,11 +77,13 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
         return;
       }
 
-      emit(MessageSending(
-        messages: messages,
-        clientData: clientData,
-        conversationId: conversationId,
-      ));
+      emit(
+        MessageSending(
+          messages: messages,
+          clientData: clientData,
+          conversationId: conversationId,
+        ),
+      );
 
       final response = await chatRepository.sendMessage(
         message: event.message,
@@ -103,12 +107,14 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
               .toList();
         }
 
-        emit(MessageSent(
-          messages: messages,
-          clientData: clientData,
-          conversationId: response.data!.conversationId,
-          suggestedReplies: suggestedReplies,
-        ));
+        emit(
+          MessageSent(
+            messages: messages,
+            clientData: clientData,
+            conversationId: response.data!.conversationId,
+            suggestedReplies: suggestedReplies,
+          ),
+        );
       } else {
         emit(ChatError('No response from server'));
       }

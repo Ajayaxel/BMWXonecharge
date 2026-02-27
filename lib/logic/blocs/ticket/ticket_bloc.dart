@@ -11,6 +11,31 @@ class TicketBloc extends Bloc<TicketEvent, TicketState> {
     on<FetchTicketsRequested>(_onFetchTicketsRequested);
     on<FetchTicketDetailsRequested>(_onFetchTicketDetailsRequested);
     on<DownloadInvoiceRequested>(_onDownloadInvoiceRequested);
+    on<FetchDriverLocationRequested>(_onFetchDriverLocationRequested);
+    on<UpdateDriverLocation>(_onUpdateDriverLocation);
+    on<UpdateTicketDetails>((event, emit) {
+      emit(TicketDetailSuccess(event.ticket));
+    });
+  }
+
+  void _onUpdateDriverLocation(
+    UpdateDriverLocation event,
+    Emitter<TicketState> emit,
+  ) {
+    emit(DriverLocationLoaded(event.driver));
+  }
+
+  Future<void> _onFetchDriverLocationRequested(
+    FetchDriverLocationRequested event,
+    Emitter<TicketState> emit,
+  ) async {
+    try {
+      final driver = await issueRepository.getDriverLocation(event.ticketId);
+      emit(DriverLocationLoaded(driver));
+    } catch (e) {
+      // Don't emit error state for polling to avoid UI flickers, just log it
+      print('⚠️ [TicketBloc] Error fetching driver location: $e');
+    }
   }
 
   Future<void> _onDownloadInvoiceRequested(

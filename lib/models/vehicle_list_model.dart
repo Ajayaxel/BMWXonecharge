@@ -29,6 +29,9 @@ class VehicleListItem extends Equatable {
   final String vehicleNumber;
   final String createdAt;
   final String updatedAt;
+  final String imageUrl;
+  final String brandImageUrl;
+  final String modelImageUrl;
   final VehicleTypeInfo? vehicleType;
   final BrandInfo? brand;
   final ModelInfo? model;
@@ -44,6 +47,9 @@ class VehicleListItem extends Equatable {
     required this.vehicleNumber,
     required this.createdAt,
     required this.updatedAt,
+    this.imageUrl = '',
+    this.brandImageUrl = '',
+    this.modelImageUrl = '',
     this.vehicleType,
     this.brand,
     this.model,
@@ -61,6 +67,9 @@ class VehicleListItem extends Equatable {
       vehicleNumber: json['vehicle_number'] ?? '',
       createdAt: json['created_at'] ?? '',
       updatedAt: json['updated_at'] ?? '',
+      imageUrl: json['image_url'] ?? '',
+      brandImageUrl: json['brand_image_url'] ?? '',
+      modelImageUrl: json['model_image_url'] ?? '',
       vehicleType: json['vehicle_type'] != null
           ? VehicleTypeInfo.fromJson(json['vehicle_type'])
           : null,
@@ -74,7 +83,38 @@ class VehicleListItem extends Equatable {
 
   // Helper getters for easy access
   String get vehicleName => model?.name ?? 'Unknown Vehicle';
-  String get vehicleImage => model?.image ?? '';
+
+  String get vehicleImage {
+    if (imageUrl.isNotEmpty) return imageUrl;
+    if (modelImageUrl.isNotEmpty) return modelImageUrl;
+    if (brandImageUrl.isNotEmpty) return brandImageUrl;
+
+    String rawPath = '';
+    if (model?.image != null && model!.image.isNotEmpty) {
+      rawPath = model!.image;
+    } else {
+      rawPath = brand?.image ?? '';
+    }
+
+    if (rawPath.isEmpty ||
+        rawPath.startsWith('http') ||
+        rawPath.startsWith('assets/')) {
+      return rawPath;
+    }
+
+    String path = rawPath;
+    while (path.startsWith('/') ||
+        path.startsWith('public/') ||
+        path.startsWith('storage/')) {
+      if (path.startsWith('/')) path = path.substring(1);
+      if (path.startsWith('public/')) path = path.replaceFirst('public/', '');
+      if (path.startsWith('storage/')) path = path.replaceFirst('storage/', '');
+    }
+
+    // The UI will just prepend the storageUrl if the path doesn't start with http/assets.
+    // We can just return the cleaned up path here.
+    return path;
+  }
 
   @override
   List<Object?> get props => [
@@ -87,6 +127,9 @@ class VehicleListItem extends Equatable {
     vehicleNumber,
     createdAt,
     updatedAt,
+    imageUrl,
+    brandImageUrl,
+    modelImageUrl,
     vehicleType,
     brand,
     model,

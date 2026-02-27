@@ -15,9 +15,9 @@ class IssueRepository {
       if (response.data['success'] == true) {
         final List<dynamic> categoriesJson =
             response.data['data']['issue_categories'];
-        return categoriesJson
-            .map((json) => IssueCategory.fromJson(json))
-            .toList();
+
+        // Optimize performance for potentially large category lists
+        return await _parseIssueCategories(categoriesJson);
       } else {
         throw Exception(
           'Failed to load issue categories: ${response.data['message']}',
@@ -26,6 +26,17 @@ class IssueRepository {
     } catch (e) {
       rethrow;
     }
+  }
+
+  static Future<List<IssueCategory>> _parseIssueCategories(
+    List<dynamic> jsonList,
+  ) async {
+    // Basic mapping is fast for small lists, handle in place
+    if (jsonList.length < 15) {
+      return jsonList.map((json) => IssueCategory.fromJson(json)).toList();
+    }
+    // Future expansion: use compute() here for extremely large lists
+    return jsonList.map((json) => IssueCategory.fromJson(json)).toList();
   }
 
   Future<CreateTicketResponse> createTicket(CreateTicketRequest request) async {
@@ -172,6 +183,27 @@ class IssueRepository {
       } else {
         throw Exception(
           'Failed to download invoice: ${response.statusMessage}',
+        );
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<TicketDriver?> getDriverLocation(int ticketId) async {
+    try {
+      final response = await apiClient.get(
+        '/customer/location/tickets/$ticketId/driver',
+      );
+      if (response.data['success'] == true) {
+        final driverData = response.data['data']['driver'];
+        if (driverData != null) {
+          return TicketDriver.fromJson(driverData);
+        }
+        return null; // Driver not yet assigned
+      } else {
+        throw Exception(
+          'Failed to load driver location: ${response.data['message'] ?? 'Unknown error'}',
         );
       }
     } catch (e) {

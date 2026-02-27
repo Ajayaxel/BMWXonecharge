@@ -2,14 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:onecharge/const/onebtn.dart';
-import 'package:onecharge/logic/blocs/auth/auth_bloc.dart';
-import 'package:onecharge/logic/blocs/auth/auth_event.dart';
-import 'package:onecharge/logic/blocs/auth/auth_state.dart';
-import 'package:onecharge/models/login_model.dart';
-
+import 'package:onecharge/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:onecharge/features/auth/presentation/bloc/auth_event.dart';
+import 'package:onecharge/features/auth/presentation/bloc/auth_state.dart';
 import 'package:onecharge/screen/vehicle/vehicle_selection.dart';
 import 'package:onecharge/test/testregister.dart';
 import 'package:onecharge/screen/login/otp_verification_screen.dart';
+import 'package:onecharge/test/forgot_password_screen.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter/gestures.dart';
 
 class Testlogin extends StatefulWidget {
   const Testlogin({super.key});
@@ -34,6 +35,13 @@ class _TestloginState extends State<Testlogin> {
     super.dispose();
   }
 
+  Future<void> _launchUrl(String url) async {
+    final Uri uri = Uri.parse(url);
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      _showTopError('Could not launch $url');
+    }
+  }
+
   void _handleLogin() {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -44,12 +52,12 @@ class _TestloginState extends State<Testlogin> {
       return;
     }
 
-    final loginRequest = LoginRequest(
-      email: _emailController.text.trim(),
-      password: _passwordController.text,
+    context.read<AuthBloc>().add(
+      LoginRequested(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      ),
     );
-
-    context.read<AuthBloc>().add(LoginRequested(loginRequest));
   }
 
   void _showTopError(String message) {
@@ -123,316 +131,335 @@ class _TestloginState extends State<Testlogin> {
 
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
-        if (state is AuthSuccess) {
-          // Navigate to UserInfo screen after successful login
+        if (state is Authenticated) {
           Navigator.pushAndRemoveUntil(
             context,
             MaterialPageRoute(builder: (_) => const VehicleSelection()),
             (route) => false,
           );
         } else if (state is AuthOtpRequired) {
-          // Navigate to OTP verification screen if login requires verification
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => OtpVerificationScreen(email: state.email),
-            ),
-          );
-        } else if (state is AuthError) {
-          _showTopError(state.message.replaceAll('Exception: ', ''));
+          if (ModalRoute.of(context)?.isCurrent ?? false) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => OtpVerificationScreen(email: state.email),
+              ),
+            );
+          }
+        } else if (state is AuthFailure) {
+          _showTopError(state.message);
         }
       },
       child: Scaffold(
         backgroundColor: Colors.black,
-        resizeToAvoidBottomInset: false,
+        resizeToAvoidBottomInset: true,
         body: LayoutBuilder(
           builder: (context, constraints) {
             final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
             final topPadding = MediaQuery.of(context).padding.top;
             final isKeyboardVisible = keyboardHeight > 0;
+            final screenHeight = constraints.maxHeight;
+
+            // Adjust flex ratios based on screen height to ensure form fits
+            // Large screens (e.g. iPhone Pro Max): 3:2 (Header:Form)
+            // Small/Medium screens or when keyboard is visible: Shifts priority to form
+            int headerFlex = isKeyboardVisible
+                ? 1
+                : (screenHeight < 700 ? 5 : 3);
+            int formFlex = isKeyboardVisible ? 4 : (screenHeight < 700 ? 7 : 2);
 
             return Column(
               children: [
-                SizedBox(height: topPadding),
                 // TOP SECTION - Black area
-                if (!isKeyboardVisible)
-                  // Full top section when no keyboard
-                  Expanded(
-                    flex: 1,
+                Expanded(
+                  flex: headerFlex,
+                  child: Container(
+                    width: double.infinity,
+                    color: Colors.black,
                     child: Column(
-                      mainAxisAlignment: MainAxisAlignment.start,
                       children: [
-                        const SizedBox(height: 70),
+                        SizedBox(height: topPadding),
+                        const Spacer(flex: 2),
                         Center(
                           child: Image.asset(
                             'assets/login/logo.png',
-                            fit: BoxFit.cover,
-                            height: 30,
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        const Text(
-                          "Electric vehicle charging\nstation for everyone.\nDiscover. Charge. Pay.",
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 22,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        Expanded(
-                          child: Image.asset(
-                            "assets/login/carimage.png",
                             fit: BoxFit.contain,
-                            width: double.infinity,
-                            alignment: Alignment.bottomCenter,
+                            height: isKeyboardVisible ? 24 : 30,
                           ),
                         ),
+                        if (!isKeyboardVisible) ...[
+                          const Spacer(flex: 3),
+                          const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 20),
+                            child: Text(
+                              "Electric vehicle charging\nstation for everyone.\nDiscover. Charge. Pay.",
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 22,
+                                fontWeight: FontWeight.w600,
+                                height: 1.2,
+                              ),
+                            ),
+                          ),
+                          const Spacer(flex: 2),
+                          Expanded(
+                            flex: 12,
+                            child: Image.asset(
+                              "assets/login/carimage.png",
+                              fit: BoxFit.contain,
+                              width: double.infinity,
+                              alignment: Alignment.bottomCenter,
+                            ),
+                          ),
+                        ] else
+                          const Spacer(flex: 2),
                       ],
                     ),
-                  )
-                else
-                  // Small top section when keyboard is visible
-                  Container(
-                    padding: const EdgeInsets.symmetric(vertical: 35),
-                    child: Center(
-                      child: Image.asset(
-                        'assets/login/logo.png',
-                        fit: BoxFit.cover,
-                        height: 30,
-                      ),
-                    ),
                   ),
+                ),
 
-                // FORM SECTION - White area
-                Container(
-                  width: double.infinity,
-                  decoration: const BoxDecoration(
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(20),
-                      topRight: Radius.circular(20),
-                    ),
-                    color: Colors.white,
-                  ),
-                  child: SingleChildScrollView(
-                    physics: isKeyboardVisible
-                        ? const BouncingScrollPhysics()
-                        : const NeverScrollableScrollPhysics(),
-                    padding: EdgeInsets.only(
-                      left: 16,
-                      right: 16,
-                      top: 20,
-                      bottom: isKeyboardVisible ? keyboardHeight + 20 : 30,
-                    ),
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            "Login",
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            "Enter your email and password to proceed",
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w400,
-                              color: Colors.black54,
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-                          // Email Field
-                          TextFormField(
-                            controller: _emailController,
-                            keyboardType: TextInputType.emailAddress,
-                            textInputAction: TextInputAction.next,
-                            onTapOutside: (event) {
-                              FocusScope.of(context).unfocus();
-                            },
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please enter your email';
-                              }
-                              if (!value.contains('@')) {
-                                return 'Please enter a valid email';
-                              }
-                              return null;
-                            },
-                            decoration: InputDecoration(
-                              hintText: 'Enter your email',
-                              hintStyle: const TextStyle(
-                                color: Color(0xffB8B9BD),
-                              ),
-                              prefixIcon: const Icon(Icons.email_outlined),
-                              border: OutlineInputBorder(
-                                borderSide: const BorderSide(
-                                  color: Color(0xffE4E4E4),
-                                ),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderSide: const BorderSide(
-                                  color: Color(0xffE4E4E4),
-                                ),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderSide: const BorderSide(
-                                  color: Colors.black,
-                                ),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              errorBorder: OutlineInputBorder(
-                                borderSide: const BorderSide(color: Colors.red),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          // Password Field
-                          TextFormField(
-                            controller: _passwordController,
-                            obscureText: _obscurePassword,
-                            textInputAction: TextInputAction.done,
-                            onFieldSubmitted: (_) => _handleLogin(),
-                            onTapOutside: (event) {
-                              FocusScope.of(context).unfocus();
-                            },
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please enter your password';
-                              }
-                              if (value.length < 6) {
-                                return 'Password must be at least 6 characters';
-                              }
-                              return null;
-                            },
-                            decoration: InputDecoration(
-                              hintText: 'Enter your password',
-                              hintStyle: const TextStyle(
-                                color: Color(0xffB8B9BD),
-                              ),
-                              prefixIcon: const Icon(Icons.lock_outline),
-                              suffixIcon: IconButton(
-                                icon: Icon(
-                                  _obscurePassword
-                                      ? Icons.visibility_outlined
-                                      : Icons.visibility_off_outlined,
-                                ),
-                                onPressed: () {
-                                  setState(() {
-                                    _obscurePassword = !_obscurePassword;
-                                  });
-                                },
-                              ),
-                              border: OutlineInputBorder(
-                                borderSide: const BorderSide(
-                                  color: Color(0xffE4E4E4),
-                                ),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderSide: const BorderSide(
-                                  color: Color(0xffE4E4E4),
-                                ),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderSide: const BorderSide(
-                                  color: Colors.black,
-                                ),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              errorBorder: OutlineInputBorder(
-                                borderSide: const BorderSide(color: Colors.red),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          // Privacy Policy Checkbox
-                          Row(
-                            children: [
-                              Checkbox(
-                                checkColor: Colors.white,
-                                activeColor: Colors.black,
-                                value: _isChecked,
-                                onChanged: (value) {
-                                  setState(() {
-                                    _isChecked = value ?? false;
-                                  });
-                                },
-                              ),
-                              Flexible(
-                                child: GestureDetector(
-                                  onTap: () {
-                                    setState(() {
-                                      _isChecked = !_isChecked;
-                                    });
-                                  },
-                                  child: const Text(
-                                    "I accept the Privacy Policy and Terms of Service",
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w400,
-                                      color: Colors.black54,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          // Login Button
-                          BlocBuilder<AuthBloc, AuthState>(
-                            builder: (context, state) {
-                              return OneBtn(
-                                text: "Login",
-                                isLoading: state is AuthLoading,
-                                onPressed: _handleLogin,
-                              );
-                            },
-                          ),
-                          const SizedBox(height: 16),
-                          Center(
-                            child: GestureDetector(
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const Testregister(),
-                                  ),
-                                );
-                              },
-                              child: RichText(
-                                text: const TextSpan(
-                                  text: "Don't have an account? ",
-                                  style: TextStyle(
-                                    color: Colors.black54,
-                                    fontSize: 14,
-                                  ),
-                                  children: [
-                                    TextSpan(
-                                      text: "Register",
-                                      style: TextStyle(
-                                        color: Colors.black,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
+                // BOTTOM SECTION - White form
+                Expanded(
+                  flex: formFlex,
+                  child: Container(
+                    width: double.infinity,
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(12),
+                        topRight: Radius.circular(12),
                       ),
+                    ),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        return SingleChildScrollView(
+                          physics: const ClampingScrollPhysics(),
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              minHeight: constraints.maxHeight,
+                            ),
+                            child: IntrinsicHeight(
+                              child: Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  16,
+                                  16,
+                                  16,
+                                  10,
+                                ),
+                                child: Form(
+                                  key: _formKey,
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        "Login",
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                      const Spacer(flex: 1),
+                                      const Text(
+                                        "Enter your email and password to proceed",
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w400,
+                                          color: Colors.black54,
+                                        ),
+                                      ),
+                                      const Spacer(flex: 3),
+                                      // Email Field
+                                      TextFormField(
+                                        controller: _emailController,
+                                        keyboardType:
+                                            TextInputType.emailAddress,
+                                        textInputAction: TextInputAction.next,
+                                        onTapOutside: (event) {
+                                          FocusScope.of(context).unfocus();
+                                        },
+                                        style: const TextStyle(fontSize: 14),
+                                        validator: (value) {
+                                          if (value == null || value.isEmpty) {
+                                            return 'Please enter your email';
+                                          }
+                                          if (!value.contains('@')) {
+                                            return 'Please enter a valid email';
+                                          }
+                                          return null;
+                                        },
+                                        decoration: _buildInputDecoration(
+                                          hintText: 'Enter your email',
+                                          icon: Icons.email_outlined,
+                                        ),
+                                      ),
+                                      const Spacer(flex: 4),
+                                      // Password Field
+                                      TextFormField(
+                                        controller: _passwordController,
+                                        obscureText: _obscurePassword,
+                                        textInputAction: TextInputAction.done,
+                                        onFieldSubmitted: (_) => _handleLogin(),
+                                        onTapOutside: (event) {
+                                          FocusScope.of(context).unfocus();
+                                        },
+                                        style: const TextStyle(fontSize: 14),
+                                        validator: (value) {
+                                          if (value == null || value.isEmpty) {
+                                            return 'Please enter your password';
+                                          }
+                                          if (value.length < 6) {
+                                            return 'Password must be at least 6 characters';
+                                          }
+                                          return null;
+                                        },
+                                        decoration: _buildInputDecoration(
+                                          hintText: 'Enter your password',
+                                          icon: Icons.lock_outline,
+                                          isPassword: true,
+                                        ),
+                                      ),
+                                      const Spacer(flex: 4),
+                                      Align(
+                                        alignment: Alignment.centerRight,
+                                        child: GestureDetector(
+                                          onTap: () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (_) =>
+                                                    const ForgotPasswordScreen(),
+                                              ),
+                                            );
+                                          },
+                                          child: const Text(
+                                            "Forgot Password?",
+                                            style: TextStyle(
+                                              color: Colors.black54,
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const Spacer(flex: 3),
+                                      // Privacy Policy Checkbox
+                                      Row(
+                                        children: [
+                                          SizedBox(
+                                            height: 24,
+                                            width: 24,
+                                            child: Checkbox(
+                                              checkColor: Colors.white,
+                                              activeColor: Colors.black,
+                                              value: _isChecked,
+                                              onChanged: (value) {
+                                                setState(() {
+                                                  _isChecked = value ?? false;
+                                                });
+                                              },
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Flexible(
+                                            child: RichText(
+                                              text: TextSpan(
+                                                text: "I accept the ",
+                                                style: const TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w400,
+                                                  color: Colors.black54,
+                                                  fontFamily: 'Lufga',
+                                                ),
+                                                children: [
+                                                  TextSpan(
+                                                    text: "Privacy Policy",
+                                                    style: const TextStyle(
+                                                      color: Colors.black,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      decoration: TextDecoration
+                                                          .underline,
+                                                    ),
+                                                    recognizer: TapGestureRecognizer()
+                                                      ..onTap = () => _launchUrl(
+                                                        'https://onecharge.io/privacy-policy',
+                                                      ),
+                                                  ),
+                                                  const TextSpan(text: " and "),
+                                                  TextSpan(
+                                                    text: "Terms of Service",
+                                                    style: const TextStyle(
+                                                      color: Colors.black,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      decoration: TextDecoration
+                                                          .underline,
+                                                    ),
+                                                    recognizer: TapGestureRecognizer()
+                                                      ..onTap = () => _launchUrl(
+                                                        'https://onecharge.io/terms-conditions',
+                                                      ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const Spacer(flex: 4),
+                                      // Login Button
+                                      BlocBuilder<AuthBloc, AuthState>(
+                                        builder: (context, state) {
+                                          return OneBtn(
+                                            text: "Login",
+                                            isLoading: state is AuthLoading,
+                                            onPressed: _handleLogin,
+                                          );
+                                        },
+                                      ),
+                                      const Spacer(flex: 3),
+                                      Center(
+                                        child: GestureDetector(
+                                          onTap: () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (_) =>
+                                                    const Testregister(),
+                                              ),
+                                            );
+                                          },
+                                          child: RichText(
+                                            text: const TextSpan(
+                                              text: "Don't have an account? ",
+                                              style: TextStyle(
+                                                color: Colors.black54,
+                                                fontSize: 13,
+                                              ),
+                                              children: [
+                                                TextSpan(
+                                                  text: "Register",
+                                                  style: TextStyle(
+                                                    color: Colors.black,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const Spacer(flex: 2),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ),
                 ),
@@ -440,6 +467,50 @@ class _TestloginState extends State<Testlogin> {
             );
           },
         ),
+      ),
+    );
+  }
+
+  InputDecoration _buildInputDecoration({
+    required String hintText,
+    required IconData icon,
+    bool isPassword = false,
+  }) {
+    return InputDecoration(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      hintText: hintText,
+      hintStyle: const TextStyle(color: Color(0xffB8B9BD), fontSize: 14),
+      prefixIcon: Icon(icon, size: 20),
+      suffixIcon: isPassword
+          ? IconButton(
+              icon: Icon(
+                _obscurePassword
+                    ? Icons.visibility_outlined
+                    : Icons.visibility_off_outlined,
+                size: 20,
+              ),
+              onPressed: () {
+                setState(() {
+                  _obscurePassword = !_obscurePassword;
+                });
+              },
+            )
+          : null,
+      border: OutlineInputBorder(
+        borderSide: const BorderSide(color: Color(0xffE4E4E4)),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderSide: const BorderSide(color: Color(0xffE4E4E4)),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderSide: const BorderSide(color: Colors.black),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderSide: const BorderSide(color: Colors.red),
+        borderRadius: BorderRadius.circular(10),
       ),
     );
   }

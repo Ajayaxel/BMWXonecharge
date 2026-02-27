@@ -7,20 +7,50 @@ class VehicleListBloc extends Bloc<VehicleListEvent, VehicleListState> {
   final VehicleRepository vehicleRepository;
 
   VehicleListBloc({required this.vehicleRepository})
-      : super(VehicleListInitial()) {
+    : super(const VehicleListInitial()) {
     on<FetchVehicles>(_onFetchVehicles);
+    on<RemoveVehicleFromList>(_onRemoveVehicleFromList);
   }
 
   Future<void> _onFetchVehicles(
     FetchVehicles event,
     Emitter<VehicleListState> emit,
   ) async {
-    emit(VehicleListLoading());
+    // Prevent duplicate API calls if data already exists and forceRefresh is false
+    if (!event.forceRefresh &&
+        state is VehicleListLoaded &&
+        state.vehicles.isNotEmpty) {
+      return;
+    }
+
+    // Only show full loading if list is empty
+    if (state.vehicles.isEmpty) {
+      emit(VehicleListLoading(totalCount: state.totalCount));
+    }
+
     try {
       final response = await vehicleRepository.getVehicles();
       emit(VehicleListLoaded(response.vehicles));
     } catch (e) {
-      emit(VehicleListError(e.toString()));
+      emit(
+        VehicleListError(
+          e.toString(),
+          vehicles: state.vehicles,
+          totalCount: state.totalCount,
+        ),
+      );
+    }
+  }
+
+  void _onRemoveVehicleFromList(
+    RemoveVehicleFromList event,
+    Emitter<VehicleListState> emit,
+  ) {
+    if (state is VehicleListLoaded) {
+      final updatedList = state.vehicles
+          .where((v) => v.id != event.vehicleId)
+          .toList();
+      emit(VehicleListLoaded(updatedList, totalCount: updatedList.length));
     }
   }
 }

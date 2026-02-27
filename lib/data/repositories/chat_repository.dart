@@ -11,21 +11,22 @@ class ChatRepository {
   ChatRepository({required this.apiClient});
 
   Future<ClientDetailsResponse> getClientDetails() async {
-    try {
-      final response = await apiClient.getWithBaseUrl(
-        '/apis/api/v1/clients/botcode/$clientId',
-        clientDetailsBaseUrl,
-      );
-      if (response.data['success'] == true) {
-        return ClientDetailsResponse.fromJson(response.data);
-      } else {
-        throw Exception(
-          'Failed to load client details: ${response.data['message']}',
-        );
-      }
-    } catch (e) {
-      rethrow;
-    }
+    // Return mock data to remove API call
+    return ClientDetailsResponse(
+      success: true,
+      message: 'Success',
+      data: ClientData(
+        clientId: clientId,
+        clientData: ClientInfo(
+          clientName: '1Care Assistant',
+          clientInfo: 'Support Assistant',
+          clientWebsite: 'https://onecharge.io',
+          clientEmail: 'support@onecharge.io',
+          clientId: clientId,
+          defaultMessage: 'Hello there! How may I help you?',
+        ),
+      ),
+    );
   }
 
   Future<ConversationResponse> sendMessage({
@@ -33,29 +34,22 @@ class ChatRepository {
     required String conversationId,
     required Map<String, dynamic> clientData,
   }) async {
-    try {
-      final request = ConversationRequest(
-        clientId: clientId,
-        conversationId: conversationId,
-        message: message,
-        clientData: clientData,
-      );
-
-      final response = await apiClient.post(
-        '/chat',
-        data: request.toJson(),
-        baseUrl: conversationBaseUrl,
-      );
-
-      if (response.data['success'] == true) {
-        return ConversationResponse.fromJson(response.data);
-      } else {
-        throw Exception(
-          'Failed to send message: ${response.data['message']}',
-        );
-      }
-    } catch (e) {
-      rethrow;
-    }
+    // Return mock data to remove API call
+    return ConversationResponse(
+      success: true,
+      message: 'Success',
+      data: ConversationData(
+        conversationId: conversationId.isEmpty
+            ? 'mock_convo_id'
+            : conversationId,
+        response:
+            "Thank you for reaching out to 1Care Support. Our team has received your message and will get back to you shortly.",
+        suggestedReplies: [
+          'Contact Support Team',
+          'Track my Ticket',
+          'Other Issue',
+        ],
+      ),
+    );
   }
 }
