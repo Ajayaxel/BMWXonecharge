@@ -1,7 +1,9 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:onecharge/app.dart';
 import 'package:onecharge/core/network/api_client.dart';
+import 'package:onecharge/core/services/push_notification_service.dart';
 import 'package:onecharge/data/repositories/brand_repository.dart';
 import 'package:onecharge/logic/blocs/brand/brand_bloc.dart';
 
@@ -27,6 +29,9 @@ import 'package:onecharge/data/repositories/redeem_code_repository.dart';
 import 'package:onecharge/logic/blocs/redeem_code/redeem_code_bloc.dart';
 import 'package:onecharge/data/repositories/feedback_repository.dart';
 import 'package:onecharge/logic/blocs/feedback/feedback_bloc.dart';
+import 'package:onecharge/data/repositories/company_code_repository.dart';
+import 'package:onecharge/logic/blocs/company_code/company_code_bloc.dart';
+import 'firebase_options.dart';
 
 // New Architecture Imports
 import 'package:onecharge/core/storage/secure_storage_service.dart';
@@ -42,9 +47,16 @@ import 'package:onecharge/features/auth/presentation/bloc/auth_bloc.dart'
 import 'package:onecharge/features/auth/presentation/bloc/auth_event.dart'
     as auth_event;
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
   final secureStorage = SecureStorageService();
+
+  // Initialize Push Notifications (foreground + background)
+  final pushNotificationService = PushNotificationService();
+  await pushNotificationService.initialize(storage: secureStorage);
+
   final dioClient = DioClient(secureStorage);
   final apiClient = ApiClient(secureStorage);
 
@@ -68,6 +80,7 @@ void main() {
   final locationRepository = LocationRepository(apiClient: apiClient);
   final redeemCodeRepository = RedeemCodeRepository(apiClient: apiClient);
   final feedbackRepository = FeedbackRepository(apiClient: apiClient);
+  final companyCodeRepository = CompanyCodeRepository(apiClient: apiClient);
 
   runApp(
     MultiRepositoryProvider(
@@ -86,6 +99,9 @@ void main() {
           value: redeemCodeRepository,
         ),
         RepositoryProvider<FeedbackRepository>.value(value: feedbackRepository),
+        RepositoryProvider<CompanyCodeRepository>.value(
+          value: companyCodeRepository,
+        ),
       ],
       child: MultiBlocProvider(
         providers: [
@@ -146,6 +162,10 @@ void main() {
           BlocProvider<FeedbackBloc>(
             create: (context) =>
                 FeedbackBloc(feedbackRepository: feedbackRepository),
+          ),
+          BlocProvider<CompanyCodeBloc>(
+            create: (context) =>
+                CompanyCodeBloc(companyCodeRepository: companyCodeRepository),
           ),
         ],
         child: const MyApp(),

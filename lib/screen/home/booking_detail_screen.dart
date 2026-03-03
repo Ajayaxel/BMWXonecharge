@@ -4,7 +4,7 @@ import 'package:onecharge/logic/blocs/ticket/ticket_bloc.dart';
 import 'package:onecharge/logic/blocs/ticket/ticket_event.dart';
 import 'package:onecharge/logic/blocs/ticket/ticket_state.dart';
 import 'package:onecharge/models/ticket_model.dart';
-import 'package:open_file/open_file.dart';
+import 'package:onecharge/screen/home/invoice_preview_screen.dart';
 import 'package:intl/intl.dart';
 
 class BookingDetailScreen extends StatelessWidget {
@@ -156,14 +156,18 @@ class BookingDetailScreen extends StatelessWidget {
     return BlocListener<TicketBloc, TicketState>(
       listener: (context, state) {
         if (state is InvoiceDownloadLoading) {
-          _showSideToast(context, 'Downloading invoice...', isError: false);
+          _showSideToast(context, 'Loading invoice...', isError: false);
         } else if (state is InvoiceDownloadSuccess) {
-          _showSideToast(
+          // Navigate to in-app PDF preview
+          Navigator.push(
             context,
-            'Invoice downloaded successfully!',
-            isError: false,
+            MaterialPageRoute(
+              builder: (_) => InvoicePreviewScreen(
+                filePath: state.filePath,
+                invoiceNumber: ticket.invoice?.invoiceNumber ?? 'Invoice',
+              ),
+            ),
           );
-          OpenFile.open(state.filePath);
         } else if (state is InvoiceDownloadError) {
           _showSideToast(context, 'Error: ${state.message}', isError: true);
         }

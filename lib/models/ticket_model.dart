@@ -19,6 +19,8 @@ class CreateTicketRequest extends Equatable {
   final String bookingType; // "instant" or "scheduled"
   final String?
   scheduledAt; // DateTime string in format "YYYY-MM-DD HH:mm:ss", null for instant booking
+  final String? companyCode;
+  final int? companyCodeId;
 
   const CreateTicketRequest({
     required this.issueCategoryId,
@@ -36,6 +38,8 @@ class CreateTicketRequest extends Equatable {
     this.paymentMethod,
     required this.bookingType,
     this.scheduledAt,
+    this.companyCode,
+    this.companyCodeId,
   });
 
   @override
@@ -55,6 +59,8 @@ class CreateTicketRequest extends Equatable {
     paymentMethod,
     bookingType,
     scheduledAt,
+    companyCode,
+    companyCodeId,
   ];
 }
 

@@ -1,3 +1,6 @@
+import 'package:flutter/material.dart';
+import '../../navigation/navigation_service.dart';
+import '../../../test/testlogin.dart';
 import 'package:dio/dio.dart';
 import '../../storage/secure_storage_service.dart';
 
@@ -68,9 +71,16 @@ class RefreshTokenInterceptor extends Interceptor {
         _isRefreshing = false;
         _queue.clear();
         await _storage.clearAll();
-        // Here you might want to trigger a global logout event or navigate to login
-        // but since we are in interceptor, we just pass the error.
-        // The bloc will handle the AuthLoggedOut state if needed.
+
+        // Use the global navigator key to go back to login screen
+        final context = NavigationService.navigatorKey.currentContext;
+        if (context != null) {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (_) => const Testlogin()),
+            (route) => false,
+          );
+        }
         return handler.next(err);
       }
     }

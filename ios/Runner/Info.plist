@@ -31,17 +31,7 @@
 		<string>OneCharge needs your location to auto-detect service requests and dispatch help.</string>
 		<!-- ✅ Photo Gallery Permissions -->
 		<key>NSPhotoLibraryUsageDescription</key>
-		<string>OneCharge needs access to your photo library to upload images while reporting issues.</string>
-		<key>NSPhotoLibraryAddUsageDescription</key>
-		<string>OneCharge needs access to save images to your photo library.</string>
-		<key>NSPhotoLibraryLimitedUsageDescription</key>
-		<string>OneCharge needs limited photo access to upload selected images.</string>
-		<!-- ✅ Camera Permission (Required for iOS 17+) -->
-		<key>NSCameraUsageDescription</key>
-		<string>OneCharge needs camera access to capture images while reporting issues.</string>
-		<!-- ✅ Microphone Permission (Required for Video) -->
-		<key>NSMicrophoneUsageDescription</key>
-		<string>OneCharge needs microphone access for video recording while reporting issues.</string>
+		<string>OneCharge needs access to your photo library to selection images while reporting issues.</string>
 		<key>ITSAppUsesNonExemptEncryption</key>
 		<false/>
 		<key>UIBackgroundModes</key>

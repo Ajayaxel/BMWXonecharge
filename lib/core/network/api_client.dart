@@ -1,5 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import '../../core/navigation/navigation_service.dart';
+import '../../test/testlogin.dart';
 import '../../core/storage/secure_storage_service.dart';
 
 class ApiClient {
@@ -26,6 +29,15 @@ class ApiClient {
     // Add auth interceptor to include token in requests
     _dio.interceptors.add(
       InterceptorsWrapper(
+        onResponse: (response, handler) async {
+          if (response.statusCode == 401) {
+            print(
+              '❌ [ApiClient] Unauthenticated (onResponse) - Redirecting to login...',
+            );
+            await _handleUnauthenticated();
+          }
+          return handler.next(response);
+        },
         onRequest: (options, handler) async {
           // Skip adding token for login and forgot-password endpoints
           if (options.path != '/customer/login' &&
@@ -42,11 +54,12 @@ class ApiClient {
           }
           return handler.next(options);
         },
-        onError: (error, handler) {
+        onError: (error, handler) async {
           if (error.response?.statusCode == 401) {
             print(
-              '❌ [ApiClient] Unauthenticated - Token may be invalid or expired',
+              '❌ [ApiClient] Unauthenticated (onError) - Redirecting to login...',
             );
+            await _handleUnauthenticated();
           }
           return handler.next(error);
         },
@@ -57,6 +70,21 @@ class ApiClient {
     if (kDebugMode) {
       _dio.interceptors.add(
         LogInterceptor(requestBody: true, responseBody: true),
+      );
+    }
+  }
+
+  Future<void> _handleUnauthenticated() async {
+    // Clear all sensitive data
+    await _storage.clearAll();
+
+    // Use the global navigator key to go back to login screen
+    final context = NavigationService.navigatorKey.currentContext;
+    if (context != null) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const Testlogin()),
+        (route) => false,
       );
     }
   }
@@ -187,6 +215,11 @@ class ApiClient {
         path,
         savePath,
         queryParameters: queryParameters,
+        options: Options(
+          // Allow any content type (PDF, etc.)
+          headers: {'Accept': '*/*'},
+          responseType: ResponseType.bytes,
+        ),
       );
       return response;
     } on DioException catch (e) {

@@ -75,44 +75,73 @@ class _ServiceNotificationOverlayState extends State<ServiceNotificationOverlay>
         color: Colors.black,
         borderRadius: BorderRadius.circular(24),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  "Finding agent for $issueCategory",
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    fontFamily: 'Lufga',
-                  ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      "Finding agent for $issueCategory",
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        fontFamily: 'Lufga',
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      ticketId != null
+                          ? "Ticket: #$ticketId\nFinding the best driver for you."
+                          : "Please wait, our driver will be\nassigned to you shortly.",
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 13,
+                        fontFamily: 'Lufga',
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  ticketId != null
-                      ? "Ticket: #$ticketId\nFinding the best driver for you."
-                      : "Please wait, our driver will be\nassigned to you shortly.",
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 13,
-                    fontFamily: 'Lufga',
-                  ),
+              ),
+              // Circle loading indicator
+              const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-          // Circle loading indicator
-          const SizedBox(
-            width: 24,
-            height: 24,
-            child: CircularProgressIndicator(
-              color: Colors.white,
-              strokeWidth: 2,
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              onPressed: () {
+                // Dummy cancel booking action
+              },
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.white70,
+                side: const BorderSide(color: Colors.white24),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              child: const Text(
+                "Cancel Booking",
+                style: TextStyle(
+                  fontFamily: 'Lufga',
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ),
         ],
@@ -318,7 +347,7 @@ class _ServiceNotificationOverlayState extends State<ServiceNotificationOverlay>
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,
                 foregroundColor: Colors.black,
-                padding: const EdgeInsets.symmetric(vertical: 18),
+                padding: const EdgeInsets.symmetric(vertical: 13),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),

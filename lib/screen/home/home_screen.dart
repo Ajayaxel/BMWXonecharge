@@ -1045,14 +1045,29 @@ class HomeScreenState extends State<HomeScreen> {
               }
             } else if (state is TicketDetailSuccess) {
               _updateStageFromTicket(state.ticket);
+            } else if (state is TicketError) {
+              String message = state.message;
+              if (message.contains('errors:')) {
+                final match = RegExp(r'\[(.*?)\]').firstMatch(message);
+                if (match != null && match.groupCount >= 1) {
+                  message = match.group(1) ?? message;
+                }
+              }
+              final formattedMessage = message
+                  .replaceFirst('Exception: ', '')
+                  .replaceFirst('Failed to create ticket: ', '')
+                  .split(' - ')
+                  .last
+                  .replaceAll('{success: false, message: ', '')
+                  .split(',')[0]
+                  .replaceAll('}', '');
+              showToast(formattedMessage);
             } else if (state is DriverLocationLoaded) {
               if (state.driver != null && _currentTicket != null) {
                 _updateStageFromTicket(
                   _currentTicket!.copyWith(driver: state.driver),
                 );
               }
-            } else if (state is TicketError) {
-              showToast("Error: ${state.message}");
             }
           },
         ),

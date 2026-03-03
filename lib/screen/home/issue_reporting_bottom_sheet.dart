@@ -24,6 +24,9 @@ import 'package:geolocator/geolocator.dart';
 import 'package:onecharge/logic/blocs/redeem_code/redeem_code_bloc.dart';
 import 'package:onecharge/logic/blocs/redeem_code/redeem_code_event.dart';
 import 'package:onecharge/logic/blocs/redeem_code/redeem_code_state.dart';
+import 'package:onecharge/logic/blocs/company_code/company_code_bloc.dart';
+import 'package:onecharge/logic/blocs/company_code/company_code_event.dart';
+import 'package:onecharge/logic/blocs/company_code/company_code_state.dart';
 
 class IssueReportingBottomSheet extends StatefulWidget {
   final String vehicleName;
@@ -1052,45 +1055,6 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
                           ),
                         ],
                       ],
-                      const SizedBox(height: 16),
-
-                      const SizedBox(height: 16),
-
-                      const Text(
-                        "Parking Location",
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w500,
-                          fontFamily: 'Lufga',
-                          color: Colors.black,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Container(
-                        height: 52,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFFE0E0E0)),
-                        ),
-                        child: TextField(
-                          controller: _parkingLocationController,
-                          decoration: const InputDecoration(
-                            hintText:
-                                "Enter parking location (e.g., Level 2, B21)",
-                            hintStyle: TextStyle(
-                              color: Color(0xFFBDBDBD),
-                              fontFamily: 'Lufga',
-                              fontSize: 14,
-                            ),
-                            border: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 14,
-                            ),
-                          ),
-                        ),
-                      ),
 
                       const SizedBox(height: 16),
 
@@ -1235,40 +1199,210 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
                                           crossAxisAlignment:
                                               CrossAxisAlignment.start,
                                           children: [
-                                            Container(
-                                              decoration: BoxDecoration(
-                                                color: Colors.white,
-                                                borderRadius:
-                                                    BorderRadius.circular(12),
-                                                border: Border.all(
-                                                  color: const Color(
-                                                    0xFFE0E0E0,
-                                                  ),
-                                                ),
-                                              ),
-                                              child: TextField(
-                                                controller:
-                                                    _companyCodeController,
-                                                autofocus: false,
-                                                decoration:
-                                                    const InputDecoration(
-                                                      hintText:
-                                                          "Company Code / ID",
-                                                      hintStyle: TextStyle(
-                                                        color: Color(
-                                                          0xFFBDBDBD,
-                                                        ),
-                                                        fontFamily: 'Lufga',
-                                                        fontSize: 14,
-                                                      ),
-                                                      border: InputBorder.none,
-                                                      contentPadding:
-                                                          EdgeInsets.symmetric(
-                                                            horizontal: 16,
-                                                            vertical: 14,
-                                                          ),
+                                            BlocConsumer<
+                                              CompanyCodeBloc,
+                                              CompanyCodeState
+                                            >(
+                                              listener: (context, state) {
+                                                if (state
+                                                    is CompanyCodeSuccess) {
+                                                  _showToast(
+                                                    state.response.message,
+                                                  );
+                                                } else if (state
+                                                    is CompanyCodeFailure) {
+                                                  _showToast(
+                                                    _formatErrorMessage(
+                                                      state.error,
                                                     ),
-                                              ),
+                                                  );
+                                                }
+                                              },
+                                              builder: (context, state) {
+                                                final bool isApplied =
+                                                    state is CompanyCodeSuccess;
+                                                final bool isLoading =
+                                                    state is CompanyCodeLoading;
+                                                final bool canApply =
+                                                    _companyCodeController.text
+                                                        .trim()
+                                                        .isNotEmpty;
+
+                                                return Container(
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.white,
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          12,
+                                                        ),
+                                                    border: Border.all(
+                                                      color: isApplied
+                                                          ? Colors.green
+                                                          : (state
+                                                                    is CompanyCodeFailure
+                                                                ? Colors.red
+                                                                : const Color(
+                                                                    0xFFE0E0E0,
+                                                                  )),
+                                                      width:
+                                                          isApplied ||
+                                                              state
+                                                                  is CompanyCodeFailure
+                                                          ? 1.5
+                                                          : 1,
+                                                    ),
+                                                  ),
+                                                  child: Row(
+                                                    children: [
+                                                      Expanded(
+                                                        child: TextField(
+                                                          controller:
+                                                              _companyCodeController,
+                                                          autofocus: false,
+                                                          enabled:
+                                                              !isApplied &&
+                                                              !isLoading,
+                                                          onChanged: (value) =>
+                                                              setState(() {}),
+                                                          decoration: const InputDecoration(
+                                                            hintText:
+                                                                "Company Code / ID",
+                                                            hintStyle:
+                                                                TextStyle(
+                                                                  color: Color(
+                                                                    0xFFBDBDBD,
+                                                                  ),
+                                                                  fontFamily:
+                                                                      'Lufga',
+                                                                  fontSize: 14,
+                                                                ),
+                                                            border: InputBorder
+                                                                .none,
+                                                            contentPadding:
+                                                                EdgeInsets.symmetric(
+                                                                  horizontal:
+                                                                      16,
+                                                                  vertical: 14,
+                                                                ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      if (isApplied)
+                                                        Padding(
+                                                          padding:
+                                                              const EdgeInsets.only(
+                                                                right: 4,
+                                                              ),
+                                                          child: TextButton(
+                                                            onPressed: isLoading
+                                                                ? null
+                                                                : () {
+                                                                    context
+                                                                        .read<
+                                                                          CompanyCodeBloc
+                                                                        >()
+                                                                        .add(
+                                                                          ResetCompanyCode(),
+                                                                        );
+                                                                    setState(() {
+                                                                      _companyCodeController
+                                                                          .clear();
+                                                                    });
+                                                                  },
+                                                            child: const Text(
+                                                              "Remove",
+                                                              style: TextStyle(
+                                                                color:
+                                                                    Colors.red,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w700,
+                                                                fontFamily:
+                                                                    'Lufga',
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        )
+                                                      else
+                                                        Padding(
+                                                          padding:
+                                                              const EdgeInsets.only(
+                                                                right: 8,
+                                                              ),
+                                                          child: SizedBox(
+                                                            height: 36,
+                                                            child: ElevatedButton(
+                                                              onPressed:
+                                                                  !canApply ||
+                                                                      isLoading
+                                                                  ? null
+                                                                  : () {
+                                                                      FocusScope.of(
+                                                                        context,
+                                                                      ).unfocus();
+                                                                      context
+                                                                          .read<
+                                                                            CompanyCodeBloc
+                                                                          >()
+                                                                          .add(
+                                                                            ValidateCompanyCode(
+                                                                              _companyCodeController.text.trim(),
+                                                                            ),
+                                                                          );
+                                                                    },
+                                                              style: ElevatedButton.styleFrom(
+                                                                backgroundColor:
+                                                                    Colors
+                                                                        .black,
+                                                                foregroundColor:
+                                                                    Colors
+                                                                        .white,
+                                                                disabledBackgroundColor:
+                                                                    Colors
+                                                                        .grey[300],
+                                                                elevation: 0,
+                                                                shape: RoundedRectangleBorder(
+                                                                  borderRadius:
+                                                                      BorderRadius.circular(
+                                                                        8,
+                                                                      ),
+                                                                ),
+                                                                padding:
+                                                                    const EdgeInsets.symmetric(
+                                                                      horizontal:
+                                                                          16,
+                                                                    ),
+                                                              ),
+                                                              child: isLoading
+                                                                  ? const SizedBox(
+                                                                      width: 20,
+                                                                      height:
+                                                                          20,
+                                                                      child: CupertinoActivityIndicator(
+                                                                        color: Colors
+                                                                            .white,
+                                                                        radius:
+                                                                            8,
+                                                                      ),
+                                                                    )
+                                                                  : const Text(
+                                                                      "Apply",
+                                                                      style: TextStyle(
+                                                                        fontSize:
+                                                                            14,
+                                                                        fontWeight:
+                                                                            FontWeight.w600,
+                                                                        fontFamily:
+                                                                            'Lufga',
+                                                                      ),
+                                                                    ),
+                                                            ),
+                                                          ),
+                                                        ),
+                                                    ],
+                                                  ),
+                                                );
+                                              },
                                             ),
                                           ],
                                         ),
@@ -1417,8 +1551,6 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
                               );
                               Navigator.pop(context);
                             }
-                          } else if (state is TicketError) {
-                            _showToast(_formatErrorMessage(state.message));
                           }
                         },
                         child: BlocBuilder<TicketBloc, TicketState>(
@@ -1483,7 +1615,38 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
       return;
     }
 
+    // ── Company Code ──────────────────────────────────────────────────────
+    final companyCodeState = context.read<CompanyCodeBloc>().state;
+    String? appliedCompanyCode;
+    int? appliedCompanyCodeId;
+    bool companyMakesFree = false;
+    if (companyCodeState is CompanyCodeSuccess &&
+        companyCodeState.response.data != null) {
+      final ccData = companyCodeState.response.data!;
+      appliedCompanyCode = ccData.code.isNotEmpty ? ccData.code : null;
+      appliedCompanyCodeId = ccData.companyCodeId > 0
+          ? ccData.companyCodeId
+          : null;
+      companyMakesFree = ccData.isFree;
+    }
+
     // Create ticket request
+    // ── Redeem Code ───────────────────────────────────────────────────────
+    final String? redeemCode =
+        (_appliedRedeemCode != null && _appliedRedeemCode!.isNotEmpty)
+        ? _appliedRedeemCode
+        : null;
+
+    // ── Payment Method ────────────────────────────────────────────────────
+    // If the company code makes the ticket free → no payment method required.
+    // Otherwise send "cod" or null (online).
+    String? paymentMethod;
+    if (!companyMakesFree) {
+      paymentMethod = _selectedPaymentMethodNotifier.value == "cod"
+          ? "cod"
+          : null;
+    }
+
     final request = CreateTicketRequest(
       issueCategoryId: _selectedCategoryObj?.id ?? 1,
       issueCategorySubTypeId: _selectedChargeUnit?.id,
@@ -1498,15 +1661,21 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
       latitude: _currentLatitude,
       longitude: _currentLongitude,
       attachments: _selectedFiles.isNotEmpty ? _selectedFiles : null,
-      redeemCode: _appliedRedeemCode,
-      paymentMethod: _selectedPaymentMethodNotifier.value == "cod"
-          ? "cod"
-          : null,
+      redeemCode: redeemCode,
+      companyCode: appliedCompanyCode,
+      companyCodeId: appliedCompanyCodeId,
+      paymentMethod: paymentMethod,
       bookingType: isInstant ? "instant" : "scheduled",
       scheduledAt: isInstant
           ? DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now().toUtc())
           : DateFormat('yyyy-MM-dd HH:mm:ss').format(_selectedDateTime.toUtc()),
     );
+
+    print('📋 [SubmitTicket] bookingType: ${request.bookingType}');
+    print('📋 [SubmitTicket] paymentMethod: ${request.paymentMethod}');
+    print('📋 [SubmitTicket] redeemCode: ${request.redeemCode}');
+    print('📋 [SubmitTicket] companyCode: ${request.companyCode}');
+    print('📋 [SubmitTicket] companyCodeId: ${request.companyCodeId}');
 
     // Dispatch create ticket event
     if (mounted) {

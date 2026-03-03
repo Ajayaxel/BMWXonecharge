@@ -4,6 +4,7 @@ import UIKit
 import CarPlay
 import UserNotifications
 import MapKit
+import Firebase
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
@@ -14,6 +15,7 @@ import MapKit
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
     GMSServices.provideAPIKey("AIzaSyCyWXFiBQAQ6qBpb3Mq_YKta4Y_dI5c4X0")
+    FirebaseApp.configure()
     
     let engine = FlutterEngine(name: "shared_engine")
     engine.run()
@@ -23,7 +25,8 @@ import MapKit
     CarPlayManager.shared.setup(with: engine)
     
     UNUserNotificationCenter.current().delegate = self
-    UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+    UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
+    application.registerForRemoteNotifications()
     
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }

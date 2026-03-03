@@ -27,6 +27,8 @@ class _LocationMapScreenState extends State<LocationMapScreen> {
   final TextEditingController _houseController = TextEditingController();
   final TextEditingController _roadController = TextEditingController();
   final TextEditingController _directionController = TextEditingController();
+  final TextEditingController _parkingLocationController =
+      TextEditingController();
 
   // Autocomplete variables
   GooglePlace? _googlePlace;
@@ -454,6 +456,11 @@ class _LocationMapScreenState extends State<LocationMapScreen> {
                     ),
                     const SizedBox(height: 12),
                     _buildDetailTextField(_roadController, "Road / Area"),
+                    SizedBox(height: 12),
+                    _buildDetailTextField(
+                      _parkingLocationController,
+                      "Parking Location , outside the building",
+                    ),
                     const SizedBox(height: 12),
                     _buildDetailTextField(
                       _directionController,

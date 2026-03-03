@@ -61,6 +61,10 @@ class IssueRepository {
         'booking_type': request.bookingType,
         if (request.scheduledAt != null && request.scheduledAt!.isNotEmpty)
           'scheduled_at': request.scheduledAt,
+        if (request.companyCode != null && request.companyCode!.isNotEmpty)
+          'company_code': request.companyCode,
+        if (request.companyCodeId != null)
+          'company_code_id': request.companyCodeId,
       });
 
       // Add attachments if any

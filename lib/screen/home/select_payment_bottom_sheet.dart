@@ -22,7 +22,7 @@ class SelectPaymentBottomSheet extends StatefulWidget {
 }
 
 class _SelectPaymentBottomSheetState extends State<SelectPaymentBottomSheet> {
-  String _selectedMethod = "card";
+  String _selectedMethod = "paymob";
 
   @override
   Widget build(BuildContext context) {

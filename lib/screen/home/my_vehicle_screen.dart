@@ -233,47 +233,37 @@ class _MyVehicleScreenState extends State<MyVehicleScreen> {
               ],
             ),
             const SizedBox(height: 20),
-            Center(
-              child: Column(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.black, width: 1.5),
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: List.generate(8, (index) {
-                        double batteryLevel = double.parse(vehicle['battery']!);
-                        int greenBars = (batteryLevel / 12.5).round();
-                        return Container(
-                          width: 32,
-                          height: 70,
-                          margin: const EdgeInsets.symmetric(horizontal: 3),
-                          decoration: BoxDecoration(
-                            color: index < greenBars
-                                ? const Color(0xFF27AE10)
-                                : const Color(0xFFE9F5E8),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        );
-                      }),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    '${vehicle['battery']}%',
-                    style: const TextStyle(
-                      fontSize: 32,
-                      fontFamily: 'Lufga',
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            // Center(
+            //   child: Column(
+            //     children: [
+            //       Container(
+            //         padding: const EdgeInsets.all(4),
+            //         decoration: BoxDecoration(
+            //           border: Border.all(color: Colors.black, width: 1.5),
+            //           borderRadius: BorderRadius.circular(15),
+            //         ),
+            //         child: Row(
+            //           mainAxisSize: MainAxisSize.min,
+            //           children: List.generate(8, (index) {
+            //             double batteryLevel = double.parse(vehicle['battery']!);
+            //             int greenBars = (batteryLevel / 12.5).round();
+            //             return Container(
+            //               width: 32,
+            //               height: 70,
+            //               margin: const EdgeInsets.symmetric(horizontal: 3),
+            //               decoration: BoxDecoration(
+            //                 color: index < greenBars
+            //                     ? const Color(0xFF27AE10)
+            //                     : const Color(0xFFE9F5E8),
+            //                 borderRadius: BorderRadius.circular(8),
+            //               ),
+            //             );
+            //           }),
+            //         ),
+            //       ),
+            //     ],
+            //   ),
+            // ),
             const SizedBox(height: 40),
           ],
         ),
