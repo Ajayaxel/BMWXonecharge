@@ -696,7 +696,7 @@ class HomeScreenState extends State<HomeScreen> {
       scheduledAt: DateFormat(
         'yyyy-MM-dd HH:mm:ss',
       ).format(DateTime.now().toUtc()),
-      paymentMethod: "cod", // Default for CarPlay for now
+      paymentMethod: "company", // Updated from "cod" as it was removed from API
     );
 
     if (mounted) {
@@ -1436,6 +1436,16 @@ class HomeScreenState extends State<HomeScreen> {
                     setState(() {
                       _currentServiceStage = 'none';
                       _stopPolling();
+                      _currentTicket = null;
+                    });
+                  },
+                  onCancel: () {
+                    // Since there is no cancel API yet, we do a dummy cancel locally
+                    showToast("Booking Cancelled");
+                    setState(() {
+                      _currentServiceStage = 'none';
+                      _stopPolling();
+                      _realtimeService?.disconnect();
                       _currentTicket = null;
                     });
                   },

@@ -8,18 +8,14 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 class ServiceSummaryBottomSheet extends StatefulWidget {
   final int? ticketId;
 
-  const ServiceSummaryBottomSheet({
-    super.key,
-    this.ticketId,
-  });
+  const ServiceSummaryBottomSheet({super.key, this.ticketId});
 
   @override
   State<ServiceSummaryBottomSheet> createState() =>
       _ServiceSummaryBottomSheetState();
 }
 
-class _ServiceSummaryBottomSheetState
-    extends State<ServiceSummaryBottomSheet> {
+class _ServiceSummaryBottomSheetState extends State<ServiceSummaryBottomSheet> {
   Ticket? _ticket;
   bool _isLoading = true;
   String? _error;
@@ -53,7 +49,7 @@ class _ServiceSummaryBottomSheetState
       final response = await repository.getTicketDetails(widget.ticketId!);
 
       if (!mounted) return;
-      
+
       if (response.success && response.data?.ticket != null) {
         setState(() {
           _ticket = response.data!.ticket;
@@ -84,9 +80,9 @@ class _ServiceSummaryBottomSheetState
 
     try {
       final currentPosition = await Geolocator.getCurrentPosition();
-      
+
       if (!mounted) return;
-      
+
       final ticketLat = double.tryParse(_ticket!.latitude ?? '');
       final ticketLng = double.tryParse(_ticket!.longitude ?? '');
 
@@ -186,304 +182,281 @@ class _ServiceSummaryBottomSheetState
               ),
             )
           : _error != null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(40.0),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          _error!,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontFamily: 'Lufga',
-                            color: Colors.red,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: _fetchTicketDetails,
-                          child: const Text('Retry'),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-              : SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Header
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            "Summary",
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w500,
-                              fontFamily: 'Lufga',
-                              color: Colors.black,
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: () {},
-                            child: const Text(
-                              "HELP",
-                              style: TextStyle(
-                                color: Color(0xFFE53935),
-                                fontWeight: FontWeight.w700,
-                                fontFamily: 'Lufga',
-                                fontSize: 14,
-                              ),
-                            ),
-                          ),
-                        ],
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(40.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _error!,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontFamily: 'Lufga',
+                        color: Colors.red,
                       ),
-                      const SizedBox(height: 16),
-
-                      // Distance & Time
-                      if (_distance != null || _estimatedTime != null)
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.location_on_outlined,
-                              size: 20,
-                              color: Colors.black,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              _distance != null
-                                  ? "${_distance!.toStringAsFixed(0)} km"
-                                  : "N/A",
-                              style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                                fontFamily: 'Lufga',
-                              ),
-                            ),
-                            if (_estimatedTime != null) ...[
-                              const SizedBox(width: 24),
-                              const Icon(Icons.access_time,
-                                  size: 20, color: Colors.black),
-                              const SizedBox(width: 8),
-                              Text(
-                                _estimatedTime!,
-                                style: const TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                  fontFamily: 'Lufga',
-                                ),
-                              ),
-                            ],
-                          ],
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: _fetchTicketDetails,
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        "Summary",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w500,
+                          fontFamily: 'Lufga',
+                          color: Colors.black,
                         ),
-                      if (_distance != null || _estimatedTime != null)
-                        const Divider(
-                            height: 32, thickness: 1, color: Color(0xFFF0F0F0)),
-
-                      // Car Model
-                      if (_ticket?.issueCategorySubType != null)
-                        Row(
-                          children: [
-                            Image.asset(
-                              'assets/home/car_icon_black.png',
-                              height: 24,
-                              width: 24,
-                              errorBuilder: (c, e, s) =>
-                                  const Icon(Icons.directions_car),
-                            ),
-                            const SizedBox(width: 16),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  "Service Type",
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    fontFamily: 'Lufga',
-                                    color: Color(0xFF475569),
-                                  ),
-                                ),
-                                Text(
-                                  _ticket!.issueCategorySubType!.name,
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    fontFamily: 'Lufga',
-                                    color: Color(0xFF757575),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      if (_ticket?.issueCategorySubType != null)
-                        const SizedBox(height: 20),
-
-                      // Landmark
-                      if (_ticket?.location != null)
-                        Row(
-                          children: [
-                            const Icon(Icons.location_pin,
-                                size: 24, color: Colors.black),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    "Landmark",
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                      fontFamily: 'Lufga',
-                                      color: Color(0xFF475569),
-                                    ),
-                                  ),
-                                  Text(
-                                    _ticket!.location!,
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      fontFamily: 'Lufga',
-                                      color: Color(0xFF757575),
-                                    ),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      if (_ticket?.location != null) const SizedBox(height: 24),
-
-                      // Added Services Section
-                      if (_ticket?.issueCategory != null) ...[
-                        const Text(
-                          "Added Services",
+                      ),
+                      TextButton(
+                        onPressed: () {},
+                        child: const Text(
+                          "HELP",
                           style: TextStyle(
-                            fontSize: 15,
+                            color: Color(0xFFE53935),
                             fontWeight: FontWeight.w700,
                             fontFamily: 'Lufga',
-                            color: Color(0xFF475569),
+                            fontSize: 14,
                           ),
                         ),
-                        const SizedBox(height: 12),
-
-                        // Service Card
-                        _buildServiceCard(
-                          title: _ticket!.issueCategory!.name,
-                          price: _ticket!.issueCategorySubType != null
-                              ? _formatCurrency(
-                                  _ticket!.issueCategorySubType!.serviceCost,
-                                  _ticket!.invoice?.currency ?? 'AED',
-                                )
-                              : "AED 0.00",
-                          iconPath: _getCategoryIcon(_ticket!.issueCategory!.name),
-                          items: _ticket!.issueCategorySubType != null
-                              ? [_ticket!.issueCategorySubType!.name]
-                              : [],
-                          defaultIcon:
-                              _getCategoryDefaultIcon(_ticket!.issueCategory!.name),
-                        ),
-
-                        const SizedBox(height: 24),
-                      ],
-
-                      // Pricing Table (Invoice Section)
-                      if (_ticket?.invoice != null) ...[
-                        _buildPriceRow(
-                          "Service Cost",
-                          _formatCurrency(
-                            _ticket!.invoice!.subtotal,
-                            _ticket!.invoice!.currency,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        if (_ticket!.invoice!.vatAmount > 0) ...[
-                          _buildPriceRow(
-                            "Vat",
-                            _formatCurrency(
-                              _ticket!.invoice!.vatAmount,
-                              _ticket!.invoice!.currency,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                        ],
-                        if (_ticket!.invoice!.discountAmount > 0) ...[
-                          _buildPriceRow(
-                            "Discount",
-                            "-${_formatCurrency(
-                              _ticket!.invoice!.discountAmount,
-                              _ticket!.invoice!.currency,
-                            )}",
-                          ),
-                          const SizedBox(height: 12),
-                        ],
-                        _buildPriceRow(
-                          "Total price",
-                          _formatCurrency(
-                            _ticket!.invoice!.totalAmount,
-                            _ticket!.invoice!.currency,
-                          ),
-                          isTotal: true,
-                        ),
-                      ] else if (_ticket?.issueCategorySubType != null) ...[
-                        // Fallback to sub-type costs if invoice is not available
-                        _buildPriceRow(
-                          "Service Cost",
-                          _formatCurrency(
-                            _ticket!.issueCategorySubType!.serviceCost,
-                            'AED',
-                          ),
-                        ),
-                        if (_ticket!.issueCategorySubType!.serviceCharge > 0) ...[
-                          const SizedBox(height: 12),
-                          _buildPriceRow(
-                            "Service Charge",
-                            _formatCurrency(
-                              _ticket!.issueCategorySubType!.serviceCharge,
-                              'AED',
-                            ),
-                          ),
-                        ],
-                        if (_ticket!.issueCategorySubType!.vat > 0) ...[
-                          const SizedBox(height: 12),
-                          _buildPriceRow(
-                            "Vat",
-                            _formatCurrency(
-                              _ticket!.issueCategorySubType!.vat,
-                              'AED',
-                            ),
-                          ),
-                        ],
-                        const SizedBox(height: 16),
-                        _buildPriceRow(
-                          "Total price",
-                          _formatCurrency(
-                            _ticket!.issueCategorySubType!.serviceCost +
-                                _ticket!.issueCategorySubType!.serviceCharge +
-                                _ticket!.issueCategorySubType!.vat,
-                            'AED',
-                          ),
-                          isTotal: true,
-                        ),
-                      ],
-
-                      const SizedBox(height: 32),
-
-                      // Done Button
-                      OneBtn(
-                        onPressed: () {
-                          Navigator.pop(context);
-                        },
-                        text: "Done",
                       ),
                     ],
                   ),
-                ),
+                  const SizedBox(height: 16),
+
+                  // Distance & Time
+                  if (_distance != null || _estimatedTime != null)
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.location_on_outlined,
+                          size: 20,
+                          color: Colors.black,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          _distance != null
+                              ? "${_distance!.toStringAsFixed(0)} km"
+                              : "N/A",
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            fontFamily: 'Lufga',
+                          ),
+                        ),
+                        if (_estimatedTime != null) ...[
+                          const SizedBox(width: 24),
+                          const Icon(
+                            Icons.access_time,
+                            size: 20,
+                            color: Colors.black,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            _estimatedTime!,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              fontFamily: 'Lufga',
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  if (_distance != null || _estimatedTime != null)
+                    const Divider(
+                      height: 32,
+                      thickness: 1,
+                      color: Color(0xFFF0F0F0),
+                    ),
+
+                  // Car Model
+                  if (_ticket?.issueCategorySubType != null)
+                    Row(
+                      children: [
+                        Image.asset(
+                          'assets/home/car_icon_black.png',
+                          height: 24,
+                          width: 24,
+                          errorBuilder: (c, e, s) =>
+                              const Icon(Icons.directions_car),
+                        ),
+                        const SizedBox(width: 16),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              "Service Type",
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                fontFamily: 'Lufga',
+                                color: Color(0xFF475569),
+                              ),
+                            ),
+                            Text(
+                              _ticket!.issueCategorySubType!.name,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontFamily: 'Lufga',
+                                color: Color(0xFF757575),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  if (_ticket?.issueCategorySubType != null)
+                    const SizedBox(height: 20),
+
+                  // Landmark
+                  if (_ticket?.location != null)
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.location_pin,
+                          size: 24,
+                          color: Colors.black,
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                "Landmark",
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  fontFamily: 'Lufga',
+                                  color: Color(0xFF475569),
+                                ),
+                              ),
+                              Text(
+                                _ticket!.location!,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontFamily: 'Lufga',
+                                  color: Color(0xFF757575),
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  if (_ticket?.location != null) const SizedBox(height: 24),
+
+                  // Added Services Section
+                  if (_ticket?.issueCategory != null) ...[
+                    const Text(
+                      "Added Services",
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        fontFamily: 'Lufga',
+                        color: Color(0xFF475569),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Service Card
+                    _buildServiceCard(
+                      title: _ticket!.issueCategory!.name,
+                      price: _formatCurrency(
+                        _ticket!.serviceCost,
+                        _ticket!.invoice?.currency ?? 'AED',
+                      ),
+                      iconPath: _getCategoryIcon(_ticket!.issueCategory!.name),
+                      items: _ticket!.issueCategorySubType != null
+                          ? [_ticket!.issueCategorySubType!.name]
+                          : [],
+                      defaultIcon: _getCategoryDefaultIcon(
+                        _ticket!.issueCategory!.name,
+                      ),
+                    ),
+
+                    const SizedBox(height: 24),
+                  ],
+
+                  // Pricing Table (Invoice Section)
+                  // Pricing Table
+                  if (_ticket != null) ...[
+                    _buildPriceRow(
+                      "Service Cost",
+                      _formatCurrency(
+                        _ticket!.serviceCost,
+                        _ticket!.invoice?.currency ?? 'AED',
+                      ),
+                    ),
+                    if (_ticket!.serviceCharge > 0) ...[
+                      const SizedBox(height: 12),
+                      _buildPriceRow(
+                        "Service Charge",
+                        _formatCurrency(
+                          _ticket!.serviceCharge,
+                          _ticket!.invoice?.currency ?? 'AED',
+                        ),
+                      ),
+                    ],
+                    if (_ticket!.vat > 0) ...[
+                      const SizedBox(height: 12),
+                      _buildPriceRow(
+                        "Vat",
+                        _formatCurrency(
+                          _ticket!.vat,
+                          _ticket!.invoice?.currency ?? 'AED',
+                        ),
+                      ),
+                    ],
+                    if (_ticket!.invoice?.discountAmount != null &&
+                        _ticket!.invoice!.discountAmount > 0) ...[
+                      const SizedBox(height: 12),
+                      _buildPriceRow(
+                        "Discount",
+                        "-${_formatCurrency(_ticket!.invoice!.discountAmount, _ticket!.invoice!.currency)}",
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    _buildPriceRow(
+                      "Total price",
+                      _formatCurrency(
+                        _ticket!.totalAmount,
+                        _ticket!.invoice?.currency ?? 'AED',
+                      ),
+                      isTotal: true,
+                    ),
+                  ],
+
+                  const SizedBox(height: 32),
+
+                  // Done Button
+                  OneBtn(
+                    onPressed: () {
+                      Navigator.pop(context);
+                    },
+                    text: "Done",
+                  ),
+                ],
+              ),
+            ),
     );
   }
 

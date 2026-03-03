@@ -29,6 +29,8 @@
 		<!-- ✅ Location Permissions -->
 		<key>NSLocationWhenInUseUsageDescription</key>
 		<string>OneCharge needs your location to auto-detect service requests and dispatch help.</string>
+		<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+		<string>OneCharge needs your location to auto-detect service requests and dispatch help even when the app is in background.</string>
 		<!-- ✅ Photo Gallery Permissions -->
 		<key>NSPhotoLibraryUsageDescription</key>
 		<string>OneCharge needs access to your photo library to selection images while reporting issues.</string>

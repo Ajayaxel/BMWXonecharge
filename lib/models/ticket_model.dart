@@ -146,6 +146,10 @@ class Ticket extends Equatable {
   final TicketInvoice? invoice;
   final String? createdAt;
   final String? updatedAt;
+  final double serviceCost;
+  final double serviceCharge;
+  final double vat;
+  final double totalAmount;
 
   const Ticket({
     required this.id,
@@ -165,6 +169,10 @@ class Ticket extends Equatable {
     this.invoice,
     this.createdAt,
     this.updatedAt,
+    this.serviceCost = 0.0,
+    this.serviceCharge = 0.0,
+    this.vat = 0.0,
+    this.totalAmount = 0.0,
   });
 
   Ticket copyWith({
@@ -185,6 +193,10 @@ class Ticket extends Equatable {
     TicketInvoice? invoice,
     String? createdAt,
     String? updatedAt,
+    double? serviceCost,
+    double? serviceCharge,
+    double? vat,
+    double? totalAmount,
   }) {
     return Ticket(
       id: id ?? this.id,
@@ -204,6 +216,10 @@ class Ticket extends Equatable {
       invoice: invoice ?? this.invoice,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      serviceCost: serviceCost ?? this.serviceCost,
+      serviceCharge: serviceCharge ?? this.serviceCharge,
+      vat: vat ?? this.vat,
+      totalAmount: totalAmount ?? this.totalAmount,
     );
   }
 
@@ -320,6 +336,10 @@ class Ticket extends Equatable {
       invoice: invoice,
       createdAt: json['created_at']?.toString(),
       updatedAt: json['updated_at']?.toString(),
+      serviceCost: (json['service_cost'] ?? 0).toDouble(),
+      serviceCharge: (json['service_charge'] ?? 0).toDouble(),
+      vat: (json['vat'] ?? 0).toDouble(),
+      totalAmount: (json['total_amount'] ?? 0).toDouble(),
     );
   }
 
@@ -342,6 +362,10 @@ class Ticket extends Equatable {
     invoice,
     createdAt,
     updatedAt,
+    serviceCost,
+    serviceCharge,
+    vat,
+    totalAmount,
   ];
 }
 
@@ -494,6 +518,9 @@ class PaymentBreakdown extends Equatable {
   final bool discountApplied;
   final double discountAmount;
   final String? redeemCode;
+  final String? companyCode;
+  final bool? isFree;
+  final String? paymentMethod;
 
   const PaymentBreakdown({
     required this.baseAmount,
@@ -503,6 +530,9 @@ class PaymentBreakdown extends Equatable {
     required this.discountApplied,
     required this.discountAmount,
     this.redeemCode,
+    this.companyCode,
+    this.isFree,
+    this.paymentMethod,
   });
 
   factory PaymentBreakdown.fromJson(Map<String, dynamic> json) {
@@ -514,6 +544,9 @@ class PaymentBreakdown extends Equatable {
       discountApplied: json['discount_applied'] ?? false,
       discountAmount: (json['discount_amount'] ?? 0).toDouble(),
       redeemCode: json['redeem_code'],
+      companyCode: json['company_code'],
+      isFree: json['is_free'],
+      paymentMethod: json['payment_method'],
     );
   }
 
@@ -526,6 +559,9 @@ class PaymentBreakdown extends Equatable {
     discountApplied,
     discountAmount,
     redeemCode,
+    companyCode,
+    isFree,
+    paymentMethod,
   ];
 }
 

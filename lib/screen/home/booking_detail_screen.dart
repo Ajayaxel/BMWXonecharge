@@ -128,11 +128,10 @@ class BookingDetailScreen extends StatelessWidget {
       }
     }
 
-    final subType = ticket.issueCategorySubType;
-    final serviceCost = subType?.serviceCost ?? 0.0;
-    final serviceCharge = subType?.serviceCharge ?? 0.0;
-    final vat = subType?.vat ?? 0.0;
-    final calculatedTotal = serviceCost + serviceCharge + vat;
+    final serviceCost = ticket.serviceCost;
+    final serviceCharge = ticket.serviceCharge;
+    final vat = ticket.vat;
+    final totalAmount = ticket.totalAmount;
     final currency = invoice?.currency ?? 'AED';
 
     // final totalAmount = invoice != null
@@ -245,7 +244,7 @@ class BookingDetailScreen extends StatelessWidget {
               _buildDetailRow('VAT', '$currency ${vat.toStringAsFixed(2)}'),
               _buildDetailRow(
                 'Total Amount',
-                '$currency ${calculatedTotal.toStringAsFixed(2)}',
+                '$currency ${totalAmount.toStringAsFixed(2)}',
               ),
               _buildDetailRow(
                 'Payment Method',

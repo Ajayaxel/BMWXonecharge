@@ -426,6 +426,17 @@ class _TrackingMapScreenState extends State<TrackingMapScreen> {
                 ticket: _currentTicket,
                 onDismiss: () => Navigator.pop(context),
                 onSolved: () => Navigator.pop(context, true),
+                onCancel: () {
+                  // Dummy cancel locally
+                  if (mounted) {
+                    setState(() {
+                      _currentStage = 'none';
+                    });
+                    if (Navigator.canPop(context)) {
+                      Navigator.pop(context);
+                    }
+                  }
+                },
                 onTap: () {}, // Already on map
               ),
 

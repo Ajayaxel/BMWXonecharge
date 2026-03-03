@@ -8,6 +8,7 @@ class ServiceNotificationOverlay extends StatefulWidget {
   final double progress;
   final VoidCallback onDismiss;
   final VoidCallback onSolved;
+  final VoidCallback? onCancel;
   final VoidCallback? onTap;
   final Ticket? ticket;
 
@@ -17,6 +18,7 @@ class ServiceNotificationOverlay extends StatefulWidget {
     required this.progress,
     required this.onDismiss,
     required this.onSolved,
+    this.onCancel,
     this.onTap,
     this.ticket,
   });
@@ -124,9 +126,7 @@ class _ServiceNotificationOverlayState extends State<ServiceNotificationOverlay>
           SizedBox(
             width: double.infinity,
             child: OutlinedButton(
-              onPressed: () {
-                // Dummy cancel booking action
-              },
+              onPressed: widget.onCancel,
               style: OutlinedButton.styleFrom(
                 foregroundColor: Colors.white70,
                 side: const BorderSide(color: Colors.white24),

@@ -66,7 +66,7 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
       TextEditingController();
   IssueSubType? _selectedChargeUnit;
   final ValueNotifier<String> _selectedPaymentMethodNotifier =
-      ValueNotifier<String>("cod");
+      ValueNotifier<String>("company");
   final TextEditingController _companyCodeController = TextEditingController();
   final TextEditingController _redeemCodeController = TextEditingController();
   String? _appliedRedeemCode;
@@ -125,6 +125,14 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
     if (_currentLatitude == 0.0) {
       _getCurrentCoordinates();
     }
+
+    // Reset blocs to clear previous state (e.g., applied company/redeem codes)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<CompanyCodeBloc>().add(ResetCompanyCode());
+        context.read<RedeemCodeBloc>().add(ResetRedeemCode());
+      }
+    });
   }
 
   Future<void> _getCurrentCoordinates() async {
@@ -1122,7 +1130,8 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
                               // Pay By Company
                               GestureDetector(
                                 onTap: () {
-                                  _selectedPaymentMethodNotifier.value = "cod";
+                                  _selectedPaymentMethodNotifier.value =
+                                      "company";
                                   // Auto-focus the company code field after a short delay for the expansion animation
                                   Future.delayed(
                                     const Duration(milliseconds: 400),
@@ -1161,13 +1170,13 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
                                         decoration: BoxDecoration(
                                           shape: BoxShape.circle,
                                           border: Border.all(
-                                            color: selectedMethod == "cod"
+                                            color: selectedMethod == "company"
                                                 ? Colors.black
                                                 : const Color(0xFFD0D0D0),
                                             width: 2,
                                           ),
                                         ),
-                                        child: selectedMethod == "cod"
+                                        child: selectedMethod == "company"
                                             ? Center(
                                                 child: Container(
                                                   width: 12,
@@ -1190,7 +1199,7 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
                               AnimatedSize(
                                 duration: const Duration(milliseconds: 300),
                                 curve: Curves.easeInOut,
-                                child: selectedMethod == "cod"
+                                child: selectedMethod == "company"
                                     ? Padding(
                                         padding: const EdgeInsets.only(
                                           top: 12.0,
@@ -1535,15 +1544,16 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
                                   breakdown?.totalAmount ??
                                   invoice?.totalAmount;
 
-                              if (totalAmount != null && totalAmount > 0) {
-                                final currency =
-                                    breakdown?.currency ??
-                                    invoice?.currency ??
-                                    "AED";
-                                HomeScreenState.activeState?.showToast(
-                                  "Ticket created successfully! Total Amount: ${totalAmount.toStringAsFixed(2)} $currency",
-                                );
-                              }
+                              final currency =
+                                  breakdown?.currency ??
+                                  invoice?.currency ??
+                                  "AED";
+                              final String toastMsg =
+                                  (totalAmount != null && totalAmount > 0)
+                                  ? "Ticket created successfully! Total Amount: ${totalAmount.toStringAsFixed(2)} $currency"
+                                  : "Ticket created successfully!";
+
+                              HomeScreenState.activeState?.showToast(toastMsg);
 
                               // Return to home and show service notification flow
                               HomeScreenState.activeState?.startServiceFlow(
@@ -1551,6 +1561,8 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
                               );
                               Navigator.pop(context);
                             }
+                          } else if (state is TicketError) {
+                            _showToast(_formatErrorMessage(state.message));
                           }
                         },
                         child: BlocBuilder<TicketBloc, TicketState>(
@@ -1583,6 +1595,15 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
     if (!isInstant && _slotController.text.isEmpty) {
       _showToast("Please select a Slot");
       return;
+    }
+
+    // New validation for "Pay By Company"
+    if (_selectedPaymentMethodNotifier.value == "company") {
+      final companyCodeState = context.read<CompanyCodeBloc>().state;
+      if (companyCodeState is! CompanyCodeSuccess) {
+        _showToast("Please enter company code or select other payment option");
+        return;
+      }
     }
 
     // Check if "Other" category requires description
@@ -1619,7 +1640,6 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
     final companyCodeState = context.read<CompanyCodeBloc>().state;
     String? appliedCompanyCode;
     int? appliedCompanyCodeId;
-    bool companyMakesFree = false;
     if (companyCodeState is CompanyCodeSuccess &&
         companyCodeState.response.data != null) {
       final ccData = companyCodeState.response.data!;
@@ -1627,7 +1647,6 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
       appliedCompanyCodeId = ccData.companyCodeId > 0
           ? ccData.companyCodeId
           : null;
-      companyMakesFree = ccData.isFree;
     }
 
     // Create ticket request
@@ -1638,14 +1657,9 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
         : null;
 
     // ── Payment Method ────────────────────────────────────────────────────
-    // If the company code makes the ticket free → no payment method required.
-    // Otherwise send "cod" or null (online).
-    String? paymentMethod;
-    if (!companyMakesFree) {
-      paymentMethod = _selectedPaymentMethodNotifier.value == "cod"
-          ? "cod"
-          : null;
-    }
+    // Always send "online" as shown in the user's screenshots.
+    // The presence of companyCode will determine if payment is required.
+    final String paymentMethod = "online";
 
     final request = CreateTicketRequest(
       issueCategoryId: _selectedCategoryObj?.id ?? 1,
