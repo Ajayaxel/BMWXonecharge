@@ -12,6 +12,7 @@ class IssueRepository {
   Future<List<IssueCategory>> getIssueCategories() async {
     try {
       final response = await apiClient.get('/customer/issue-categories');
+      print("Issue Categories Response: ${response.data}");
       if (response.data['success'] == true) {
         final List<dynamic> categoriesJson =
             response.data['data']['issue_categories'];

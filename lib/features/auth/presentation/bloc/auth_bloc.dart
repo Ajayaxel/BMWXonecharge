@@ -7,6 +7,7 @@ import 'package:onecharge/features/auth/domain/usecases/register_usecase.dart';
 import 'package:onecharge/features/auth/domain/usecases/verify_otp_usecase.dart';
 import 'package:onecharge/features/auth/presentation/bloc/auth_event.dart';
 import 'package:onecharge/features/auth/presentation/bloc/auth_state.dart';
+import 'package:onecharge/core/error/failures.dart' as f;
 
 class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final LoginUseCase _loginUseCase;
@@ -107,10 +108,13 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
     final result = await _loginUseCase(event.email, event.password);
 
-    result.fold(
-      (failure) => emit(AuthFailure(failure.message)),
-      (user) => emit(Authenticated(user)),
-    );
+    result.fold((failure) {
+      if (failure is f.VerificationRequiredFailure) {
+        emit(AuthOtpRequired(failure.email));
+      } else {
+        emit(AuthFailure(failure.message));
+      }
+    }, (user) => emit(Authenticated(user)));
   }
 
   Future<void> _onLogoutRequested(

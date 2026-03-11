@@ -22,3 +22,8 @@ class AuthFailure extends Failure {
 class ValidationFailure extends Failure {
   const ValidationFailure(super.message);
 }
+
+class VerificationRequiredFailure extends Failure {
+  final String email;
+  const VerificationRequiredFailure(super.message, this.email);
+}

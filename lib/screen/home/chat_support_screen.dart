@@ -1,10 +1,12 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:onecharge/logic/blocs/chat/chat_bloc.dart';
-import 'package:onecharge/logic/blocs/chat/chat_event.dart';
-import 'package:onecharge/logic/blocs/chat/chat_state.dart';
-import 'package:onecharge/models/chat_models.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:onecharge/core/storage/secure_storage_service.dart';
+import 'package:onecharge/features/ai_chat/data/models/ai_chat_models.dart';
+import 'package:onecharge/features/ai_chat/presentation/bloc/ai_chat_bloc.dart';
+import 'package:onecharge/features/ai_chat/presentation/bloc/ai_chat_event.dart';
+import 'package:onecharge/features/ai_chat/presentation/bloc/ai_chat_state.dart';
 
 class ChatSupportScreen extends StatefulWidget {
   const ChatSupportScreen({super.key});
@@ -17,7 +19,8 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
-  final List<String> _quickOptions = [
+  /// Default quick-reply chips shown before any conversation starts.
+  final List<String> _quickOptions = const [
     'General',
     'Payment Related Issue',
     'Issue Not Solved',
@@ -27,7 +30,26 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
   @override
   void initState() {
     super.initState();
-    context.read<ChatBloc>().add(FetchClientDetails());
+    _initChat();
+  }
+
+  /// Reads the logged-in user's ID and name from secure storage,
+  /// then fires [AiChatInitialised] with the real values.
+  Future<void> _initChat() async {
+    final storage = SecureStorageService();
+    final userId = await storage.getUserId();
+    final userName = await storage.getUserName();
+
+    print('🧑 [AiChat] userId  = $userId');
+    print('🧑 [AiChat] userName = $userName');
+
+    if (!mounted) return;
+    context.read<AiChatBloc>().add(
+      AiChatInitialised(
+        userId: userId ?? 'user_anonymous',
+        userName: userName ?? 'User',
+      ),
+    );
   }
 
   @override
@@ -52,13 +74,13 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
   void _sendMessage() {
     final message = _messageController.text.trim();
     if (message.isNotEmpty) {
-      context.read<ChatBloc>().add(SendMessage(message));
+      context.read<AiChatBloc>().add(AiChatMessageSent(message));
       _messageController.clear();
     }
   }
 
   void _sendQuickReply(String message) {
-    context.read<ChatBloc>().add(SendQuickReply(message));
+    context.read<AiChatBloc>().add(AiChatQuickReplySent(message));
   }
 
   @override
@@ -89,18 +111,33 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
         centerTitle: true,
       ),
       body: SafeArea(
-        child: BlocConsumer<ChatBloc, ChatState>(
+        child: BlocConsumer<AiChatBloc, AiChatState>(
           listener: (context, state) {
-            if (state is MessageSent || state is MessageSending) {
+            if (state is AiChatReady || state is AiChatAwaitingReply) {
               _scrollToBottom();
+            }
+            if (state is AiChatError && state.messages.isNotEmpty) {
+              // Show a snackbar for inline errors so we don't lose the history.
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    state.message,
+                    style: const TextStyle(fontFamily: 'Lufga'),
+                  ),
+                  backgroundColor: Colors.redAccent,
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
             }
           },
           builder: (context, state) {
-            if (state is ChatLoading) {
+            // ── Full-screen loading (initial session load) ────────────────
+            if (state is AiChatLoading) {
               return const Center(child: CupertinoActivityIndicator());
             }
 
-            if (state is ChatError) {
+            // ── Full-screen error (no messages yet) ───────────────────────
+            if (state is AiChatError && state.messages.isEmpty) {
               return Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -111,19 +148,27 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
                       color: Colors.red,
                     ),
                     const SizedBox(height: 16),
-                    Text(
-                      state.message,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontFamily: 'Lufga',
-                        color: Colors.black87,
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Text(
+                        state.message,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontFamily: 'Lufga',
+                          color: Colors.black87,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 16),
                     ElevatedButton(
                       onPressed: () {
-                        context.read<ChatBloc>().add(FetchClientDetails());
+                        context.read<AiChatBloc>().add(
+                          const AiChatInitialised(
+                            userId: 'user_123',
+                            userName: 'User',
+                          ),
+                        );
                       },
                       child: const Text('Retry'),
                     ),
@@ -132,23 +177,22 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
               );
             }
 
-            List<ChatMessage> messages = [];
-            String defaultMessage = 'How can i assist you';
-            List<String>? suggestedReplies;
-            bool isLoadingMessage = false;
+            // ── Resolve messages and loading flag ─────────────────────────
+            List<AiChatMessage> messages = [];
+            bool isAwaitingReply = false;
 
-            if (state is ClientDetailsLoaded) {
-              defaultMessage = state.defaultMessage;
-            } else if (state is MessageSent) {
+            if (state is AiChatReady) {
               messages = state.messages;
-              suggestedReplies = state.suggestedReplies;
-            } else if (state is MessageSending) {
+            } else if (state is AiChatAwaitingReply) {
               messages = state.messages;
-              isLoadingMessage = true;
+              isAwaitingReply = true;
+            } else if (state is AiChatError) {
+              messages = state.messages;
             }
 
             return Column(
               children: [
+                // ── Message list / welcome screen ─────────────────────────
                 Expanded(
                   child: messages.isEmpty
                       ? Center(
@@ -158,7 +202,7 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
                               const Text('👋', style: TextStyle(fontSize: 50)),
                               const SizedBox(height: 20),
                               const Text(
-                                'HEY, i\'m 1Care Assistant.',
+                                "HEY, i'm 1Care Assistant.",
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   fontSize: 18,
@@ -168,10 +212,10 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
                                 ),
                               ),
                               const SizedBox(height: 8),
-                              Text(
-                                defaultMessage,
+                              const Text(
+                                'Hello there! How may I help you?',
                                 textAlign: TextAlign.center,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 16,
                                   fontFamily: 'Lufga',
                                   color: Colors.black54,
@@ -187,17 +231,18 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
                             vertical: 16,
                           ),
                           itemCount:
-                              messages.length + (isLoadingMessage ? 1 : 0),
+                              messages.length + (isAwaitingReply ? 1 : 0),
                           itemBuilder: (context, index) {
-                            if (index == messages.length && isLoadingMessage) {
-                              return _buildLoadingIndicator();
+                            if (index == messages.length && isAwaitingReply) {
+                              return _buildTypingIndicator();
                             }
                             return _buildMessageBubble(messages[index]);
                           },
                         ),
                 ),
-                // Quick Options (only show when no messages or suggested replies available)
-                if (messages.isEmpty || suggestedReplies != null)
+
+                // ── Quick-reply chips (only before conversation starts) ────
+                if (messages.isEmpty)
                   Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16,
@@ -206,13 +251,13 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
                     child: Wrap(
                       spacing: 8,
                       runSpacing: 8,
-                      children: (suggestedReplies ?? _quickOptions)
+                      children: _quickOptions
                           .map((option) => _buildQuickOption(option))
                           .toList(),
                     ),
                   ),
-                if (suggestedReplies != null) const SizedBox(height: 8),
-                // Input Field
+
+                // ── Input bar ─────────────────────────────────────────────
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
                   child: Row(
@@ -241,13 +286,18 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
                                     ),
                                   ),
                                   onSubmitted: (_) => _sendMessage(),
+                                  enabled: state is! AiChatAwaitingReply,
                                 ),
                               ),
                               GestureDetector(
-                                onTap: _sendMessage,
-                                child: const Icon(
+                                onTap: state is AiChatAwaitingReply
+                                    ? null
+                                    : _sendMessage,
+                                child: Icon(
                                   Icons.send,
-                                  color: Colors.black,
+                                  color: state is AiChatAwaitingReply
+                                      ? Colors.grey
+                                      : Colors.black,
                                 ),
                               ),
                             ],
@@ -265,50 +315,91 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
     );
   }
 
-  Widget _buildMessageBubble(ChatMessage message) {
+  // ── Widgets ──────────────────────────────────────────────────────────────
+
+  Widget _buildMessageBubble(AiChatMessage message) {
+    final isUser = message.isUser;
     return Align(
-      alignment: message.isUser ? Alignment.centerRight : Alignment.centerLeft,
+      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: message.isUser
-              ? const Color(0xFF007AFF)
-              : const Color(0xFFF0F0F0),
+          color: isUser ? const Color(0xFF007AFF) : const Color(0xFFF0F0F0),
           borderRadius: BorderRadius.circular(20),
         ),
         constraints: BoxConstraints(
           maxWidth: MediaQuery.of(context).size.width * 0.75,
         ),
-        child: Text(
-          message.message,
-          style: TextStyle(
-            fontSize: 14,
-            fontFamily: 'Lufga',
-            color: message.isUser ? Colors.white : Colors.black87,
-          ),
-        ),
+        child: isUser
+            // ── User bubble: plain white text ──────────────────────────────
+            ? Text(
+                message.text,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontFamily: 'Lufga',
+                  color: Colors.white,
+                ),
+              )
+            // ── AI bubble: markdown rendered ───────────────────────────────
+            : MarkdownBody(
+                data: message.text,
+                shrinkWrap: true,
+                styleSheet: MarkdownStyleSheet(
+                  p: const TextStyle(
+                    fontSize: 14,
+                    fontFamily: 'Lufga',
+                    color: Colors.black87,
+                    height: 1.4,
+                  ),
+                  strong: const TextStyle(
+                    fontSize: 14,
+                    fontFamily: 'Lufga',
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black87,
+                  ),
+                  em: const TextStyle(
+                    fontSize: 14,
+                    fontFamily: 'Lufga',
+                    fontStyle: FontStyle.italic,
+                    color: Colors.black87,
+                  ),
+                  listBullet: const TextStyle(
+                    fontSize: 14,
+                    fontFamily: 'Lufga',
+                    color: Colors.black87,
+                  ),
+                  code: const TextStyle(
+                    fontSize: 13,
+                    backgroundColor: Color(0xFFE0E0E0),
+                    color: Colors.black87,
+                  ),
+                  blockquote: const TextStyle(
+                    fontSize: 13,
+                    fontFamily: 'Lufga',
+                    color: Colors.black54,
+                  ),
+                ),
+              ),
       ),
     );
   }
 
-  Widget _buildLoadingIndicator() {
+  /// Animated "..." typing indicator shown while waiting for AI reply.
+  Widget _buildTypingIndicator() {
     return Align(
       alignment: Alignment.centerLeft,
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
           color: const Color(0xFFF0F0F0),
           borderRadius: BorderRadius.circular(20),
         ),
         child: const SizedBox(
-          width: 20,
-          height: 20,
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            valueColor: AlwaysStoppedAnimation<Color>(Colors.black54),
-          ),
+          width: 24,
+          height: 16,
+          child: CupertinoActivityIndicator(radius: 8),
         ),
       ),
     );
@@ -321,7 +412,7 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
           color: Colors.white,
-          border: Border.all(color: Colors.grey.withOpacity(0.3)),
+          border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
           borderRadius: BorderRadius.circular(20),
         ),
         child: Text(

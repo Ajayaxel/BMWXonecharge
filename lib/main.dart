@@ -15,6 +15,8 @@ import 'package:onecharge/logic/blocs/issue_category/issue_category_bloc.dart';
 
 import 'package:onecharge/data/repositories/chat_repository.dart';
 import 'package:onecharge/logic/blocs/chat/chat_bloc.dart';
+import 'package:onecharge/features/ai_chat/data/repositories/ai_chat_repository.dart';
+import 'package:onecharge/features/ai_chat/presentation/bloc/ai_chat_bloc.dart';
 import 'package:onecharge/data/repositories/charging_type_repository.dart';
 import 'package:onecharge/logic/blocs/charging_type/charging_type_bloc.dart';
 import 'package:onecharge/logic/blocs/add_vehicle/add_vehicle_bloc.dart';
@@ -75,6 +77,7 @@ void main() async {
   final vehicleRepository = VehicleRepository(apiClient: apiClient);
   final issueRepository = IssueRepository(apiClient: apiClient);
   final chatRepository = ChatRepository(apiClient: apiClient);
+  final aiChatRepository = AiChatRepository();
   final chargingTypeRepository = ChargingTypeRepository(apiClient: apiClient);
   final profileRepository = ProfileRepository(apiClient: apiClient);
   final locationRepository = LocationRepository(apiClient: apiClient);
@@ -118,6 +121,9 @@ void main() async {
           ),
           BlocProvider<ChatBloc>(
             create: (context) => ChatBloc(chatRepository: chatRepository),
+          ),
+          BlocProvider<AiChatBloc>(
+            create: (context) => AiChatBloc(aiChatRepository: aiChatRepository),
           ),
           BlocProvider<ChargingTypeBloc>(
             create: (context) => ChargingTypeBloc(

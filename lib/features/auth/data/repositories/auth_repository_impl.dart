@@ -1,7 +1,6 @@
 import 'package:dartz/dartz.dart';
 import 'package:dio/dio.dart';
 import '../../../../core/error/failures.dart';
-import '../../../../core/error/exceptions.dart';
 import '../../../../core/storage/secure_storage_service.dart';
 import '../../domain/entities/auth_user.dart';
 import '../../domain/repositories/auth_repository.dart';
@@ -22,9 +21,29 @@ class AuthRepositoryImpl implements AuthRepository {
       if (responseData['success'] == true) {
         return Right(await _handleAuthResponse(responseData));
       } else {
+        if (responseData['data'] != null &&
+            responseData['data']['requires_verification'] == true) {
+          return Left(
+            VerificationRequiredFailure(
+              responseData['message'] ?? 'Verification required',
+              responseData['data']['email'] ?? email,
+            ),
+          );
+        }
         return Left(ServerFailure(responseData['message'] ?? 'Login failed'));
       }
     } on DioException catch (e) {
+      if (e.response != null &&
+          e.response?.data is Map &&
+          e.response?.data['data'] != null &&
+          e.response?.data['data']['requires_verification'] == true) {
+        return Left(
+          VerificationRequiredFailure(
+            e.response?.data['message'] ?? 'Verification required',
+            e.response?.data['data']['email'] ?? email,
+          ),
+        );
+      }
       return Left(ServerFailure(_handleDioError(e)));
     } catch (e) {
       return Left(ServerFailure(e.toString()));
@@ -154,6 +173,7 @@ class AuthRepositoryImpl implements AuthRepository {
 
     final user = UserModel.fromJson(userData);
     await storage.saveUserName(user.name);
+    await storage.saveUserId(user.id.toString());
 
     return user;
   }

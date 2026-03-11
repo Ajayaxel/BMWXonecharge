@@ -10,6 +10,7 @@ import 'package:dio/dio.dart';
 
 /// Top-level function for handling background/terminated FCM messages.
 /// Must be a top-level function (not a class method).
+/// NOTE: Not supported on macOS.
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
@@ -34,8 +35,8 @@ class PushNotificationService {
 
   /// Android notification channel for high-importance foreground notifications
   static const AndroidNotificationChannel _channel = AndroidNotificationChannel(
-    'onecharge_notifications', // channel id
-    'OneCharge Notifications', // channel name
+    'onecharge_notifications',
+    'OneCharge Notifications',
     description: 'Notifications from OneCharge app',
     importance: Importance.high,
     playSound: true,
@@ -46,45 +47,69 @@ class PushNotificationService {
   Future<void> initialize({SecureStorageService? storage}) async {
     _storage = storage;
 
-    // 1. Register the background handler
-    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+    // macOS does not support Firebase Cloud Messaging or background message handlers
+    if (Platform.isMacOS) {
+      debugPrint('🔔 Push notifications not supported on macOS. Skipping.');
+      return;
+    }
 
-    // 2. Request permissions (iOS & Android 13+)
-    await _requestPermission();
+    try {
+      // 1. Register the background handler (iOS/Android only)
+      FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
-    // 3. Set up local notifications for foreground display
-    await _setupLocalNotifications();
+      // 2. Request permissions (iOS & Android 13+)
+      await _requestPermission();
 
-    // 4. Set up foreground message listener
-    _setupForegroundListener();
+      // 3. Set up local notifications for foreground display
+      await _setupLocalNotifications();
 
-    // 5. Set up notification tap handlers
-    _setupNotificationTapHandlers();
+      // 4. Set up foreground message listener
+      _setupForegroundListener();
 
-    // 6. Get FCM token and send to backend
-    await _getToken();
+      // 5. Set up notification tap handlers
+      _setupNotificationTapHandlers();
 
-    // 7. iOS foreground presentation options
-    await _messaging.setForegroundNotificationPresentationOptions(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
+      // 6. Get FCM token and send to backend
+      await _getToken();
+
+      // 7. iOS foreground presentation options
+      if (Platform.isIOS) {
+        try {
+          await _messaging.setForegroundNotificationPresentationOptions(
+            alert: true,
+            badge: true,
+            sound: true,
+          );
+        } catch (e) {
+          debugPrint('🔔 Could not set foreground presentation options: $e');
+        }
+      }
+    } catch (e) {
+      // Never let push notification setup crash the app.
+      // This can happen when the user has denied notification permissions
+      // or on simulators where APNS is unavailable.
+      debugPrint('🔔 Push notification initialization failed (non-fatal): $e');
+    }
   }
 
   /// Request notification permissions
   Future<void> _requestPermission() async {
-    final settings = await _messaging.requestPermission(
-      alert: true,
-      announcement: false,
-      badge: true,
-      carPlay: false,
-      criticalAlert: false,
-      provisional: false,
-      sound: true,
-    );
-
-    debugPrint('🔔 Notification permission: ${settings.authorizationStatus}');
+    try {
+      final settings = await _messaging.requestPermission(
+        alert: true,
+        announcement: false,
+        badge: true,
+        carPlay: false,
+        criticalAlert: false,
+        provisional: false,
+        sound: true,
+      );
+      debugPrint('🔔 Notification permission: ${settings.authorizationStatus}');
+    } catch (e) {
+      debugPrint(
+        '🔔 Failed to request notification permission (non-fatal): $e',
+      );
+    }
   }
 
   /// Set up flutter_local_notifications for foreground display
@@ -92,16 +117,15 @@ class PushNotificationService {
     const androidSettings = AndroidInitializationSettings(
       '@mipmap/ic_launcher',
     );
-
-    const iosSettings = DarwinInitializationSettings(
+    const darwinSettings = DarwinInitializationSettings(
       requestAlertPermission: false,
       requestBadgePermission: false,
       requestSoundPermission: false,
     );
-
     const initSettings = InitializationSettings(
       android: androidSettings,
-      iOS: iosSettings,
+      iOS: darwinSettings,
+      macOS: darwinSettings,
     );
 
     await _localNotifications.initialize(
@@ -129,7 +153,6 @@ class PushNotificationService {
       debugPrint('🔔 Title: ${message.notification?.title}');
       debugPrint('🔔 Body: ${message.notification?.body}');
       debugPrint('🔔 Data: ${message.data}');
-
       _showLocalNotification(message);
     });
   }
@@ -168,14 +191,12 @@ class PushNotificationService {
 
   /// Set up handlers for when user taps on a notification
   void _setupNotificationTapHandlers() {
-    // When app is in background and user taps the notification
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
       debugPrint('🔔 Notification tapped (background): ${message.messageId}');
       debugPrint('🔔 Data: ${message.data}');
       _handleNotificationNavigation(message.data);
     });
 
-    // Check if the app was opened from a terminated state via notification
     _messaging.getInitialMessage().then((RemoteMessage? message) {
       if (message != null) {
         debugPrint(
@@ -190,19 +211,14 @@ class PushNotificationService {
   /// Handle notification tap — navigate based on notification type
   void _handleNotificationNavigation(Map<String, dynamic> data) {
     final type = data['type'] as String?;
-
     switch (type) {
       case 'booking_success':
         debugPrint('🔔 Navigate to booking details: ${data['booking_id']}');
-        // TODO: Navigate to booking details screen
-        // NavigationService.navigateTo('/booking/${data['booking_id']}');
         break;
       case 'driver_status':
         debugPrint(
-          '🔔 Navigate to tracking screen: ${data['booking_id']} - Status: ${data['status']}',
+          '🔔 Navigate to tracking: ${data['booking_id']} - Status: ${data['status']}',
         );
-        // TODO: Navigate to tracking screen
-        // NavigationService.navigateTo('/tracking/${data['booking_id']}');
         break;
       default:
         debugPrint('🔔 Unknown notification type: $type');
@@ -225,12 +241,11 @@ class PushNotificationService {
   /// Get the FCM token for this device
   Future<String?> _getToken() async {
     try {
-      // On iOS, wait for the APNS token before requesting FCM token
       if (Platform.isIOS) {
         final apnsToken = await _messaging.getAPNSToken();
         if (apnsToken == null) {
           debugPrint(
-            '🔔 APNS token not yet available (iOS Simulator or not registered). Skipping FCM token retrieval.',
+            '🔔 APNS token not yet available. Skipping FCM token retrieval.',
           );
           _messaging.onTokenRefresh.listen((newToken) {
             debugPrint('🔔 FCM Token received (delayed): $newToken');
@@ -243,12 +258,10 @@ class PushNotificationService {
       final token = await _messaging.getToken();
       debugPrint('🔔 FCM Token: $token');
 
-      // Send token to backend
       if (token != null) {
         await _sendTokenToBackend(token);
       }
 
-      // Listen for token refresh
       _messaging.onTokenRefresh.listen((newToken) {
         debugPrint('🔔 FCM Token refreshed: $newToken');
         _sendTokenToBackend(newToken);
@@ -257,9 +270,6 @@ class PushNotificationService {
       return token;
     } catch (e) {
       debugPrint('🔔 Error getting FCM token: $e');
-      debugPrint(
-        '🔔 This is expected on iOS Simulator where APNS is not available.',
-      );
       return null;
     }
   }
@@ -268,7 +278,6 @@ class PushNotificationService {
   Future<void> _sendTokenToBackend(String fcmToken) async {
     try {
       if (_storage == null) return;
-
       final authToken = await _storage!.getAccessToken();
       if (authToken == null || authToken.isEmpty) {
         debugPrint('🔔 No auth token — will send FCM token after login');
@@ -290,7 +299,6 @@ class PushNotificationService {
           },
         ),
       );
-
       debugPrint('🔔 FCM token sent to backend: ${response.statusCode}');
     } catch (e) {
       debugPrint('🔔 Error sending FCM token to backend: $e');
@@ -299,6 +307,7 @@ class PushNotificationService {
 
   /// Call this after user logs in to send the FCM token
   Future<void> sendTokenAfterLogin(SecureStorageService storage) async {
+    if (Platform.isMacOS) return;
     _storage = storage;
     final token = await _messaging.getToken();
     if (token != null) {
@@ -308,12 +317,14 @@ class PushNotificationService {
 
   /// Subscribe to a topic
   Future<void> subscribeToTopic(String topic) async {
+    if (Platform.isMacOS) return;
     await _messaging.subscribeToTopic(topic);
     debugPrint('🔔 Subscribed to topic: $topic');
   }
 
   /// Unsubscribe from a topic
   Future<void> unsubscribeFromTopic(String topic) async {
+    if (Platform.isMacOS) return;
     await _messaging.unsubscribeFromTopic(topic);
     debugPrint('🔔 Unsubscribed from topic: $topic');
   }

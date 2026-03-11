@@ -8,6 +8,9 @@ class SecureStorageService {
     : _storage = const FlutterSecureStorage(
         aOptions: AndroidOptions(encryptedSharedPreferences: true),
         iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
+        // usesDataProtectionKeychain: false avoids the -34018 entitlement error
+        // on macOS debug builds that are not signed with a developer certificate.
+        mOptions: MacOsOptions(usesDataProtectionKeychain: false),
       );
 
   static const _accessTokenKey = 'access_token';
@@ -61,6 +64,25 @@ class SecureStorageService {
       return await _storage.read(key: _userNameKey);
     } catch (e) {
       _handleStorageError(e, 'getUserName');
+      return null;
+    }
+  }
+
+  static const _userIdKey = 'user_id';
+
+  Future<void> saveUserId(String id) async {
+    try {
+      await _storage.write(key: _userIdKey, value: id);
+    } on PlatformException catch (e) {
+      _handleStorageError(e, 'saveUserId');
+    }
+  }
+
+  Future<String?> getUserId() async {
+    try {
+      return await _storage.read(key: _userIdKey);
+    } catch (e) {
+      _handleStorageError(e, 'getUserId');
       return null;
     }
   }

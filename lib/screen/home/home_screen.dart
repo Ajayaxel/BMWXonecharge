@@ -1371,11 +1371,7 @@ class HomeScreenState extends State<HomeScreen> {
                           // Filter out 'Other' if it exists in the API list to avoid duplication
                           // Also filter out categories with null names
                           var categories = state.categories
-                              .where(
-                                (c) =>
-                                    c.name != null &&
-                                    c.name!.toLowerCase() != 'other',
-                              )
+                              .where((c) => c.name != null)
                               .toList();
 
                           if (_searchQuery.isNotEmpty) {
@@ -1407,12 +1403,6 @@ class HomeScreenState extends State<HomeScreen> {
                                       cardWidth,
                                     );
                                   }),
-                                  _buildServiceCard(
-                                    categories.length,
-                                    'Other',
-                                    '',
-                                    cardWidth,
-                                  ),
                                 ],
                               );
                             },

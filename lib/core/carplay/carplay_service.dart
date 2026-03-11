@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:onecharge/screen/home/home_screen.dart';
 
@@ -5,6 +6,7 @@ class CarPlayService {
   static const MethodChannel _channel = MethodChannel('com.onecharge.carplay');
 
   static void setupHandler() {
+    if (!Platform.isIOS) return;
     _channel.setMethodCallHandler((call) async {
       switch (call.method) {
         case 'bookService':
@@ -18,10 +20,13 @@ class CarPlayService {
   }
 
   static Future<void> updateUI() async {
+    if (!Platform.isIOS) return;
     try {
       await _channel.invokeMethod('updateCarPlayUI');
     } on PlatformException catch (e) {
       print("Failed to update CarPlay UI: '${e.message}'.");
+    } on MissingPluginException catch (e) {
+      print("CarPlay plugin not found: '${e.message}'.");
     }
   }
 
@@ -29,6 +34,7 @@ class CarPlayService {
     double? latitude,
     double? longitude,
   }) async {
+    if (!Platform.isIOS) return;
     try {
       await _channel.invokeMethod('showBookingSuccess', {
         'latitude': latitude,
@@ -36,6 +42,8 @@ class CarPlayService {
       });
     } on PlatformException catch (e) {
       print("Failed to show booking success: '${e.message}'.");
+    } on MissingPluginException catch (e) {
+      print("CarPlay plugin not found: '${e.message}'.");
     }
   }
 }

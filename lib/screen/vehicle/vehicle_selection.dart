@@ -36,7 +36,7 @@ class _VehicleSelectionState extends State<VehicleSelection> {
   final TextEditingController searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
-  final List<String> vehicleTypes = ['Sedan', 'SUV'];
+
 
   @override
   void initState() {
@@ -410,50 +410,76 @@ class _VehicleSelectionState extends State<VehicleSelection> {
   }
 
   Widget _buildVehicleTypeFilters() {
-    return Row(
-      children: vehicleTypes.map((type) {
-        final isSelected = selectedVehicleType == type;
-        return Padding(
-          padding: const EdgeInsets.only(right: 12),
-          child: GestureDetector(
-            onTap: () {
-              setState(() {
-                selectedVehicleType = type;
-              });
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              decoration: BoxDecoration(
-                color: isSelected ? Colors.black : Colors.transparent,
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(
-                  color: isSelected ? Colors.black : const Color(0xFFE0E0E0),
-                  width: 1.5,
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.directions_car,
-                    color: isSelected ? Colors.white : Colors.black,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    type,
-                    style: TextStyle(
-                      color: isSelected ? Colors.white : Colors.black,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
+    return BlocBuilder<VehicleModelBloc, VehicleModelState>(
+      builder: (context, state) {
+        List<String> dynamicVehicleTypes = [];
+
+        if (state is VehicleModelLoaded || state is VehicleModelPaginationLoading) {
+          dynamicVehicleTypes = state.models
+              .map((m) => m.vehicleCategory?.name)
+              .where((name) => name != null && name.isNotEmpty)
+              .toSet()
+              .cast<String>()
+              .toList();
+        }
+
+        if (dynamicVehicleTypes.isEmpty) {
+          dynamicVehicleTypes = ['Sedan', 'SUV']; // Fallback while loading
+        }
+
+        // If current selection is not in the list (and not initial state), maybe we don't change selection, 
+        // just let it highlight if matched.
+
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
+          child: Row(
+            children: dynamicVehicleTypes.map((type) {
+              final isSelected = selectedVehicleType.toLowerCase() == type.toLowerCase();
+              return Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      selectedVehicleType = type;
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: isSelected ? Colors.black : Colors.transparent,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(
+                        color: isSelected ? Colors.black : const Color(0xFFE0E0E0),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.directions_car,
+                          color: isSelected ? Colors.white : Colors.black,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          type,
+                          style: TextStyle(
+                            color: isSelected ? Colors.white : Colors.black,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
-            ),
+                ),
+              );
+            }).toList(),
           ),
         );
-      }).toList(),
+      },
     );
   }
 
