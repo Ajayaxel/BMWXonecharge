@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:onecharge/core/storage/location_storage.dart';
 import 'package:flutter/cupertino.dart';
 import 'dart:ui';
 import 'dart:io';
@@ -32,17 +33,22 @@ class IssueReportingBottomSheet extends StatefulWidget {
   final String vehicleName;
   final String vehiclePlate;
   final String currentAddress;
-  final double? latitude;
-  final double? longitude;
+  final double latitude;
+  final double longitude;
+  final int? locationId;
   final String? initialCategory;
+  final DateTime? initialDateTime;
+
   const IssueReportingBottomSheet({
     super.key,
     required this.vehicleName,
     required this.vehiclePlate,
     required this.currentAddress,
-    this.latitude,
-    this.longitude,
+    required this.latitude,
+    required this.longitude,
+    this.locationId,
     this.initialCategory,
+    this.initialDateTime,
   });
 
   @override
@@ -56,6 +62,7 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
   String _currentAddress = "";
   double _currentLatitude = 0.0;
   double _currentLongitude = 0.0;
+  int? _selectedLocationId;
   final TextEditingController _issueController = TextEditingController();
   final TextEditingController _slotController = TextEditingController();
   DateTime _selectedDateTime = DateTime.now();
@@ -70,6 +77,7 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
   final TextEditingController _companyCodeController = TextEditingController();
   final TextEditingController _redeemCodeController = TextEditingController();
   String? _appliedRedeemCode;
+  String _selectedLocationType = "Inside";
 
   @override
   void initState() {
@@ -77,49 +85,45 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
     if (widget.initialCategory != null) {
       _selectedCategory = widget.initialCategory!.replaceAll('\n', ' ');
     }
-    DateTime now = DateTime.now();
-    // Default to nearest slot from now
-    int minutes = now.minute;
-    if (minutes <= 30) {
-      _selectedDateTime = DateTime(now.year, now.month, now.day, now.hour, 30);
-    } else {
-      _selectedDateTime = DateTime(
-        now.year,
-        now.month,
-        now.day,
-        now.hour + 1,
-        00,
-      );
-    }
-    _currentAddress = widget.currentAddress;
 
-    if (widget.latitude != null && widget.latitude != 0.0) {
-      _currentLatitude = widget.latitude!;
-      _currentLongitude = widget.longitude!;
+    if (widget.initialDateTime != null) {
+      _selectedDateTime = widget.initialDateTime!;
     } else {
-      // Try to get default saved location
-      final locationState = context.read<LocationBloc>().state;
-      if (locationState is LocationsLoaded) {
-        final defaultLoc =
-            locationState.locations.where((l) => l.isDefault).firstOrNull ??
-            locationState.locations.firstOrNull;
-        if (defaultLoc != null) {
-          _currentAddress = defaultLoc.address;
-          _currentLatitude = defaultLoc.latitude;
-          _currentLongitude = defaultLoc.longitude;
-        }
+      DateTime now = DateTime.now();
+      // Default to nearest slot from now
+      int minutes = now.minute;
+      if (minutes <= 30) {
+        _selectedDateTime = DateTime(
+          now.year,
+          now.month,
+          now.day,
+          now.hour,
+          30,
+        );
+      } else {
+        _selectedDateTime = DateTime(
+          now.year,
+          now.month,
+          now.day,
+          now.hour + 1,
+          00,
+        );
       }
     }
+    _currentAddress = widget.currentAddress;
+    _currentLatitude = widget.latitude;
+    _currentLongitude = widget.longitude;
+    _selectedLocationId = widget.locationId;
 
     _slotController.text =
         "${DateFormat('MMM dd').format(_selectedDateTime)}, ${DateFormat('hh:mm a').format(_selectedDateTime)}";
 
-    // Only fetch current coordinates if we don't have them from a saved location
+    // Only fetch current coordinates if we don't have them
     if (_currentLatitude == 0.0) {
       _getCurrentCoordinates();
     }
 
-    // Reset blocs to clear previous state (e.g., applied company/redeem codes)
+    // Reset blocs to clear previous state
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         context.read<CompanyCodeBloc>().add(ResetCompanyCode());
@@ -127,22 +131,48 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
       }
     });
   }
-
   Future<void> _getCurrentCoordinates() async {
     try {
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
-      setState(() {
-        _currentLatitude = position.latitude;
-        _currentLongitude = position.longitude;
-      });
+      if (mounted) {
+        setState(() {
+          _currentLatitude = position.latitude;
+          _currentLongitude = position.longitude;
+        });
+      }
     } catch (e) {
-      // Default to Dubai coordinates if location fails
-      setState(() {
-        _currentLatitude = 25.2048;
-        _currentLongitude = 55.2708;
-      });
+      debugPrint('Error getting coordinates: $e');
+      // Default to Dubai if location fails
+      if (mounted) {
+        setState(() {
+          _currentLatitude = 25.2048;
+          _currentLongitude = 55.2708;
+        });
+      }
+    }
+  }
+
+  void _validateCurrentLocation(List<LocationModel> locations) async {
+    if (_selectedLocationId != null) {
+      final exists = locations.any((loc) => loc.id == _selectedLocationId);
+      if (!exists) {
+        // Current location was deleted, fallback to GPS
+        await LocationStorage.clearSelectedLocation();
+        if (mounted) {
+          setState(() {
+            _selectedLocationId = null;
+          });
+          // Also sync fallback to HomeScreen
+          HomeScreenState.activeState?.updateLocation(
+            "",
+            0.0,
+            0.0,
+          );
+          await _getCurrentCoordinates();
+        }
+      }
     }
   }
 
@@ -381,6 +411,36 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
       builder: (context) {
         DateTime localDateTime = _selectedDateTime;
 
+        // Calculate initial offsets
+        // Date Item Width: 65 (width) + 12 (margin-right) = 77
+        final double dateInitialOffset = (localDateTime.day - 1) * 77.0;
+
+        // Time Grid logic to calculate initial scroll
+        final List<String> tempSlots = List.generate(48, (i) {
+          int h = i ~/ 2;
+          int m = (i % 2) * 30;
+          return "${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}";
+        });
+        final String activeTimeStr = DateFormat('HH:mm').format(localDateTime);
+        final int timeIndex = tempSlots.indexOf(activeTimeStr).clamp(0, 47);
+
+        // Calculate dynamic row height based on screen width
+        final double screenWidth = MediaQuery.of(context).size.width;
+        final double gridContentWidth =
+            screenWidth - 40; // 20 horizontal padding
+        final double cellWidth = (gridContentWidth - 30) / 4; // 10 spacing x 3
+        final double cellHeight = cellWidth / 2.2; // childAspectRatio: 2.2
+        final double rowHeight = cellHeight + 10; // mainAxisSpacing: 10
+
+        final double timeInitialOffset = (timeIndex ~/ 4) * rowHeight;
+
+        final ScrollController dateScrollController = ScrollController(
+          initialScrollOffset: dateInitialOffset,
+        );
+        final ScrollController timeGridController = ScrollController(
+          initialScrollOffset: timeInitialOffset,
+        );
+
         return StatefulBuilder(
           builder: (context, setModalState) {
             // Add a timer to refresh every minute for "real-time" disabling
@@ -551,6 +611,7 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
                       SizedBox(
                         height: 85,
                         child: ListView.builder(
+                          controller: dateScrollController,
                           scrollDirection: Axis.horizontal,
                           // Show all days in the month
                           itemCount: DateTime(
@@ -645,6 +706,7 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
                       const SizedBox(height: 16),
                       Expanded(
                         child: GridView.builder(
+                          controller: timeGridController,
                           padding: EdgeInsets.zero,
                           gridDelegate:
                               const SliverGridDelegateWithFixedCrossAxisCount(
@@ -885,60 +947,99 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
                       ),
                       const SizedBox(height: 12),
                       Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 12,
-                        ),
+                        padding: const EdgeInsets.all(4),
                         decoration: BoxDecoration(
                           color: const Color(0xFFF5F5F5),
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(12),
                         ),
                         child: Row(
                           children: [
-                            const Icon(
-                              Icons.location_on_outlined,
-                              color: Colors.black,
-                              size: 22,
-                            ),
-                            const SizedBox(width: 10),
                             Expanded(
-                              child: Text(
-                                _currentAddress,
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  color: Color(0xFF757575),
-                                  fontFamily: 'Lufga',
-                                  height: 1.3,
+                              child: GestureDetector(
+                                onTap: _openLocationPicker,
+                                child: Container(
+                                  color: Colors.transparent,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 8,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.location_on_outlined,
+                                        color: Colors.black,
+                                        size: 22,
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text(
+                                          _currentAddress,
+                                          style: const TextStyle(
+                                            fontSize: 14,
+                                            color: Color(0xFF757575),
+                                            fontFamily: 'Lufga',
+                                            height: 1.3,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 10),
-                            GestureDetector(
-                              onTap: () async {
-                                final result =
-                                    await Navigator.push<LocationModel>(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            const MyLocationScreen(
-                                              isPicker: true,
-                                            ),
-                                      ),
-                                    );
-                                if (result != null) {
-                                  setState(() {
-                                    _currentAddress = result.name.isNotEmpty
-                                        ? result.name
-                                        : result.address;
-                                    _currentLatitude = result.latitude;
-                                    _currentLongitude = result.longitude;
-                                  });
-                                }
+                            PopupMenuButton<String>(
+                              onSelected: (String value) {
+                                setState(() {
+                                  _selectedLocationType = value;
+                                });
                               },
-                              child: const Icon(
-                                Icons.edit_outlined,
-                                color: Colors.black,
-                                size: 20,
+                              color: Colors.white,
+                              offset: const Offset(0, 50),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              itemBuilder: (BuildContext context) =>
+                                  <PopupMenuEntry<String>>[
+                                    _buildPopupMenuItem('Inside'),
+                                    _buildPopupMenuItem('Outside'),
+                                    _buildPopupMenuItem('Road'),
+                                  ],
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 10,
+                                ),
+                                decoration: const BoxDecoration(
+                                  color: Colors.black,
+                                  borderRadius: BorderRadius.only(
+                                    topRight: Radius.circular(8),
+                                    bottomRight: Radius.circular(8),
+                                    topLeft: Radius.zero,
+                                    bottomLeft: Radius.zero,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      _selectedLocationType,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                        fontFamily: 'Lufga',
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    const Icon(
+                                      Icons.keyboard_arrow_down,
+                                      color: Colors.white,
+                                      size: 20,
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ],
@@ -1657,98 +1758,73 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
                       ),
                       const SizedBox(height: 32),
 
-                      BlocListener<TicketBloc, TicketState>(
+                      BlocListener<LocationBloc, LocationState>(
                         listener: (context, state) {
-                          if (state is TicketSuccess) {
-                            final requiresPayment =
-                                state.response.data?.paymentRequired == true &&
-                                state.response.data?.paymentUrl != null;
-
-                            if (requiresPayment) {
-                              // Close the issue reporting sheet first
-                              Navigator.pop(context);
-
-                              // Then show payment bottom sheet with payment breakdown
-                              showModalBottomSheet(
-                                context: context,
-                                isScrollControlled: true,
-                                backgroundColor: Colors.transparent,
-                                builder: (context) => PaymentBottomSheet(
-                                  vehicleName: widget.vehicleName,
-                                  vehiclePlate: widget.vehiclePlate,
-                                  locationAddress: _currentAddress,
-                                  locationCity: "",
-                                  date:
-                                      state
-                                              .response
-                                              .data
-                                              ?.ticket
-                                              ?.bookingType ==
-                                          "instant"
-                                      ? "Today"
-                                      : DateFormat(
-                                          'MMM dd',
-                                        ).format(_selectedDateTime),
-                                  time:
-                                      state
-                                              .response
-                                              .data
-                                              ?.ticket
-                                              ?.bookingType ==
-                                          "instant"
-                                      ? "Instant"
-                                      : DateFormat(
-                                          'hh:mm a',
-                                        ).format(_selectedDateTime),
-                                  paymentBreakdown:
-                                      state.response.data?.paymentBreakdown,
-                                  paymentUrl: state.response.data?.paymentUrl,
-                                  intentionId: state.response.data?.intentionId,
-                                ),
-                              );
-                            } else {
-                              // No online payment required (e.g., COD or Free)
-                              final breakdown =
-                                  state.response.data?.paymentBreakdown;
-                              final invoice =
-                                  state.response.data?.ticket?.invoice;
-                              final totalAmount =
-                                  breakdown?.totalAmount ??
-                                  invoice?.totalAmount;
-
-                              final currency =
-                                  breakdown?.currency ??
-                                  invoice?.currency ??
-                                  "AED";
-                              final String toastMsg =
-                                  (totalAmount != null && totalAmount > 0)
-                                  ? "Ticket created successfully! Total Amount: ${totalAmount.toStringAsFixed(2)} $currency"
-                                  : "Ticket created successfully!";
-
-                              HomeScreenState.activeState?.showToast(toastMsg);
-
-                              // Return to home and show service notification flow
-                              HomeScreenState.activeState?.startServiceFlow(
-                                ticket: state.response.data?.ticket,
-                              );
-                              Navigator.pop(context);
-                            }
-                          } else if (state is TicketError) {
-                            _showToast(_formatErrorMessage(state.message));
+                          if (state is LocationsLoaded) {
+                            _validateCurrentLocation(state.locations);
                           }
                         },
-                        child: BlocBuilder<TicketBloc, TicketState>(
-                          builder: (context, ticketState) {
-                            return OneBtn(
-                              onPressed: ticketState is TicketLoading
-                                  ? null
-                                  : () async {
-                                      _submitTicket(isInstant: false);
-                                    },
-                              text: "Submit Service",
-                              isLoading: ticketState is TicketLoading,
-                            );
+                        child: BlocListener<TicketBloc, TicketState>(
+                          listener: (context, state) {
+                            if (state is TicketSuccess) {
+                              final requiresPayment =
+                                  state.response.data?.paymentRequired == true &&
+                                  state.response.data?.paymentUrl != null;
+
+                              if (requiresPayment) {
+                                Navigator.pop(context);
+                                showModalBottomSheet(
+                                  context: context,
+                                  isScrollControlled: true,
+                                  backgroundColor: Colors.transparent,
+                                  builder: (context) => PaymentBottomSheet(
+                                    vehicleName: widget.vehicleName,
+                                    vehiclePlate: widget.vehiclePlate,
+                                    locationAddress: _currentAddress,
+                                    locationCity: "",
+                                    date: state.response.data?.ticket?.bookingType == "instant"
+                                        ? "Today"
+                                        : DateFormat('MMM dd').format(_selectedDateTime),
+                                    time: state.response.data?.ticket?.bookingType == "instant"
+                                        ? "Instant"
+                                        : DateFormat('hh:mm a').format(_selectedDateTime),
+                                    paymentBreakdown: state.response.data?.paymentBreakdown,
+                                    paymentUrl: state.response.data?.paymentUrl,
+                                    intentionId: state.response.data?.intentionId,
+                                  ),
+                                );
+                              } else {
+                                final breakdown = state.response.data?.paymentBreakdown;
+                                final invoice = state.response.data?.ticket?.invoice;
+                                final totalAmount = breakdown?.totalAmount ?? invoice?.totalAmount;
+                                final currency = breakdown?.currency ?? invoice?.currency ?? "AED";
+                                final String toastMsg = (totalAmount != null && totalAmount > 0)
+                                    ? "Ticket created successfully! Total Amount: ${totalAmount.toStringAsFixed(2)} $currency"
+                                    : "Ticket created successfully!";
+
+                                HomeScreenState.activeState?.showToast(toastMsg);
+                                HomeScreenState.activeState?.startServiceFlow(
+                                  ticket: state.response.data?.ticket,
+                                );
+                                Navigator.pop(context);
+                              }
+                            } else if (state is TicketError) {
+                              _showToast(_formatErrorMessage(state.message));
+                            }
                           },
+                          child: BlocBuilder<TicketBloc, TicketState>(
+                            builder: (context, ticketState) {
+                              return OneBtn(
+                                onPressed: ticketState is TicketLoading
+                                    ? null
+                                    : () async {
+                                        _submitTicket(isInstant: false);
+                                      },
+                                text: "Submit Service",
+                                isLoading: ticketState is TicketLoading,
+                              );
+                            },
+                          ),
                         ),
                       ),
                     ],
@@ -1758,6 +1834,47 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Future<void> _openLocationPicker() async {
+    final result = await Navigator.push<LocationModel>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const MyLocationScreen(isPicker: true),
+      ),
+    );
+    if (result != null) {
+      setState(() {
+        _currentAddress = result.name.isNotEmpty ? result.name : result.address;
+        _currentLatitude = result.latitude;
+        _currentLongitude = result.longitude;
+      });
+      // Persist manual selection
+      await LocationStorage.saveSelectedLocation(
+        address: _currentAddress,
+        lat: _currentLatitude,
+        lng: _currentLongitude,
+        isManual: true,
+        id: result.id,
+      );
+      // Update HomeScreen if it's visible
+      HomeScreenState.activeState?.updateLocation(
+        _currentAddress,
+        _currentLatitude,
+        _currentLongitude,
+        id: result.id,
+      );
+    }
+  }
+
+  PopupMenuItem<String> _buildPopupMenuItem(String value) {
+    return PopupMenuItem<String>(
+      value: value,
+      child: Text(
+        value,
+        style: const TextStyle(fontFamily: 'Lufga', fontSize: 14),
       ),
     );
   }
@@ -2091,16 +2208,19 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
           children: [
             Text(
               subType.name ?? '',
+              maxLines: 4,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
-                fontSize: 24,
+                fontSize: 18,
                 fontWeight: FontWeight.w500,
                 fontFamily: 'Lufga',
                 color: Colors.black,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
             Container(
-              width: 44,
-              height: 44,
+              width: 42,
+              height: 42,
               decoration: const BoxDecoration(
                 color: Colors.black,
                 shape: BoxShape.circle,
@@ -2109,11 +2229,11 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
                 child: _getQuickServiceIcon(subType.name ?? '').isNotEmpty
                     ? Image.asset(
                         _getQuickServiceIcon(subType.name ?? ''),
-                        width: 24,
-                        height: 24,
+                        width: 22,
+                        height: 22,
                         color: Colors.white,
                       )
-                    : const Icon(Icons.power, color: Colors.white, size: 24),
+                    : const Icon(Icons.power, color: Colors.white, size: 22),
               ),
             ),
           ],

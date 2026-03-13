@@ -27,6 +27,7 @@ import 'package:onecharge/models/ticket_model.dart';
 import 'package:onecharge/core/storage/vehicle_storage.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:onecharge/screen/notification/notification_screen.dart';
+import 'package:onecharge/core/storage/location_storage.dart';
 import 'package:onecharge/core/storage/token_storage.dart';
 import 'package:onecharge/screen/home/my_location_screen.dart';
 import 'package:onecharge/models/location_model.dart';
@@ -64,6 +65,7 @@ class HomeScreenState extends State<HomeScreen> {
   String currentAddress = "Fetching location...";
   double _currentLatitude = 0.0;
   double _currentLongitude = 0.0;
+  int? _selectedLocationId;
   String _currentServiceStage = 'none';
   double _serviceProgress = 0.0;
   Timer? _serviceTimer;
@@ -333,8 +335,8 @@ class HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     activeState = this;
+    _loadSavedLocation();
     _loadUserName();
-    _getCurrentLocation();
     _fetchInitialData();
     CarPlayService.setupHandler();
   }
@@ -351,6 +353,38 @@ class HomeScreenState extends State<HomeScreen> {
       context.read<ProfileBloc>().add(FetchProfile());
       context.read<LocationBloc>().add(FetchLocations());
     });
+  }
+
+  Future<void> _loadSavedLocation() async {
+    final saved = await LocationStorage.getSelectedLocation();
+    if (saved != null && saved['isManual'] == true) {
+      if (mounted) {
+        setState(() {
+          currentAddress = saved['address'];
+          _currentLatitude = saved['lat'];
+          _currentLongitude = saved['lng'];
+          _selectedLocationId = saved['id'];
+        });
+      }
+    } else {
+      await _getCurrentLocation();
+    }
+  }
+
+  void _validateCurrentLocation(List<LocationModel> locations) async {
+    if (_selectedLocationId != null) {
+      final exists = locations.any((loc) => loc.id == _selectedLocationId);
+      if (!exists) {
+        // Current location was deleted, fallback to GPS
+        await LocationStorage.clearSelectedLocation();
+        if (mounted) {
+          setState(() {
+            _selectedLocationId = null;
+          });
+          await _getCurrentLocation();
+        }
+      }
+    }
   }
 
   Future<void> _loadUserName() async {
@@ -422,6 +456,16 @@ class HomeScreenState extends State<HomeScreen> {
           currentAddress = addressParts.join(", ");
           _currentLatitude = position.latitude;
           _currentLongitude = position.longitude;
+          _selectedLocationId = null; // GPS location has no ID
+
+          // Save current location as non-manual by default
+          LocationStorage.saveSelectedLocation(
+            address: currentAddress,
+            lat: _currentLatitude,
+            lng: _currentLongitude,
+            isManual: false,
+          );
+
           if (currentAddress.isEmpty) {
             currentAddress =
                 "${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}";
@@ -444,6 +488,27 @@ class HomeScreenState extends State<HomeScreen> {
     _searchController.dispose();
     _toastEntry?.remove();
     super.dispose();
+  }
+
+  void updateLocation(
+    String address,
+    double lat,
+    double lng, {
+    int? id,
+  }) {
+    if (mounted) {
+      // If address is null or empty, fallback to current location
+      if (address.isEmpty || address == "Fetching location...") {
+        _getCurrentLocation();
+        return;
+      }
+      setState(() {
+        currentAddress = address;
+        _currentLatitude = lat;
+        _currentLongitude = lng;
+        _selectedLocationId = id;
+      });
+    }
   }
 
   OverlayEntry? _toastEntry;
@@ -810,6 +875,7 @@ class HomeScreenState extends State<HomeScreen> {
                                   currentAddress: currentAddress,
                                   latitude: _currentLatitude,
                                   longitude: _currentLongitude,
+                                  locationId: _selectedLocationId,
                                   initialCategory: category,
                                 ),
                               );
@@ -1023,6 +1089,8 @@ class HomeScreenState extends State<HomeScreen> {
           listener: (context, state) {
             if (state is LocationAdded) {
               showToast('Location added successfully');
+            } else if (state is LocationsLoaded) {
+              _validateCurrentLocation(state.locations);
             }
           },
         ),
@@ -1163,15 +1231,24 @@ class HomeScreenState extends State<HomeScreen> {
                                               ),
                                         ),
                                       );
-                                  if (result != null) {
-                                    setState(() {
-                                      currentAddress = result.name.isNotEmpty
-                                          ? result.name
-                                          : result.address;
-                                      _currentLatitude = result.latitude;
-                                      _currentLongitude = result.longitude;
-                                    });
-                                  }
+                                    if (result != null) {
+                                      setState(() {
+                                        currentAddress = result.name.isNotEmpty
+                                            ? result.name
+                                            : result.address;
+                                        _currentLatitude = result.latitude;
+                                        _currentLongitude = result.longitude;
+                                        _selectedLocationId = result.id;
+                                      });
+                                      // Persist manual selection
+                                      await LocationStorage.saveSelectedLocation(
+                                        address: currentAddress,
+                                        lat: _currentLatitude,
+                                        lng: _currentLongitude,
+                                        isManual: true,
+                                        id: result.id,
+                                      );
+                                    }
                                 },
                                 child: Row(
                                   children: [

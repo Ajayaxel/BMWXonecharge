@@ -27,8 +27,7 @@ class _LocationMapScreenState extends State<LocationMapScreen> {
   final TextEditingController _houseController = TextEditingController();
   final TextEditingController _roadController = TextEditingController();
   final TextEditingController _directionController = TextEditingController();
-  final TextEditingController _parkingLocationController =
-      TextEditingController();
+  String _selectedAddressType = "Home";
 
   // Autocomplete variables
   GooglePlace? _googlePlace;
@@ -450,17 +449,9 @@ class _LocationMapScreenState extends State<LocationMapScreen> {
                   ),
                   const SizedBox(height: 16),
                   if (_showAddressDetailsForm) ...[
-                    _buildDetailTextField(
-                      _houseController,
-                      "House / flat/ office",
-                    ),
-                    const SizedBox(height: 12),
+                    _buildAddressTypeChips(),
+                    const SizedBox(height: 20),
                     _buildDetailTextField(_roadController, "Road / Area"),
-                    SizedBox(height: 12),
-                    _buildDetailTextField(
-                      _parkingLocationController,
-                      "Parking Location , outside the building",
-                    ),
                     const SizedBox(height: 12),
                     _buildDetailTextField(
                       _directionController,
@@ -481,15 +472,9 @@ class _LocationMapScreenState extends State<LocationMapScreen> {
                         } else {
                           // Combine full address
                           String fullAddress = _selectedAddress;
-                          if (_houseController.text.isNotEmpty) {
-                            fullAddress =
-                                "${_houseController.text}, $fullAddress";
-                          }
 
-                          final location = LocationModel(
-                            name: _mainText.isEmpty
-                                ? "Selected Location"
-                                : _mainText,
+                           final location = LocationModel(
+                            name: _selectedAddressType,
                             address: fullAddress,
                             latitude: _selectedLocation?.latitude ?? 0.0,
                             longitude: _selectedLocation?.longitude ?? 0.0,
@@ -525,6 +510,76 @@ class _LocationMapScreenState extends State<LocationMapScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildAddressTypeChips() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "Save address as",
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+            fontFamily: 'Lufga',
+            color: Color(0xFF6B7280),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            _buildTypeChip("Home", Icons.home_outlined),
+            const SizedBox(width: 12),
+            _buildTypeChip("Work", Icons.work_outline),
+            const SizedBox(width: 12),
+            _buildTypeChip("Other", Icons.location_on_outlined),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTypeChip(String type, IconData icon) {
+    bool isSelected = _selectedAddressType == type;
+    Color activeColor = Colors.black;
+
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedAddressType = type;
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? activeColor.withOpacity(0.05) : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? activeColor : const Color(0xFFE5E7EB),
+            width: 1.5,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              size: 20,
+              color: isSelected ? activeColor : const Color(0xFF374151),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              type,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                fontFamily: 'Lufga',
+                color: isSelected ? activeColor : const Color(0xFF374151),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
