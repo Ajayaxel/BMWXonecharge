@@ -415,14 +415,26 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
         // Date Item Width: 65 (width) + 12 (margin-right) = 77
         final double dateInitialOffset = (localDateTime.day - 1) * 77.0;
 
-        // Time Grid logic to calculate initial scroll
-        final List<String> tempSlots = List.generate(48, (i) {
-          int h = i ~/ 2;
-          int m = (i % 2) * 30;
+        final List<String> tempSlots = List.generate(16, (i) {
+          int totalMinutes = i * 90;
+          int h = totalMinutes ~/ 60;
+          int m = totalMinutes % 60;
           return "${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}";
         });
         final String activeTimeStr = DateFormat('HH:mm').format(localDateTime);
-        final int timeIndex = tempSlots.indexOf(activeTimeStr).clamp(0, 47);
+        // Find closest index if not exact
+        int timeIndex = 0;
+        int minDiff = 10000;
+        final currentMinutes = localDateTime.hour * 60 + localDateTime.minute;
+        for (int i = 0; i < tempSlots.length; i++) {
+          final parts = tempSlots[i].split(':');
+          final slotMinutes = int.parse(parts[0]) * 60 + int.parse(parts[1]);
+          final diff = (currentMinutes - slotMinutes).abs();
+          if (diff < minDiff) {
+            minDiff = diff;
+            timeIndex = i;
+          }
+        }
 
         // Calculate dynamic row height based on screen width
         final double screenWidth = MediaQuery.of(context).size.width;
@@ -459,11 +471,10 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
                 );
                 String activeTime = DateFormat('HH:mm').format(localDateTime);
 
-                // Strictly generate 48 slots for the selected CALENDAR day (00:00 to 23:30)
-                // This ensures "Friday 13" only shows Friday times, with no rollover confusion.
-                List<String> timeSlots = List.generate(48, (i) {
-                  int h = i ~/ 2;
-                  int m = (i % 2) * 30;
+                List<String> timeSlots = List.generate(16, (i) {
+                  int totalMinutes = i * 90;
+                  int h = totalMinutes ~/ 60;
+                  int m = totalMinutes % 60;
                   return "${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}";
                 });
 
@@ -823,10 +834,13 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
       List<String> parts = startTime.split(':');
       int h = int.parse(parts[0]);
       int m = int.parse(parts[1]);
-      m += 30;
+      m += 90;
       if (m >= 60) {
-        h += 1;
-        m -= 60;
+        h += m ~/ 60;
+        m = m % 60;
+      }
+      if (h >= 24) {
+        h = h % 24;
       }
       return "${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}";
     } catch (e) {
