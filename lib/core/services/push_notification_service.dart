@@ -286,7 +286,7 @@ class PushNotificationService {
 
       final dio = Dio();
       final response = await dio.post(
-        'https://app.onecharge.io/api/customer/fcm-token',
+        'https://dev.app.onecharge.io/api/customer/fcm-token',
         data: {
           'fcm_token': fcmToken,
           'device_type': Platform.isIOS ? 'ios' : 'android',
@@ -299,7 +299,14 @@ class PushNotificationService {
           },
         ),
       );
-      debugPrint('🔔 FCM token sent to backend: ${response.statusCode}');
+
+      if (response.data != null && response.data['success'] == true) {
+        debugPrint('🔔 FCM token saved: ${response.data['message']}');
+      } else {
+        debugPrint(
+          '🔔 FCM token save failed: ${response.data?['message'] ?? 'Unknown error'}',
+        );
+      }
     } catch (e) {
       debugPrint('🔔 Error sending FCM token to backend: $e');
     }
@@ -327,5 +334,22 @@ class PushNotificationService {
     if (Platform.isMacOS) return;
     await _messaging.unsubscribeFromTopic(topic);
     debugPrint('🔔 Unsubscribed from topic: $topic');
+  }
+
+  /// Trigger a test notification (for debugging)
+  void triggerTestNotification() {
+    debugPrint('🔔 Triggering test notification');
+    _showLocalNotification(
+      const RemoteMessage(
+        notification: RemoteNotification(
+          title: 'Test Notification 🔔',
+          body: 'This is a test notification from OneCharge!',
+        ),
+        data: {
+          'type': 'test',
+          'message': 'Work in progress',
+        },
+      ),
+    );
   }
 }

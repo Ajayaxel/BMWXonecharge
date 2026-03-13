@@ -78,23 +78,16 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
       _selectedCategory = widget.initialCategory!.replaceAll('\n', ' ');
     }
     DateTime now = DateTime.now();
-    // Default to 3 hours gap as requested
-    DateTime scheduledTime = now.add(const Duration(hours: 3));
-    int minutes = scheduledTime.minute;
+    // Default to nearest slot from now
+    int minutes = now.minute;
     if (minutes <= 30) {
-      _selectedDateTime = DateTime(
-        scheduledTime.year,
-        scheduledTime.month,
-        scheduledTime.day,
-        scheduledTime.hour,
-        30,
-      );
+      _selectedDateTime = DateTime(now.year, now.month, now.day, now.hour, 30);
     } else {
       _selectedDateTime = DateTime(
-        scheduledTime.year,
-        scheduledTime.month,
-        scheduledTime.day,
-        scheduledTime.hour + 1,
+        now.year,
+        now.month,
+        now.day,
+        now.hour + 1,
         00,
       );
     }
@@ -378,10 +371,6 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
   }
 
   void _showSlotPicker(BuildContext context) {
-    _showDatePicker(context);
-  }
-
-  void _showDatePicker(BuildContext context) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -390,79 +379,364 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
       ),
       builder: (context) {
-        DateTime tempDate = _selectedDateTime;
+        DateTime localDateTime = _selectedDateTime;
+
         return StatefulBuilder(
           builder: (context, setModalState) {
-            return SizedBox(
-              height: MediaQuery.of(context).size.height * 0.5,
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 20,
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        GestureDetector(
-                          onTap: () => Navigator.pop(context),
-                          child: const Icon(
-                            Icons.arrow_back_ios_new,
-                            size: 20,
-                            color: Colors.black,
+            // Add a timer to refresh every minute for "real-time" disabling
+            // We can use a StreamBuilder with a recurring stream for simplicity if we don't want to manage a Timer object manually in a local StatefulBuilder
+            return StreamBuilder<DateTime>(
+              stream: Stream.periodic(
+                const Duration(seconds: 1),
+                (_) => DateTime.now(),
+              ),
+              builder: (context, snapshot) {
+                DateTime now = snapshot.data ?? DateTime.now();
+                DateTime activeDate = DateTime(
+                  localDateTime.year,
+                  localDateTime.month,
+                  localDateTime.day,
+                );
+                String activeTime = DateFormat('HH:mm').format(localDateTime);
+
+                // Strictly generate 48 slots for the selected CALENDAR day (00:00 to 23:30)
+                // This ensures "Friday 13" only shows Friday times, with no rollover confusion.
+                List<String> timeSlots = List.generate(48, (i) {
+                  int h = i ~/ 2;
+                  int m = (i % 2) * 30;
+                  return "${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}";
+                });
+
+                bool isTimeDisabled(String timeStr) {
+                  DateTime slotTime = DateTime(
+                    activeDate.year,
+                    activeDate.month,
+                    activeDate.day,
+                    int.parse(timeStr.split(':')[0]),
+                    int.parse(timeStr.split(':')[1]),
+                  );
+                  return slotTime.isBefore(
+                    now.subtract(const Duration(minutes: 5)),
+                  );
+                }
+
+                return Container(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                  height: MediaQuery.of(context).size.height * 0.85,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[300],
+                            borderRadius: BorderRadius.circular(2),
                           ),
                         ),
-                        const Text(
-                          "Date",
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w600,
-                            fontFamily: 'Lufga',
-                            color: Colors.black,
-                          ),
-                        ),
-                        GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _selectedDateTime = DateTime(
-                                tempDate.year,
-                                tempDate.month,
-                                tempDate.day,
-                                _selectedDateTime.hour,
-                                _selectedDateTime.minute,
-                              );
-                            });
-                            Navigator.pop(context);
-                            _showTimePicker(context);
-                          },
-                          child: const Text(
-                            "Done",
-                            style: TextStyle(
-                              color: Colors.black,
-                              fontSize: 17,
-                              fontWeight: FontWeight.w600,
-                              fontFamily: 'Lufga',
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Expanded(
-                    child: CupertinoDatePicker(
-                      mode: CupertinoDatePickerMode.date,
-                      initialDateTime: _selectedDateTime,
-                      minimumDate: DateTime.now().subtract(
-                        const Duration(minutes: 1),
                       ),
-                      onDateTimeChanged: (DateTime newDate) {
-                        tempDate = newDate;
-                      },
-                    ),
+                      const SizedBox(height: 20),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              GestureDetector(
+                                onTap: () => Navigator.pop(context),
+                                child: const Icon(
+                                  Icons.arrow_back_ios,
+                                  size: 20,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              const Text(
+                                "Schedule",
+                                style: TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w700,
+                                  fontFamily: 'Lufga',
+                                ),
+                              ),
+                            ],
+                          ),
+                          // Real-time Clock in Header
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.05),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.access_time_filled,
+                                  size: 14,
+                                  color: Colors.black,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  DateFormat('hh:mm:ss a').format(now),
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    fontFamily: 'Lufga',
+                                    color: Colors.black,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            DateFormat('MMMM yyyy').format(activeDate),
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              fontFamily: 'Lufga',
+                            ),
+                          ),
+                          Row(
+                            children: [
+                              GestureDetector(
+                                onTap: () {
+                                  setModalState(() {
+                                    // Subtract 1 month
+                                    localDateTime = DateTime(
+                                      localDateTime.year,
+                                      localDateTime.month - 1,
+                                      localDateTime.day,
+                                      localDateTime.hour,
+                                      localDateTime.minute,
+                                    );
+                                  });
+                                },
+                                child: const Icon(
+                                  Icons.arrow_back_ios,
+                                  size: 16,
+                                ),
+                              ),
+                              const SizedBox(width: 20),
+                              GestureDetector(
+                                onTap: () {
+                                  setModalState(() {
+                                    // Add 1 month
+                                    localDateTime = DateTime(
+                                      localDateTime.year,
+                                      localDateTime.month + 1,
+                                      localDateTime.day,
+                                      localDateTime.hour,
+                                      localDateTime.minute,
+                                    );
+                                  });
+                                },
+                                child: const Icon(
+                                  Icons.arrow_forward_ios,
+                                  size: 16,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        height: 85,
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          // Show all days in the month
+                          itemCount: DateTime(
+                            activeDate.year,
+                            activeDate.month + 1,
+                            0,
+                          ).day,
+                          itemBuilder: (context, index) {
+                            // Start from 1st of the selected month
+                            DateTime d = DateTime(
+                              activeDate.year,
+                              activeDate.month,
+                              index + 1,
+                            );
+
+                            bool isBeforeToday = d.isBefore(
+                              DateTime(now.year, now.month, now.day),
+                            );
+                            bool isSel =
+                                d.year == activeDate.year &&
+                                d.month == activeDate.month &&
+                                d.day == activeDate.day;
+
+                            return GestureDetector(
+                              onTap: isBeforeToday
+                                  ? null
+                                  : () {
+                                      setModalState(() {
+                                        localDateTime = DateTime(
+                                          d.year,
+                                          d.month,
+                                          d.day,
+                                          localDateTime.hour,
+                                          localDateTime.minute,
+                                        );
+                                      });
+                                    },
+                              child: Container(
+                                width: 65,
+                                margin: const EdgeInsets.only(right: 12),
+                                decoration: BoxDecoration(
+                                  color: isSel
+                                      ? Colors.white
+                                      : const Color(0xFFF8F8F8),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: isSel
+                                        ? Colors.black
+                                        : Colors.transparent,
+                                    width: 2,
+                                  ),
+                                ),
+                                child: Opacity(
+                                  opacity: isBeforeToday ? 0.4 : 1.0,
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        DateFormat('E').format(d),
+                                        style: TextStyle(
+                                          color: Colors.grey[600],
+                                          fontSize: 14,
+                                          fontFamily: 'Lufga',
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        d.day.toString(),
+                                        style: const TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w700,
+                                          fontFamily: 'Lufga',
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      const Text(
+                        "Time",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          fontFamily: 'Lufga',
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Expanded(
+                        child: GridView.builder(
+                          padding: EdgeInsets.zero,
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 4,
+                                crossAxisSpacing: 10,
+                                mainAxisSpacing: 10,
+                                childAspectRatio: 2.2,
+                              ),
+                          itemCount: timeSlots.length,
+                          itemBuilder: (context, index) {
+                            String time = timeSlots[index];
+                            bool disabled = isTimeDisabled(time);
+                            bool isSel = activeTime == time;
+                            return GestureDetector(
+                              onTap: disabled
+                                  ? null
+                                  : () {
+                                      setModalState(() {
+                                        List<String> p = time.split(':');
+                                        localDateTime = DateTime(
+                                          activeDate.year,
+                                          activeDate.month,
+                                          activeDate.day,
+                                          int.parse(p[0]),
+                                          int.parse(p[1]),
+                                        );
+                                      });
+                                    },
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: isSel
+                                      ? Colors.white
+                                      : (disabled
+                                            ? Colors.grey[100]
+                                            : Colors.white),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: isSel
+                                        ? Colors.black
+                                        : const Color(0xFFE0E0E0),
+                                    width: isSel ? 1.5 : 1,
+                                  ),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    _formatTo12h(time),
+                                    style: TextStyle(
+                                      color: disabled
+                                          ? Colors.grey[400]
+                                          : Colors.black,
+                                      fontWeight: isSel
+                                          ? FontWeight.w700
+                                          : FontWeight.w500,
+                                      fontFamily: 'Lufga',
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 20),
+                          child: Text(
+                            "${DateFormat('EEE, d MMM').format(activeDate)} | ${_formatTo12h(activeTime).replaceAll(':', '.')} - ${_formatTo12h(_getEndTime(activeTime)).replaceAll(':', '.')}",
+                            style: const TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w700,
+                              fontFamily: 'Lufga',
+                            ),
+                          ),
+                        ),
+                      ),
+                      OneBtn(
+                        onPressed: () {
+                          setState(() {
+                            _selectedDateTime = localDateTime;
+                            _slotController.text =
+                                "${DateFormat('MMM dd').format(_selectedDateTime)}, ${DateFormat('hh:mm a').format(_selectedDateTime)}";
+                          });
+                          Navigator.pop(context);
+                        },
+                        text: "Schedule",
+                      ),
+                      const SizedBox(height: 10),
+                    ],
                   ),
-                ],
-              ),
+                );
+              },
             );
           },
         );
@@ -470,134 +744,32 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
     );
   }
 
-  void _showTimePicker(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-      ),
-      builder: (context) {
-        DateTime tempTime = _selectedDateTime;
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return SizedBox(
-              height: MediaQuery.of(context).size.height * 0.5,
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 20,
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        GestureDetector(
-                          onTap: () {
-                            Navigator.pop(context);
-                            _showDatePicker(context);
-                          },
-                          child: const Icon(
-                            Icons.arrow_back_ios_new,
-                            size: 20,
-                            color: Colors.black,
-                          ),
-                        ),
-                        const Text(
-                          "Time",
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w600,
-                            fontFamily: 'Lufga',
-                            color: Colors.black,
-                          ),
-                        ),
-                        GestureDetector(
-                          onTap: () {
-                            final now = DateTime.now();
-                            final minAllowed = now.add(
-                              const Duration(hours: 3),
-                            );
-                            DateTime selected = DateTime(
-                              _selectedDateTime.year,
-                              _selectedDateTime.month,
-                              _selectedDateTime.day,
-                              tempTime.hour,
-                              tempTime.minute,
-                            );
+  String _formatTo12h(String time24h) {
+    try {
+      final parts = time24h.split(':');
+      int h = int.parse(parts[0]);
+      int m = int.parse(parts[1]);
+      final dt = DateTime(2022, 1, 1, h, m);
+      return DateFormat('hh:mm a').format(dt);
+    } catch (e) {
+      return time24h;
+    }
+  }
 
-                            // If selected time is in the past or before the 3-hour window on the same day
-                            if (selected.isBefore(minAllowed)) {
-                              // If it's today, we snap it to the minAllowed rounded up
-                              if (selected.year == now.year &&
-                                  selected.month == now.month &&
-                                  selected.day == now.day) {
-                                int minutes = minAllowed.minute;
-                                if (minutes <= 30) {
-                                  selected = DateTime(
-                                    minAllowed.year,
-                                    minAllowed.month,
-                                    minAllowed.day,
-                                    minAllowed.hour,
-                                    30,
-                                  );
-                                } else {
-                                  selected = DateTime(
-                                    minAllowed.year,
-                                    minAllowed.month,
-                                    minAllowed.day,
-                                    minAllowed.hour + 1,
-                                    00,
-                                  );
-                                }
-                                _showToast(
-                                  "Minimum 3 hours gap required. Adjusted to nearest slot.",
-                                );
-                              } else if (selected.isBefore(now)) {
-                                _showToast("Please select a future time");
-                                return;
-                              }
-                            }
-
-                            setState(() {
-                              _selectedDateTime = selected;
-                              _slotController.text =
-                                  "${DateFormat('MMM dd').format(_selectedDateTime)}, ${DateFormat('hh:mm a').format(_selectedDateTime)}";
-                            });
-                            Navigator.pop(context);
-                          },
-                          child: const Text(
-                            "Done",
-                            style: TextStyle(
-                              color: Colors.black,
-                              fontSize: 17,
-                              fontWeight: FontWeight.w600,
-                              fontFamily: 'Lufga',
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Expanded(
-                    child: CupertinoDatePicker(
-                      mode: CupertinoDatePickerMode.time,
-                      minuteInterval: 30,
-                      initialDateTime: _selectedDateTime,
-                      onDateTimeChanged: (DateTime newTime) {
-                        tempTime = newTime;
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
+  String _getEndTime(String startTime) {
+    try {
+      List<String> parts = startTime.split(':');
+      int h = int.parse(parts[0]);
+      int m = int.parse(parts[1]);
+      m += 30;
+      if (m >= 60) {
+        h += 1;
+        m -= 60;
+      }
+      return "${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}";
+    } catch (e) {
+      return "";
+    }
   }
 
   @override

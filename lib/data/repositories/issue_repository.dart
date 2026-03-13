@@ -215,4 +215,20 @@ class IssueRepository {
       rethrow;
     }
   }
+
+  Future<void> cancelTicket(int ticketId, String reason) async {
+    try {
+      final response = await apiClient.post(
+        '/customer/tickets/$ticketId/cancel',
+        data: {'cancellation_reason': reason},
+      );
+      if (response.data['success'] != true) {
+        throw Exception(
+          'Failed to cancel ticket: ${response.data['message'] ?? 'Unknown error'}',
+        );
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
 }

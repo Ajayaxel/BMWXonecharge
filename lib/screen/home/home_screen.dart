@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:onecharge/screen/home/issue_reporting_bottom_sheet.dart';
 import 'package:onecharge/screen/home/widgets/service_notification.dart';
 import 'package:onecharge/screen/home/widgets/feedback_bottom_sheet.dart';
+import 'package:onecharge/screen/home/widgets/cancellation_bottom_sheet.dart';
 import 'package:onecharge/screen/home/settings_screen.dart';
 import 'package:onecharge/screen/home/tracking_map_screen.dart';
 import 'package:onecharge/logic/services/realtime_service.dart';
+import 'package:onecharge/core/services/push_notification_service.dart';
 import 'package:onecharge/screen/vehicle/vehicle_selection.dart';
 import 'package:onecharge/const/onebtn.dart';
 import 'dart:async';
@@ -1211,6 +1213,10 @@ class HomeScreenState extends State<HomeScreen> {
                               ),
                             );
                           },
+                          onLongPress: () {
+                            PushNotificationService().triggerTestNotification();
+                            showToast("Testing Notification... Check your tray!");
+                          },
                           child: Container(
                             padding: const EdgeInsets.all(12),
                             decoration: const BoxDecoration(
@@ -1429,15 +1435,25 @@ class HomeScreenState extends State<HomeScreen> {
                       _currentTicket = null;
                     });
                   },
-                  onCancel: () {
-                    // Since there is no cancel API yet, we do a dummy cancel locally
-                    showToast("Booking Cancelled");
-                    setState(() {
-                      _currentServiceStage = 'none';
-                      _stopPolling();
-                      _realtimeService?.disconnect();
-                      _currentTicket = null;
-                    });
+                  onCancel: () async {
+                    if (_currentTicket?.id == null) return;
+                    final shouldClear = await showModalBottomSheet<bool>(
+                      context: context,
+                      backgroundColor: Colors.transparent,
+                      isScrollControlled: true,
+                      builder: (context) => CancellationBottomSheet(
+                        ticketId: _currentTicket!.id,
+                      ),
+                    );
+
+                    if (shouldClear == true) {
+                      setState(() {
+                        _currentServiceStage = 'none';
+                        _stopPolling();
+                        _realtimeService?.disconnect();
+                        _currentTicket = null;
+                      });
+                    }
                   },
                   onSolved: () {
                     final tId = _currentTicket?.id;

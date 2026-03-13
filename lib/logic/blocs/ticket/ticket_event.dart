@@ -65,3 +65,13 @@ class UpdateTicketDetails extends TicketEvent {
   @override
   List<Object> get props => [ticket];
 }
+
+class CancelTicketRequested extends TicketEvent {
+  final int ticketId;
+  final String reason;
+
+  const CancelTicketRequested({required this.ticketId, required this.reason});
+
+  @override
+  List<Object> get props => [ticketId, reason];
+}

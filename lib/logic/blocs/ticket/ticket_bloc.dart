@@ -16,6 +16,7 @@ class TicketBloc extends Bloc<TicketEvent, TicketState> {
     on<UpdateTicketDetails>((event, emit) {
       emit(TicketDetailSuccess(event.ticket));
     });
+    on<CancelTicketRequested>(_onCancelTicketRequested);
   }
 
   void _onUpdateDriverLocation(
@@ -23,6 +24,19 @@ class TicketBloc extends Bloc<TicketEvent, TicketState> {
     Emitter<TicketState> emit,
   ) {
     emit(DriverLocationLoaded(event.driver));
+  }
+
+  Future<void> _onCancelTicketRequested(
+    CancelTicketRequested event,
+    Emitter<TicketState> emit,
+  ) async {
+    emit(TicketCancelLoading());
+    try {
+      await issueRepository.cancelTicket(event.ticketId, event.reason);
+      emit(TicketCancelSuccess());
+    } catch (e) {
+      emit(TicketCancelError(e.toString()));
+    }
   }
 
   Future<void> _onFetchDriverLocationRequested(

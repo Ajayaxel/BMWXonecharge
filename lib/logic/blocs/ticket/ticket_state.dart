@@ -80,3 +80,16 @@ class DriverLocationLoaded extends TicketState {
   @override
   List<Object> get props => [driver ?? 'none'];
 }
+
+class TicketCancelLoading extends TicketState {}
+
+class TicketCancelSuccess extends TicketState {}
+
+class TicketCancelError extends TicketState {
+  final String message;
+
+  const TicketCancelError(this.message);
+
+  @override
+  List<Object> get props => [message];
+}
