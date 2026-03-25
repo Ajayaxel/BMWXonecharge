@@ -16,6 +16,7 @@ class SecureStorageService {
   static const _accessTokenKey = 'access_token';
   static const _refreshTokenKey = 'refresh_token';
   static const _userNameKey = 'user_name';
+  static const _selectedLocationKey = 'selected_location';
 
   Future<void> saveAccessToken(String token) async {
     try {
@@ -83,6 +84,23 @@ class SecureStorageService {
       return await _storage.read(key: _userIdKey);
     } catch (e) {
       _handleStorageError(e, 'getUserId');
+      return null;
+    }
+  }
+
+  Future<void> saveSelectedLocation(String locationJson) async {
+    try {
+      await _storage.write(key: _selectedLocationKey, value: locationJson);
+    } on PlatformException catch (e) {
+      _handleStorageError(e, 'saveSelectedLocation');
+    }
+  }
+
+  Future<String?> getSelectedLocation() async {
+    try {
+      return await _storage.read(key: _selectedLocationKey);
+    } catch (e) {
+      _handleStorageError(e, 'getSelectedLocation');
       return null;
     }
   }

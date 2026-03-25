@@ -131,6 +131,7 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
       }
     });
   }
+
   Future<void> _getCurrentCoordinates() async {
     try {
       Position position = await Geolocator.getCurrentPosition(
@@ -165,11 +166,7 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
             _selectedLocationId = null;
           });
           // Also sync fallback to HomeScreen
-          HomeScreenState.activeState?.updateLocation(
-            "",
-            0.0,
-            0.0,
-          );
+          HomeScreenState.activeState?.updateLocation("", 0.0, 0.0);
           await _getCurrentCoordinates();
         }
       }
@@ -1782,7 +1779,8 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
                           listener: (context, state) {
                             if (state is TicketSuccess) {
                               final requiresPayment =
-                                  state.response.data?.paymentRequired == true &&
+                                  state.response.data?.paymentRequired ==
+                                      true &&
                                   state.response.data?.paymentUrl != null;
 
                               if (requiresPayment) {
@@ -1796,27 +1794,55 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
                                     vehiclePlate: widget.vehiclePlate,
                                     locationAddress: _currentAddress,
                                     locationCity: "",
-                                    date: state.response.data?.ticket?.bookingType == "instant"
+                                    date:
+                                        state
+                                                .response
+                                                .data
+                                                ?.ticket
+                                                ?.bookingType ==
+                                            "instant"
                                         ? "Today"
-                                        : DateFormat('MMM dd').format(_selectedDateTime),
-                                    time: state.response.data?.ticket?.bookingType == "instant"
+                                        : DateFormat(
+                                            'MMM dd',
+                                          ).format(_selectedDateTime),
+                                    time:
+                                        state
+                                                .response
+                                                .data
+                                                ?.ticket
+                                                ?.bookingType ==
+                                            "instant"
                                         ? "Instant"
-                                        : DateFormat('hh:mm a').format(_selectedDateTime),
-                                    paymentBreakdown: state.response.data?.paymentBreakdown,
+                                        : DateFormat(
+                                            'hh:mm a',
+                                          ).format(_selectedDateTime),
+                                    paymentBreakdown:
+                                        state.response.data?.paymentBreakdown,
                                     paymentUrl: state.response.data?.paymentUrl,
-                                    intentionId: state.response.data?.intentionId,
+                                    intentionId:
+                                        state.response.data?.intentionId,
                                   ),
                                 );
                               } else {
-                                final breakdown = state.response.data?.paymentBreakdown;
-                                final invoice = state.response.data?.ticket?.invoice;
-                                final totalAmount = breakdown?.totalAmount ?? invoice?.totalAmount;
-                                final currency = breakdown?.currency ?? invoice?.currency ?? "AED";
-                                final String toastMsg = (totalAmount != null && totalAmount > 0)
+                                final breakdown =
+                                    state.response.data?.paymentBreakdown;
+                                final invoice =
+                                    state.response.data?.ticket?.invoice;
+                                final totalAmount =
+                                    breakdown?.totalAmount ??
+                                    invoice?.totalAmount;
+                                final currency =
+                                    breakdown?.currency ??
+                                    invoice?.currency ??
+                                    "AED";
+                                final String toastMsg =
+                                    (totalAmount != null && totalAmount > 0)
                                     ? "Ticket created successfully! Total Amount: ${totalAmount.toStringAsFixed(2)} $currency"
                                     : "Ticket created successfully!";
 
-                                HomeScreenState.activeState?.showToast(toastMsg);
+                                HomeScreenState.activeState?.showToast(
+                                  toastMsg,
+                                );
                                 HomeScreenState.activeState?.startServiceFlow(
                                   ticket: state.response.data?.ticket,
                                 );
@@ -2240,7 +2266,24 @@ class _IssueReportingBottomSheetState extends State<IssueReportingBottomSheet> {
                 shape: BoxShape.circle,
               ),
               child: Center(
-                child: _getQuickServiceIcon(subType.name ?? '').isNotEmpty
+                child:
+                    subType.iconImageUrl != null &&
+                        subType.iconImageUrl!.isNotEmpty
+                    ? ClipOval(
+                        child: Image.network(
+                          subType.iconImageUrl!,
+                          width: 42,
+                          height: 42,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) =>
+                              const Icon(
+                                Icons.power,
+                                color: Colors.white,
+                                size: 22,
+                              ),
+                        ),
+                      )
+                    : _getQuickServiceIcon(subType.name ?? '').isNotEmpty
                     ? Image.asset(
                         _getQuickServiceIcon(subType.name ?? ''),
                         width: 22,

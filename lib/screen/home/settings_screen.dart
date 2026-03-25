@@ -427,18 +427,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   activeColor: Colors.green,
                 ),
               ),
-              _buildMenuItem(
-                Icons.directions_car_filled_outlined,
-                'My Vehicle',
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const MyVehicleScreen(),
-                    ),
-                  );
-                },
-              ),
+              // _buildMenuItem(
+              //   Icons.directions_car_filled_outlined,
+              //   'My Vehicle',
+              //   onTap: () {
+              //     Navigator.push(
+              //       context,
+              //       MaterialPageRoute(
+              //         builder: (context) => const MyVehicleScreen(),
+              //       ),
+              //     );
+              //   },
+              // ),
               _buildMenuItem(
                 Icons.location_on_outlined,
                 'Location',

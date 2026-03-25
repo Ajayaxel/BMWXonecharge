@@ -10,6 +10,8 @@ abstract class LocationEvent extends Equatable {
 
 class FetchLocations extends LocationEvent {}
 
+class FetchLocationConfig extends LocationEvent {}
+
 class AddLocation extends LocationEvent {
   final LocationModel location;
 
@@ -27,3 +29,14 @@ class DeleteLocation extends LocationEvent {
   @override
   List<Object?> get props => [locationId];
 }
+
+class SelectLocation extends LocationEvent {
+  final LocationModel location;
+
+  const SelectLocation(this.location);
+
+  @override
+  List<Object?> get props => [location];
+}
+
+class LoadSelectedLocation extends LocationEvent {}

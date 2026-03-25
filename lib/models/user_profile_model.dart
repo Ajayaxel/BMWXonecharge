@@ -29,8 +29,11 @@ class Customer {
   final String phone;
   final String? profileImage;
   final String? emailVerifiedAt;
+  final String? dateOfBirth;
+  final String? gender;
   final String? createdAt;
   final String? updatedAt;
+  final double? walletBalance;
 
   Customer({
     required this.id,
@@ -39,8 +42,11 @@ class Customer {
     required this.phone,
     this.profileImage,
     this.emailVerifiedAt,
+    this.dateOfBirth,
+    this.gender,
     this.createdAt,
     this.updatedAt,
+    this.walletBalance,
   });
 
   factory Customer.fromJson(Map<String, dynamic> json) {
@@ -51,8 +57,11 @@ class Customer {
       phone: json['phone'] ?? '',
       profileImage: json['profile_image'],
       emailVerifiedAt: json['email_verified_at'],
+      dateOfBirth: json['date_of_birth'],
+      gender: json['gender'],
       createdAt: json['created_at'],
       updatedAt: json['updated_at'],
+      walletBalance: (json['wallet_balance'] as num?)?.toDouble(),
     );
   }
 
@@ -64,8 +73,11 @@ class Customer {
       'phone': phone,
       'profile_image': profileImage,
       'email_verified_at': emailVerifiedAt,
+      'date_of_birth': dateOfBirth,
+      'gender': gender,
       'created_at': createdAt,
       'updated_at': updatedAt,
+      'wallet_balance': walletBalance,
     };
   }
 }

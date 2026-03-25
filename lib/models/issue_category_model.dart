@@ -7,6 +7,8 @@ class IssueSubType extends Equatable {
   final String serviceCost;
   final String serviceCharge;
   final String vat;
+  final String? iconImage;
+  final String? iconImageUrl;
 
   const IssueSubType({
     required this.id,
@@ -15,6 +17,8 @@ class IssueSubType extends Equatable {
     required this.serviceCost,
     required this.serviceCharge,
     required this.vat,
+    this.iconImage,
+    this.iconImageUrl,
   });
 
   factory IssueSubType.fromJson(Map<String, dynamic> json) {
@@ -25,11 +29,13 @@ class IssueSubType extends Equatable {
       serviceCost: json['service_cost']?.toString() ?? '0.00',
       serviceCharge: json['service_charge']?.toString() ?? '0.00',
       vat: json['vat']?.toString() ?? '0.00',
+      iconImage: json['icon_image'],
+      iconImageUrl: json['icon_image_url'],
     );
   }
 
   @override
-  List<Object?> get props => [id, issueCategoryId, name, serviceCost, serviceCharge, vat];
+  List<Object?> get props => [id, issueCategoryId, name, serviceCost, serviceCharge, vat, iconImage, iconImageUrl];
 }
 
 class IssueCategory extends Equatable {
@@ -38,6 +44,8 @@ class IssueCategory extends Equatable {
   final String serviceCost;
   final String serviceCharge;
   final String vat;
+  final String? image;
+  final String? imageUrl;
   final List<IssueSubType> subTypes;
 
   const IssueCategory({
@@ -46,6 +54,8 @@ class IssueCategory extends Equatable {
     required this.serviceCost,
     required this.serviceCharge,
     required this.vat,
+    this.image,
+    this.imageUrl,
     required this.subTypes,
   });
 
@@ -56,6 +66,8 @@ class IssueCategory extends Equatable {
       serviceCost: json['service_cost']?.toString() ?? '0.00',
       serviceCharge: json['service_charge']?.toString() ?? '0.00',
       vat: json['vat']?.toString() ?? '0.00',
+      image: json['image'],
+      imageUrl: json['image_url'],
       subTypes: (json['sub_types'] as List<dynamic>?)
               ?.map((item) => IssueSubType.fromJson(item))
               .toList() ??
@@ -64,5 +76,5 @@ class IssueCategory extends Equatable {
   }
 
   @override
-  List<Object?> get props => [id, name, serviceCost, serviceCharge, vat, subTypes];
+  List<Object?> get props => [id, name, serviceCost, serviceCharge, vat, image, imageUrl, subTypes];
 }

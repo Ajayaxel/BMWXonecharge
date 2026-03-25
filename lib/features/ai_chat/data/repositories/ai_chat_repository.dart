@@ -9,7 +9,7 @@ import 'package:onecharge/features/ai_chat/data/models/ai_chat_models.dart';
 /// Get history  : GET  /api/chat/history/{userId}
 class AiChatRepository {
   static const String _baseUrl =
-      'https://onecharge-ai-production.up.railway.app';
+      'https://1charge-1chargebot.up.railway.app';
 
   late final Dio _dio;
 

@@ -26,10 +26,17 @@ class ProfileRepository {
   Future<Customer> updateProfile({
     required String name,
     required String phone,
+    String? dateOfBirth,
+    String? gender,
     File? profileImage,
   }) async {
     try {
-      final Map<String, dynamic> data = {'name': name, 'phone': phone};
+      final Map<String, dynamic> data = {
+        'name': name,
+        'phone': phone,
+        if (dateOfBirth != null) 'date_of_birth': dateOfBirth,
+        if (gender != null) 'gender': gender,
+      };
 
       if (profileImage != null) {
         String fileName = profileImage.path.split('/').last;

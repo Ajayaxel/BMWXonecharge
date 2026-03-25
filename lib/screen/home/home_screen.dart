@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:onecharge/screen/home/issue_reporting_bottom_sheet.dart';
 import 'package:onecharge/screen/home/widgets/service_notification.dart';
 import 'package:onecharge/screen/home/widgets/feedback_bottom_sheet.dart';
@@ -25,6 +26,7 @@ import 'package:onecharge/logic/blocs/vehicle_list/vehicle_list_state.dart';
 import 'package:onecharge/models/vehicle_list_model.dart';
 import 'package:onecharge/models/ticket_model.dart';
 import 'package:onecharge/core/storage/vehicle_storage.dart';
+import 'package:onecharge/screen/wallet/wallet_screen.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:onecharge/screen/notification/notification_screen.dart';
 import 'package:onecharge/core/storage/location_storage.dart';
@@ -48,6 +50,8 @@ import 'package:onecharge/logic/blocs/location/location_event.dart';
 import 'package:onecharge/logic/blocs/brand/brand_bloc.dart';
 import 'package:onecharge/logic/blocs/vehicle_model/vehicle_model_bloc.dart';
 import 'package:onecharge/logic/blocs/charging_type/charging_type_bloc.dart';
+import 'package:onecharge/logic/blocs/service_banner/service_banner_bloc.dart';
+import 'package:onecharge/logic/blocs/service_banner/service_banner_state.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -490,12 +494,7 @@ class HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  void updateLocation(
-    String address,
-    double lat,
-    double lng, {
-    int? id,
-  }) {
+  void updateLocation(String address, double lat, double lng, {int? id}) {
     if (mounted) {
       // If address is null or empty, fallback to current location
       if (address.isEmpty || address == "Fetching location...") {
@@ -1091,6 +1090,16 @@ class HomeScreenState extends State<HomeScreen> {
               showToast('Location added successfully');
             } else if (state is LocationsLoaded) {
               _validateCurrentLocation(state.locations);
+
+              if (state.selectedLocation != null) {
+                final loc = state.selectedLocation!;
+                setState(() {
+                  currentAddress = loc.name.isNotEmpty ? loc.name : loc.address;
+                  _currentLatitude = loc.latitude;
+                  _currentLongitude = loc.longitude;
+                  _selectedLocationId = loc.id;
+                });
+              }
             }
           },
         ),
@@ -1231,24 +1240,30 @@ class HomeScreenState extends State<HomeScreen> {
                                               ),
                                         ),
                                       );
-                                    if (result != null) {
-                                      setState(() {
-                                        currentAddress = result.name.isNotEmpty
-                                            ? result.name
-                                            : result.address;
-                                        _currentLatitude = result.latitude;
-                                        _currentLongitude = result.longitude;
-                                        _selectedLocationId = result.id;
-                                      });
-                                      // Persist manual selection
-                                      await LocationStorage.saveSelectedLocation(
-                                        address: currentAddress,
-                                        lat: _currentLatitude,
-                                        lng: _currentLongitude,
-                                        isManual: true,
-                                        id: result.id,
-                                      );
-                                    }
+                                  if (result != null) {
+                                    // Sync with BLoC
+                                    context.read<LocationBloc>().add(
+                                      SelectLocation(result),
+                                    );
+
+                                    setState(() {
+                                      currentAddress = result.name.isNotEmpty
+                                          ? result.name
+                                          : result.address;
+                                      _currentLatitude = result.latitude;
+                                      _currentLongitude = result.longitude;
+                                      _selectedLocationId = result.id;
+                                    });
+
+                                    // Secondary persistence (redundant but safe)
+                                    await LocationStorage.saveSelectedLocation(
+                                      address: currentAddress,
+                                      lat: _currentLatitude,
+                                      lng: _currentLongitude,
+                                      isManual: true,
+                                      id: result.id,
+                                    );
+                                  }
                                 },
                                 child: Row(
                                   children: [
@@ -1285,6 +1300,26 @@ class HomeScreenState extends State<HomeScreen> {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
+                                builder: (context) => const WalletScreen(),
+                              ),
+                            );
+                          },
+                          child: CircleAvatar(
+                            radius: 25,
+                            backgroundColor: Colors.grey.shade200,
+                            child: Image.asset(
+                              "assets/home/mingcute_wallet-fill.png",
+                              height: 25,
+                              width: 25,
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: 10),
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
                                 builder: (context) =>
                                     const NotificationScreen(),
                               ),
@@ -1292,7 +1327,9 @@ class HomeScreenState extends State<HomeScreen> {
                           },
                           onLongPress: () {
                             PushNotificationService().triggerTestNotification();
-                            showToast("Testing Notification... Check your tray!");
+                            showToast(
+                              "Testing Notification... Check your tray!",
+                            );
                           },
                           child: Container(
                             padding: const EdgeInsets.all(12),
@@ -1337,46 +1374,192 @@ class HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(height: 16),
                     // Banner
-                    Stack(
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Image.asset(
-                            'assets/home/bannerBG.png',
-                            width: double.infinity,
-                            height: 180,
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                        Positioned(
-                          top: 20,
-                          left: 20,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                    BlocBuilder<ServiceBannerBloc, ServiceBannerState>(
+                      builder: (context, state) {
+                        // ── Shimmer while loading ──────────────────────────
+                        if (state is ServiceBannerInitial ||
+                            state is ServiceBannerLoading) {
+                          return Shimmer.fromColors(
+                            baseColor: const Color(0xFFE0E0E0),
+                            highlightColor: const Color(0xFFF5F5F5),
+                            child: Container(
+                              width: double.infinity,
+                              height: 180,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          );
+                        }
+
+                        // ── Error: fall back to static asset banner ────────
+                        if (state is ServiceBannerError) {
+                          return Stack(
                             children: [
-                              const Text(
-                                'Save 30% off\nfirst 2 booking',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w500,
-                                  fontFamily: 'Lufga',
-                                  height: 1.2,
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: Image.asset(
+                                  'assets/home/bannerBG.png',
+                                  width: double.infinity,
+                                  height: 180,
+                                  fit: BoxFit.cover,
                                 ),
                               ),
-                              const SizedBox(height: 5),
-                              const Text(
-                                'USECODE 125MND',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                  fontFamily: 'Lufga',
+                              const Positioned(
+                                top: 20,
+                                left: 20,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Save 30% off\nfirst 2 booking',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w500,
+                                        fontFamily: 'Lufga',
+                                        height: 1.2,
+                                      ),
+                                    ),
+                                    SizedBox(height: 5),
+                                    Text(
+                                      'USECODE 125MND',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                        fontFamily: 'Lufga',
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          );
+                        }
+
+                        // ── Loaded: API banner ─────────────────────────────
+                        final banner = (state as ServiceBannerLoaded).banner;
+                        return ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Stack(
+                            children: [
+                              // Background image
+                              Image.network(
+                                banner.bgImage,
+                                width: double.infinity,
+                                height: 180,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    Image.asset(
+                                      'assets/home/bannerBG.png',
+                                      width: double.infinity,
+                                      height: 180,
+                                      fit: BoxFit.cover,
+                                    ),
+                              ),
+                              // Dark gradient so text is always readable
+                              Positioned.fill(
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.centerLeft,
+                                      end: Alignment.centerRight,
+                                      colors: [
+                                        Colors.black.withOpacity(0.55),
+                                        Colors.black.withOpacity(0.10),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              // Text & code chip
+                              Positioned(
+                                top: 20,
+                                left: 20,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    SizedBox(
+                                      width: 160,
+                                      child: Text(
+                                        () {
+                                          final words = banner.title.split(' ');
+                                          if (words.length <= 1) {
+                                            return banner.title;
+                                          }
+                                          final mid = (words.length / 2).ceil();
+                                          return '${words.take(mid).join(' ')}\n${words.skip(mid).join(' ')}';
+                                        }(),
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 17,
+                                          fontWeight: FontWeight.w500,
+                                          fontFamily: 'Lufga',
+                                          height: 1.2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 15),
+                                    // Code pill chip — tap to copy
+                                    GestureDetector(
+                                      onTap: () {
+                                        Clipboard.setData(
+                                          ClipboardData(text: banner.code),
+                                        );
+                                        showToast(
+                                          'Code "${banner.code}" copied!',
+                                        );
+                                      },
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 4,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withOpacity(0.20),
+                                          borderRadius: BorderRadius.circular(
+                                            20,
+                                          ),
+                                          border: Border.all(
+                                            color: Colors.white.withOpacity(
+                                              0.50,
+                                            ),
+                                            width: 1,
+                                          ),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(
+                                              'USECODE ${banner.code}',
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600,
+                                                fontFamily: 'Lufga',
+                                                letterSpacing: 0.5,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 5),
+                                            const Icon(
+                                              Icons.copy_rounded,
+                                              color: Colors.white,
+                                              size: 12,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
                           ),
-                        ),
-                      ],
+                        );
+                      },
                     ),
                     const SizedBox(height: 16),
                     const Text(
@@ -1484,6 +1667,7 @@ class HomeScreenState extends State<HomeScreen> {
                                       categoryName,
                                       _getCategoryIcon(categoryName),
                                       cardWidth,
+                                      imageUrl: category.imageUrl,
                                     );
                                   }),
                                 ],
@@ -1518,9 +1702,8 @@ class HomeScreenState extends State<HomeScreen> {
                       context: context,
                       backgroundColor: Colors.transparent,
                       isScrollControlled: true,
-                      builder: (context) => CancellationBottomSheet(
-                        ticketId: _currentTicket!.id,
-                      ),
+                      builder: (context) =>
+                          CancellationBottomSheet(ticketId: _currentTicket!.id),
                     );
 
                     if (shouldClear == true) {
@@ -1612,8 +1795,9 @@ class HomeScreenState extends State<HomeScreen> {
     int index,
     String title,
     String imagePath,
-    double width,
-  ) {
+    double width, {
+    String? imageUrl,
+  }) {
     bool isSelected = selectedIndex == index;
     bool isOther = title == 'Other';
 
@@ -1647,37 +1831,94 @@ class HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ),
-            if (!isOther && imagePath.isNotEmpty)
-              (title.contains('Tow') || title.contains('Pickup'))
+            if (!isOther && (imagePath.isNotEmpty || imageUrl != null))
+              (title.toLowerCase().contains('tow') ||
+                      title.toLowerCase().contains('pickup'))
                   ? Positioned(
                       right: -10,
                       top: 40,
                       bottom: 0,
-                      child: Image.asset(
-                        imagePath,
-                        width: 110,
-                        fit: BoxFit.contain,
-                        color: isSelected
-                            ? Colors.white.withOpacity(0.9)
-                            : null,
-                        colorBlendMode: isSelected ? BlendMode.modulate : null,
-                      ),
+                      child: imageUrl != null
+                          ? Image.network(
+                              imageUrl,
+                              width: 110,
+                              fit: BoxFit.contain,
+                              color: isSelected
+                                  ? Colors.white.withOpacity(0.9)
+                                  : null,
+                              colorBlendMode: isSelected
+                                  ? BlendMode.modulate
+                                  : null,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  Image.asset(
+                                    imagePath,
+                                    width: 110,
+                                    fit: BoxFit.contain,
+                                    color: isSelected
+                                        ? Colors.white.withOpacity(0.9)
+                                        : null,
+                                    colorBlendMode: isSelected
+                                        ? BlendMode.modulate
+                                        : null,
+                                  ),
+                            )
+                          : Image.asset(
+                              imagePath,
+                              width: 110,
+                              fit: BoxFit.contain,
+                              color: isSelected
+                                  ? Colors.white.withOpacity(0.9)
+                                  : null,
+                              colorBlendMode: isSelected
+                                  ? BlendMode.modulate
+                                  : null,
+                            ),
                     )
                   : Positioned.fill(
                       top: 30,
                       child: Center(
-                        child: Image.asset(
-                          imagePath,
-                          width: title.contains('Station') ? 60 : 120,
-                          height: title.contains('Station') ? 90 : 80,
-                          fit: BoxFit.contain,
-                          color: isSelected
-                              ? Colors.white.withOpacity(0.9)
-                              : null,
-                          colorBlendMode: isSelected
-                              ? BlendMode.modulate
-                              : null,
-                        ),
+                        child: imageUrl != null
+                            ? Image.network(
+                                imageUrl,
+                                width: title.contains('Station') ? 60 : 120,
+                                height: title.contains('Station') ? 90 : 80,
+                                fit: BoxFit.contain,
+                                color: isSelected
+                                    ? Colors.white.withOpacity(0.9)
+                                    : null,
+                                colorBlendMode: isSelected
+                                    ? BlendMode.modulate
+                                    : null,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    Image.asset(
+                                      imagePath,
+                                      width: title.contains('Station')
+                                          ? 60
+                                          : 120,
+                                      height: title.contains('Station')
+                                          ? 90
+                                          : 80,
+                                      fit: BoxFit.contain,
+                                      color: isSelected
+                                          ? Colors.white.withOpacity(0.9)
+                                          : null,
+                                      colorBlendMode: isSelected
+                                          ? BlendMode.modulate
+                                          : null,
+                                    ),
+                              )
+                            : Image.asset(
+                                imagePath,
+                                width: title.contains('Station') ? 60 : 120,
+                                height: title.contains('Station') ? 90 : 80,
+                                fit: BoxFit.contain,
+                                color: isSelected
+                                    ? Colors.white.withOpacity(0.9)
+                                    : null,
+                                colorBlendMode: isSelected
+                                    ? BlendMode.modulate
+                                    : null,
+                              ),
                       ),
                     ),
             if (isOther)

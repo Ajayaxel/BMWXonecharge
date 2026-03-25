@@ -33,6 +33,11 @@ import 'package:onecharge/data/repositories/feedback_repository.dart';
 import 'package:onecharge/logic/blocs/feedback/feedback_bloc.dart';
 import 'package:onecharge/data/repositories/company_code_repository.dart';
 import 'package:onecharge/logic/blocs/company_code/company_code_bloc.dart';
+import 'package:onecharge/data/repositories/service_banner_repository.dart';
+import 'package:onecharge/logic/blocs/service_banner/service_banner_bloc.dart';
+import 'package:onecharge/logic/blocs/service_banner/service_banner_event.dart';
+import 'package:onecharge/data/repositories/wallet_repository.dart';
+import 'package:onecharge/logic/blocs/wallet/wallet_bloc.dart';
 import 'firebase_options.dart';
 
 // New Architecture Imports
@@ -84,6 +89,8 @@ void main() async {
   final redeemCodeRepository = RedeemCodeRepository(apiClient: apiClient);
   final feedbackRepository = FeedbackRepository(apiClient: apiClient);
   final companyCodeRepository = CompanyCodeRepository(apiClient: apiClient);
+  final serviceBannerRepository = ServiceBannerRepository(apiClient: apiClient);
+  final walletRepository = WalletRepository(apiClient: apiClient);
 
   runApp(
     MultiRepositoryProvider(
@@ -105,6 +112,10 @@ void main() async {
         RepositoryProvider<CompanyCodeRepository>.value(
           value: companyCodeRepository,
         ),
+        RepositoryProvider<ServiceBannerRepository>.value(
+          value: serviceBannerRepository,
+        ),
+        RepositoryProvider<WalletRepository>.value(value: walletRepository),
       ],
       child: MultiBlocProvider(
         providers: [
@@ -159,7 +170,10 @@ void main() async {
                 ProfileBloc(profileRepository: profileRepository),
           ),
           BlocProvider<LocationBloc>(
-            create: (context) => LocationBloc(repository: locationRepository),
+            create: (context) => LocationBloc(
+              repository: locationRepository,
+              storage: secureStorage,
+            ),
           ),
           BlocProvider<RedeemCodeBloc>(
             create: (context) =>
@@ -172,6 +186,15 @@ void main() async {
           BlocProvider<CompanyCodeBloc>(
             create: (context) =>
                 CompanyCodeBloc(companyCodeRepository: companyCodeRepository),
+          ),
+          BlocProvider<ServiceBannerBloc>(
+            create: (context) => ServiceBannerBloc(
+              serviceBannerRepository: serviceBannerRepository,
+            )..add(FetchServiceBanner()),
+          ),
+          BlocProvider<WalletBloc>(
+            create: (context) =>
+                WalletBloc(walletRepository: walletRepository),
           ),
         ],
         child: const MyApp(),

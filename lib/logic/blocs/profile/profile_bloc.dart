@@ -35,6 +35,8 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
         final updatedCustomer = await profileRepository.updateProfile(
           name: event.name,
           phone: event.phone,
+          dateOfBirth: event.dateOfBirth,
+          gender: event.gender,
           profileImage: event.profileImage,
         );
         emit(

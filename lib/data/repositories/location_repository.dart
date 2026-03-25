@@ -1,5 +1,6 @@
 import 'package:onecharge/core/network/api_client.dart';
 import 'package:onecharge/models/location_model.dart';
+import 'package:onecharge/models/location_config_model.dart';
 
 class LocationRepository {
   final ApiClient apiClient;
@@ -10,17 +11,8 @@ class LocationRepository {
     try {
       final response = await apiClient.get('/customer/locations');
       if (response.data != null && response.data['success'] == true) {
-        final data = response.data['data'];
-        if (data != null && data['locations'] != null) {
-          final List<dynamic> locationsData = data['locations'];
-          return locationsData
-              .where((item) => item is Map<String, dynamic>)
-              .map(
-                (json) => LocationModel.fromJson(json as Map<String, dynamic>),
-              )
-              .toList();
-        }
-        return [];
+        final listResponse = LocationListResponse.fromJson(response.data as Map<String, dynamic>);
+        return listResponse.data.locations;
       } else {
         throw Exception(
           'Failed to fetch locations: ${response.data?['message'] ?? 'Unknown error'}',
@@ -70,6 +62,21 @@ class LocationRepository {
       if (response.data['success'] != true) {
         throw Exception(
           'Failed to delete location: ${response.data['message'] ?? 'Unknown error'}',
+        );
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<LocationConfigResponse> getLocationConfig() async {
+    try {
+      final response = await apiClient.get('/customer/location-config');
+      if (response.data != null && response.data['success'] == true) {
+        return LocationConfigResponse.fromJson(response.data as Map<String, dynamic>);
+      } else {
+        throw Exception(
+          'Failed to fetch location config: ${response.data?['message'] ?? 'Unknown error'}',
         );
       }
     } catch (e) {

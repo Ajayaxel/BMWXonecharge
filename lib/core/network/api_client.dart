@@ -8,7 +8,7 @@ import '../../core/storage/secure_storage_service.dart';
 class ApiClient {
   late Dio _dio;
   final SecureStorageService _storage;
-  
+
   static const String baseUrl = "https://app.onecharge.io/api";
 
   ApiClient(this._storage) {

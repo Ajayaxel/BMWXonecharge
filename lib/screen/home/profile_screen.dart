@@ -1,3 +1,4 @@
+import 'package:intl/intl.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
@@ -21,6 +22,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final TextEditingController _fullNameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _dobController = TextEditingController();
+  String? _selectedGender;
   bool _isUpdateLoading = false;
 
   XFile? _imageFile;
@@ -41,6 +44,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _fullNameController.text = customer.name;
     _emailController.text = customer.email;
     _phoneController.text = customer.phone;
+    _dobController.text = customer.dateOfBirth ?? '';
+    _selectedGender = customer.gender;
   }
 
   Future<void> _pickImage() async {
@@ -54,11 +59,51 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _selectDate(BuildContext context) async {
+    DateTime initialDate = DateTime.now();
+    if (_dobController.text.isNotEmpty) {
+      try {
+        initialDate = DateFormat('dd/MM/yyyy').parse(_dobController.text);
+      } catch (e) {
+        initialDate = DateTime.now();
+      }
+    }
+
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Colors.black,
+              onPrimary: Colors.white,
+              onSurface: Colors.black,
+            ),
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(foregroundColor: Colors.black),
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null) {
+      setState(() {
+        _dobController.text = DateFormat('dd/MM/yyyy').format(picked);
+      });
+    }
+  }
+
   void _updateProfile() {
     context.read<ProfileBloc>().add(
       UpdateProfile(
         name: _fullNameController.text,
         phone: _phoneController.text,
+        dateOfBirth: _dobController.text.isNotEmpty ? _dobController.text : null,
+        gender: _selectedGender,
         profileImage: _imageFile != null ? File(_imageFile!.path) : null,
       ),
     );
@@ -308,6 +353,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             _phoneController,
                             enabled: !isUpdating,
                           ),
+                          const SizedBox(height: 20),
+                          _buildInputField(
+                            'Date of Birth',
+                            _dobController,
+                            enabled: !isUpdating,
+                            readOnly: true,
+                            onTap: () => _selectDate(context),
+                            suffixIcon: const Icon(
+                              Icons.calendar_today_outlined,
+                              size: 18,
+                              color: Colors.grey,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          _buildGenderField(enabled: !isUpdating),
                         ],
                       ),
                     ),
@@ -333,7 +393,62 @@ class _ProfileScreenState extends State<ProfileScreen> {
     String label,
     TextEditingController controller, {
     bool enabled = true,
+    bool readOnly = false,
+    VoidCallback? onTap,
+    Widget? suffixIcon,
   }) {
+    return GestureDetector(
+      onTap: enabled ? onTap : null,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey.withOpacity(0.3)),
+          borderRadius: BorderRadius.circular(12),
+          color: enabled ? Colors.white : Colors.grey[50],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[400],
+                fontFamily: 'Lufga',
+              ),
+            ),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: controller,
+                    enabled: enabled,
+                    readOnly: readOnly,
+                    onTap: enabled ? onTap : null,
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.symmetric(vertical: 4),
+                    ),
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      fontFamily: 'Lufga',
+                      color: enabled ? Colors.black : Colors.grey[600],
+                    ),
+                  ),
+                ),
+                if (suffixIcon != null) suffixIcon,
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGenderField({bool enabled = true}) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -346,25 +461,73 @@ class _ProfileScreenState extends State<ProfileScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            label,
+            'Gender',
             style: TextStyle(
               fontSize: 12,
               color: Colors.grey[400],
               fontFamily: 'Lufga',
             ),
           ),
-          TextField(
-            controller: controller,
-            enabled: enabled,
-            decoration: const InputDecoration(
-              isDense: true,
-              border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(vertical: 4),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              _buildGenderOption('male', 'Male', enabled),
+              const SizedBox(width: 20),
+              _buildGenderOption('female', 'Female', enabled),
+              const SizedBox(width: 20),
+              _buildGenderOption('other', 'Other', enabled),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGenderOption(String value, String label, bool enabled) {
+    bool isSelected = _selectedGender == value;
+    return GestureDetector(
+      onTap:
+          enabled
+              ? () {
+                setState(() {
+                  _selectedGender = value;
+                });
+              }
+              : null,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 18,
+            height: 18,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: isSelected ? Colors.black : Colors.grey[300]!,
+                width: 2,
+              ),
             ),
+            child:
+                isSelected
+                    ? Center(
+                      child: Container(
+                        width: 10,
+                        height: 10,
+                        decoration: const BoxDecoration(
+                          color: Colors.black,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    )
+                    : null,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            label,
             style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
+              fontSize: 14,
               fontFamily: 'Lufga',
+              fontWeight: isSelected ? FontWeight.w500 : FontWeight.w400,
               color: enabled ? Colors.black : Colors.grey[600],
             ),
           ),
