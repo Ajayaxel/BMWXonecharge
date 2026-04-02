@@ -14,6 +14,7 @@ class ToastUtils {
     final entry = OverlayEntry(
       builder: (context) => Positioned(
         top: MediaQuery.of(context).padding.top + 20,
+        left: 20,
         right: 20,
         child: Material(
           color: Colors.transparent,
@@ -24,45 +25,41 @@ class ToastUtils {
               return Opacity(
                 opacity: value,
                 child: Transform.translate(
-                  offset: Offset(20 * (1 - value), 0),
+                  offset: Offset(0, -20 * (1 - value)),
                   child: child,
                 ),
               );
             },
             child: Container(
-              constraints: BoxConstraints(
-                maxWidth: MediaQuery.of(context).size.width - 40,
-              ),
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
               decoration: BoxDecoration(
                 color: isError
-                    ? Colors.red.withOpacity(0.95)
-                    : Colors.black.withOpacity(0.95),
+                    ? const Color(0xFFEF4444)
+                    : const Color.fromARGB(255, 0, 0, 0), // Premium Green
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.3),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 15,
+                    offset: const Offset(0, 5),
                   ),
                 ],
               ),
               child: Row(
-                mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
                     isError ? Icons.error_outline : Icons.check_circle_outline,
                     color: Colors.white,
-                    size: 20,
+                    size: 22,
                   ),
                   const SizedBox(width: 12),
-                  Flexible(
+                  Expanded(
                     child: Text(
                       message,
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
                         fontFamily: 'Lufga',
                       ),
                     ),
@@ -78,7 +75,7 @@ class ToastUtils {
     _toastEntry = entry;
     Overlay.of(context).insert(entry);
 
-    Future.delayed(const Duration(seconds: 3), () {
+    Future.delayed(const Duration(seconds: 1), () {
       if (_toastEntry == entry) {
         _toastEntry?.remove();
         _toastEntry = null;

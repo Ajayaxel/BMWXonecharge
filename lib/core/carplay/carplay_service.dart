@@ -30,6 +30,28 @@ class CarPlayService {
     }
   }
 
+  static Future<void> updateServices(List<dynamic> categories) async {
+    if (!Platform.isIOS) return;
+    try {
+      final List<Map<String, String>> services = categories.map((c) {
+        return {
+          'name': (c.name ?? 'Unknown').toString(),
+          'detail': 'Tap to book this service',
+        };
+      }).toList();
+      
+      // Use invokeMethod but wrap it to catch the specific MissingPluginException
+      await _channel.invokeMethod('updateServices', {'services': services});
+      print("Successfully pushed ${services.length} services to CarPlay.");
+    } on PlatformException catch (e) {
+      print("Platform error updating CarPlay services: ${e.message}");
+    } on MissingPluginException {
+      print("Native CarPlay plugin not yet synchronized. Please perform a full rebuild of the iOS app.");
+    } catch (e) {
+      print("Failed to update CarPlay services: $e");
+    }
+  }
+
   static Future<void> showBookingSuccess({
     double? latitude,
     double? longitude,

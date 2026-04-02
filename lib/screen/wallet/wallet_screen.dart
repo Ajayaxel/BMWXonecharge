@@ -24,15 +24,16 @@ class _WalletScreenState extends State<WalletScreen> {
     super.initState();
     context.read<WalletBloc>().add(FetchWalletDetailsEvent());
   }
-  // ios or android custom loading 
+
+  // ios or android custom loading
   bool isIos = Platform.isIOS;
-  
-   loading (){
-     if(isIos){
-       return const Center(child: CupertinoActivityIndicator());
-     }else{
-       return const Center(child: CryptoLoading());
-     }
+
+  loading() {
+    if (isIos) {
+      return const Center(child: CupertinoActivityIndicator());
+    } else {
+      return const Center(child: CryptoLoading());
+    }
   }
 
   @override
@@ -42,7 +43,7 @@ class _WalletScreenState extends State<WalletScreen> {
       body: BlocBuilder<WalletBloc, WalletState>(
         builder: (context, state) {
           if (state is WalletLoading && state is! WalletLoaded) {
-            return  loading();
+            return loading();
           }
 
           String balance = "0.00";
@@ -229,7 +230,7 @@ class _WalletScreenState extends State<WalletScreen> {
                     ],
                   ),
                   Container(
-                    color: const Color(0xFFEBF2F7),
+                    color: Colors.grey.shade100,
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 20,
@@ -266,8 +267,9 @@ class _WalletScreenState extends State<WalletScreen> {
                             : 'Transaction',
                         subtitle: _formatDate(tx.createdAt),
                         amount:
-                            '${tx.type == 'top_up' ? '+' : '-'}${tx.currency} ${tx.amount.toStringAsFixed(2)}',
-                        isOutgoing: tx.type != 'top_up',
+                            '${tx.status == 'pending' ? '-' : (tx.type == 'top_up' ? '+' : '-')}${tx.currency} ${tx.amount.toStringAsFixed(2)}',
+                        isOutgoing:
+                            tx.status == 'pending' || tx.type != 'top_up',
                         status: tx.status,
                       ),
                     ),
@@ -375,7 +377,9 @@ class _WalletScreenState extends State<WalletScreen> {
               fontSize: 16,
               fontWeight: FontWeight.bold,
               fontFamily: 'Lufga',
-              color: isOutgoing ? Colors.black : const Color(0xFF4CAF50),
+              color: status == 'pending'
+                  ? Colors.red
+                  : (isOutgoing ? Colors.black : const Color(0xFF4CAF50)),
             ),
           ),
         ],

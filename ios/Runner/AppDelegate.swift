@@ -19,26 +19,21 @@ import UserNotifications
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
         GMSServices.provideAPIKey("AIzaSyCyWXFiBQAQ6qBpb3Mq_YKta4Y_dI5c4X0")
-
-        // 1. Configure Firebase first
         FirebaseApp.configure()
 
-        // 2. Initialize the shared Flutter Engine
+        // 1. Initialize the Flutter Engine correctly
         let sharedEngine = FlutterEngine(name: "shared_engine")
-        self.flutterEngine = sharedEngine  // Use the inherited 'engine' property from FlutterAppDelegate
-
-        // 3. Start the engine shell BEFORE registration.
-        // This ensures the binary messenger and task queues are ready for plugins.
+        self.flutterEngine = sharedEngine
         sharedEngine.run()
 
-        // 4. Register plugins and CarPlay setup to the running engine
+        // 2. Register plugins and CarPlay on the running engine
         GeneratedPluginRegistrant.register(with: sharedEngine)
         CarPlayManager.shared.setup(with: sharedEngine)
+        
+        NSLog("AppDelegate: Setup complete with engine: %@", sharedEngine)
 
         UNUserNotificationCenter.current().delegate = self
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) {
-            _, _ in
-        }
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
         application.registerForRemoteNotifications()
 
         return super.application(application, didFinishLaunchingWithOptions: launchOptions)
@@ -103,6 +98,7 @@ import UserNotifications
 
         private let channelName = "com.onecharge.carplay"
         private var methodChannel: FlutterMethodChannel?
+        private var dynamicServices: [[String: String]] = []
 
         func isCarPlayActive() -> Bool {
             return interfaceController != nil
@@ -128,6 +124,13 @@ import UserNotifications
                 let lng = args?["longitude"] as? Double
                 showBookingSuccessAlert(latitude: lat, longitude: lng)
                 result(nil)
+            case "updateServices":
+                let args = call.arguments as? [String: Any]
+                if let services = args?["services"] as? [[String: String]] {
+                    self.dynamicServices = services
+                    refreshRootTemplate()
+                }
+                result(nil)
             default:
                 result(FlutterMethodNotImplemented)
             }
@@ -139,35 +142,77 @@ import UserNotifications
         ) {
             self.interfaceController = interfaceController
             print("CarPlayManager: Connected")
+            refreshRootTemplate()
+        }
 
-            let charging = CPListItem(
-                text: "Charging Station", detailText: "Emergency charging support")
-            charging.setImage(UIImage(systemName: "bolt.car.fill"))
-            charging.handler = { [weak self] _, completion in
-                self?.confirmBooking(category: "Charging Station")
-                completion()
-            }
+        private func refreshRootTemplate() {
+            guard let interfaceController = interfaceController else { return }
 
-            let flatTyre = CPListItem(text: "Flat Tyre", detailText: "Tyre repair or replacement")
-            flatTyre.setImage(UIImage(systemName: "tire"))
-            flatTyre.handler = { [weak self] _, completion in
-                self?.confirmBooking(category: "Flat Tyre")
-                completion()
-            }
-
-            let lowBattery = CPListItem(
-                text: "Low Battery", detailText: "Battery boost or replacement")
-            lowBattery.setImage(UIImage(systemName: "battery.25"))
-            lowBattery.handler = { [weak self] _, completion in
-                self?.confirmBooking(category: "Low Battery")
-                completion()
-            }
-
+            let items = createListItems()
             let serviceSection = CPListSection(
-                items: [charging, flatTyre, lowBattery], header: "Our Services",
+                items: items, header: "Our Services",
                 sectionIndexTitle: nil)
             let rootTemplate = CPListTemplate(title: "OneCharge", sections: [serviceSection])
             interfaceController.setRootTemplate(rootTemplate, animated: true, completion: nil)
+        }
+
+        private func createListItems() -> [CPListItem] {
+            if dynamicServices.isEmpty {
+                // Fallback to defaults if no dynamic services are loaded yet
+                let charging = CPListItem(text: "Charging Station", detailText: "Emergency support")
+                charging.setImage(UIImage(systemName: "bolt.car.fill"))
+                charging.handler = { [weak self] _, completion in
+                    self?.confirmBooking(category: "Charging Station")
+                    completion()
+                }
+
+                let flatTyre = CPListItem(text: "Flat Tyre", detailText: "Repair or replacement")
+                flatTyre.setImage(UIImage(systemName: "tire"))
+                flatTyre.handler = { [weak self] _, completion in
+                    self?.confirmBooking(category: "Flat Tyre")
+                    completion()
+                }
+
+                let lowBattery = CPListItem(text: "Low Battery", detailText: "Boost or replacement")
+                lowBattery.setImage(UIImage(systemName: "battery.25"))
+                lowBattery.handler = { [weak self] _, completion in
+                    self?.confirmBooking(category: "Low Battery")
+                    completion()
+                }
+                return [charging, flatTyre, lowBattery]
+            }
+
+            return dynamicServices.map { service in
+                let name = service["name"] ?? "Unknown"
+                let detail = service["detail"] ?? "Service available"
+                let item = CPListItem(text: name, detailText: detail)
+                item.setImage(getIcon(for: name))
+                item.handler = { [weak self] _, completion in
+                    self?.confirmBooking(category: name)
+                    completion()
+                }
+                return item
+            }
+        }
+
+        private func getIcon(for name: String) -> UIImage? {
+            let lowerName = name.lowercased()
+            if lowerName.contains("station") || lowerName.contains("charge") {
+                return UIImage(systemName: "bolt.car.fill")
+            }
+            if lowerName.contains("battery") {
+                return UIImage(systemName: "battery.25")
+            }
+            if lowerName.contains("tire") || lowerName.contains("tyre") {
+                return UIImage(systemName: "tire")
+            }
+            if lowerName.contains("mechanical") || lowerName.contains("engine") {
+                return UIImage(systemName: "wrench.and.screwdriver.fill")
+            }
+            if lowerName.contains("tow") || lowerName.contains("pickup") {
+                return UIImage(systemName: "truck.box.fill")
+            }
+            return UIImage(systemName: "questionmark.circle")
         }
 
         func templateApplicationScene(

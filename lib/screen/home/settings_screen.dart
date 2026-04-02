@@ -6,6 +6,7 @@ import 'package:onecharge/screen/home/my_vehicle_screen.dart';
 import 'package:onecharge/screen/home/profile_screen.dart';
 import 'package:onecharge/screen/home/recent_bookings_screen.dart';
 import 'package:onecharge/screen/home/terms_conditions_screen.dart';
+import 'package:onecharge/screen/shop/my_orders_screen.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:onecharge/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:onecharge/features/auth/presentation/bloc/auth_event.dart';
@@ -402,6 +403,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     context,
                     MaterialPageRoute(
                       builder: (context) => const RecentBookingsScreen(),
+                    ),
+                  );
+                },
+              ),
+              _buildMenuItem(
+                Icons.shopping_bag_outlined,
+                'My Orders',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const MyOrdersScreen(),
                     ),
                   );
                 },

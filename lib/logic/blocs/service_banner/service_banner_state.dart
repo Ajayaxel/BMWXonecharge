@@ -13,12 +13,12 @@ class ServiceBannerInitial extends ServiceBannerState {}
 class ServiceBannerLoading extends ServiceBannerState {}
 
 class ServiceBannerLoaded extends ServiceBannerState {
-  final ServiceBanner banner;
+  final List<ServiceBanner> banners;
 
-  const ServiceBannerLoaded(this.banner);
+  const ServiceBannerLoaded(this.banners);
 
   @override
-  List<Object?> get props => [banner];
+  List<Object?> get props => [banners];
 }
 
 class ServiceBannerError extends ServiceBannerState {

@@ -11,8 +11,8 @@ class ServiceBannerBloc extends Bloc<ServiceBannerEvent, ServiceBannerState> {
     on<FetchServiceBanner>((event, emit) async {
       emit(ServiceBannerLoading());
       try {
-        final banner = await serviceBannerRepository.getServiceBanner();
-        emit(ServiceBannerLoaded(banner));
+        final banners = await serviceBannerRepository.getServiceBanner();
+        emit(ServiceBannerLoaded(banners));
       } catch (e) {
         emit(ServiceBannerError(e.toString()));
       }

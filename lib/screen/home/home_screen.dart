@@ -4,6 +4,9 @@ import 'package:onecharge/screen/home/issue_reporting_bottom_sheet.dart';
 import 'package:onecharge/screen/home/widgets/service_notification.dart';
 import 'package:onecharge/screen/home/widgets/feedback_bottom_sheet.dart';
 import 'package:onecharge/screen/home/widgets/cancellation_bottom_sheet.dart';
+import 'package:onecharge/screen/home/widgets/home_services.dart';
+import 'package:onecharge/screen/home/widgets/home_products.dart';
+
 import 'package:onecharge/screen/home/settings_screen.dart';
 import 'package:onecharge/screen/home/tracking_map_screen.dart';
 import 'package:onecharge/logic/services/realtime_service.dart';
@@ -52,6 +55,8 @@ import 'package:onecharge/logic/blocs/vehicle_model/vehicle_model_bloc.dart';
 import 'package:onecharge/logic/blocs/charging_type/charging_type_bloc.dart';
 import 'package:onecharge/logic/blocs/service_banner/service_banner_bloc.dart';
 import 'package:onecharge/logic/blocs/service_banner/service_banner_state.dart';
+import 'package:onecharge/logic/blocs/shop_category/shop_category_bloc.dart';
+import 'package:onecharge/logic/blocs/shop_category/shop_category_event.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -79,6 +84,9 @@ class HomeScreenState extends State<HomeScreen> {
   String _searchQuery = '';
   Ticket? _currentTicket;
   bool _isConnectingRealtime = false;
+  final PageController _bannerController = PageController();
+  int _currentBannerIndex = 0;
+  Timer? _bannerTimer;
 
   /// Returns true if the driver's last location update is within the last
   /// [maxAgeMinutes] minutes (default: 30), meaning it is fresh enough to use.
@@ -343,6 +351,31 @@ class HomeScreenState extends State<HomeScreen> {
     _loadUserName();
     _fetchInitialData();
     CarPlayService.setupHandler();
+    
+    // Initial CarPlay sync if categories are already loaded
+    final initialCategoryState = context.read<IssueCategoryBloc>().state;
+    if (initialCategoryState is IssueCategoryLoaded) {
+      CarPlayService.updateServices(initialCategoryState.categories);
+    }
+    
+    _startBannerTimer();
+  }
+
+  void _startBannerTimer() {
+    _bannerTimer?.cancel();
+    _bannerTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      if (_bannerController.hasClients) {
+        final state = context.read<ServiceBannerBloc>().state;
+        if (state is ServiceBannerLoaded && state.banners.length > 1) {
+          final nextIndex = (_currentBannerIndex + 1) % state.banners.length;
+          _bannerController.animateToPage(
+            nextIndex,
+            duration: const Duration(milliseconds: 400),
+            curve: Curves.easeInOut,
+          );
+        }
+      }
+    });
   }
 
   void _fetchInitialData() {
@@ -356,6 +389,7 @@ class HomeScreenState extends State<HomeScreen> {
       context.read<ChargingTypeBloc>().add(FetchChargingTypes());
       context.read<ProfileBloc>().add(FetchProfile());
       context.read<LocationBloc>().add(FetchLocations());
+      context.read<ShopCategoryBloc>().add(FetchShopCategories());
     });
   }
 
@@ -488,8 +522,10 @@ class HomeScreenState extends State<HomeScreen> {
     activeState = null;
     _serviceTimer?.cancel();
     _pollingTimer?.cancel();
+    _bannerTimer?.cancel();
     _realtimeService?.disconnect();
     _searchController.dispose();
+    _bannerController.dispose();
     _toastEntry?.remove();
     super.dispose();
   }
@@ -1150,6 +1186,13 @@ class HomeScreenState extends State<HomeScreen> {
             }
           },
         ),
+        BlocListener<IssueCategoryBloc, IssueCategoryState>(
+          listener: (context, state) {
+            if (state is IssueCategoryLoaded) {
+              CarPlayService.updateServices(state.categories);
+            }
+          },
+        ),
       ],
       child: Scaffold(
         backgroundColor: Colors.white,
@@ -1311,6 +1354,7 @@ class HomeScreenState extends State<HomeScreen> {
                               "assets/home/mingcute_wallet-fill.png",
                               height: 25,
                               width: 25,
+                              color: Colors.black,
                             ),
                           ),
                         ),
@@ -1438,247 +1482,207 @@ class HomeScreenState extends State<HomeScreen> {
                           );
                         }
 
-                        // ── Loaded: API banner ─────────────────────────────
-                        final banner = (state as ServiceBannerLoaded).banner;
-                        return ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Stack(
-                            children: [
-                              // Background image
-                              Image.network(
-                                banner.bgImage,
-                                width: double.infinity,
-                                height: 180,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) =>
-                                    Image.asset(
-                                      'assets/home/bannerBG.png',
-                                      width: double.infinity,
-                                      height: 180,
-                                      fit: BoxFit.cover,
+                        // ── Loaded: API banners ────────────────────────────
+                        final banners = (state as ServiceBannerLoaded).banners;
+                        if (banners.isEmpty) return const SizedBox.shrink();
+
+                        return Column(
+                          children: [
+                            SizedBox(
+                              height: 180,
+                              child: PageView.builder(
+                                controller: _bannerController,
+                                onPageChanged: (index) {
+                                  setState(() {
+                                    _currentBannerIndex = index;
+                                  });
+                                },
+                                itemCount: banners.length,
+                                itemBuilder: (context, index) {
+                                  final banner = banners[index];
+                                  return Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 0,
                                     ),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: Stack(
+                                        children: [
+                                          // Background image
+                                          Image.network(
+                                            banner.bgImage,
+                                            width: double.infinity,
+                                            height: 180,
+                                            fit: BoxFit.cover,
+                                            errorBuilder:
+                                                (context, error, stackTrace) =>
+                                                    Image.asset(
+                                                      'assets/home/bannerBG.png',
+                                                      width: double.infinity,
+                                                      height: 180,
+                                                      fit: BoxFit.cover,
+                                                    ),
+                                          ),
+                                          // Dark gradient so text is always readable
+                                          Positioned.fill(
+                                            child: DecoratedBox(
+                                              decoration: BoxDecoration(
+                                                gradient: LinearGradient(
+                                                  begin: Alignment.centerLeft,
+                                                  end: Alignment.centerRight,
+                                                  colors: [
+                                                    Colors.black.withOpacity(
+                                                      0.55,
+                                                    ),
+                                                    Colors.black.withOpacity(
+                                                      0.10,
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                          // Text & code chip
+                                          Positioned(
+                                            top: 20,
+                                            left: 20,
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                SizedBox(
+                                                  width: 160,
+                                                  child: Text(
+                                                    () {
+                                                      final words = banner.title
+                                                          .split(' ');
+                                                      if (words.length <= 1) {
+                                                        return banner.title;
+                                                      }
+                                                      final mid = (words.length /
+                                                              2)
+                                                          .ceil();
+                                                      return '${words.take(mid).join(' ')}\n${words.skip(mid).join(' ')}';
+                                                    }(),
+                                                    style: const TextStyle(
+                                                      color: Colors.white,
+                                                      fontSize: 17,
+                                                      fontWeight: FontWeight.w500,
+                                                      fontFamily: 'Lufga',
+                                                      height: 1.2,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 15),
+                                                // Code pill chip — tap to copy
+                                                GestureDetector(
+                                                  onTap: () {
+                                                    Clipboard.setData(
+                                                      ClipboardData(
+                                                        text: banner.code,
+                                                      ),
+                                                    );
+                                                    showToast(
+                                                      'Code "${banner.code}" copied!',
+                                                    );
+                                                  },
+                                                  child: Container(
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
+                                                          horizontal: 10,
+                                                          vertical: 4,
+                                                        ),
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.white
+                                                          .withOpacity(0.20),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            20,
+                                                          ),
+                                                      border: Border.all(
+                                                        color: Colors.white
+                                                            .withOpacity(0.50),
+                                                        width: 1,
+                                                      ),
+                                                    ),
+                                                    child: Row(
+                                                      mainAxisSize:
+                                                          MainAxisSize.min,
+                                                      children: [
+                                                        Text(
+                                                          'USECODE ${banner.code}',
+                                                          style: const TextStyle(
+                                                            color: Colors.white,
+                                                            fontSize: 12,
+                                                            fontWeight:
+                                                                FontWeight.w600,
+                                                            fontFamily: 'Lufga',
+                                                            letterSpacing: 0.5,
+                                                            overflow:
+                                                                TextOverflow
+                                                                    .ellipsis,
+                                                          ),
+                                                        ),
+                                                        const SizedBox(
+                                                          width: 5,
+                                                        ),
+                                                        const Icon(
+                                                          Icons.copy_rounded,
+                                                          color: Colors.white,
+                                                          size: 12,
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
                               ),
-                              // Dark gradient so text is always readable
-                              Positioned.fill(
-                                child: DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      begin: Alignment.centerLeft,
-                                      end: Alignment.centerRight,
-                                      colors: [
-                                        Colors.black.withOpacity(0.55),
-                                        Colors.black.withOpacity(0.10),
-                                      ],
+                            ),
+                            if (banners.length > 1) ...[
+                              const SizedBox(height: 8),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: List.generate(
+                                  banners.length,
+                                  (index) => Container(
+                                    width: 8,
+                                    height: 8,
+                                    margin: const EdgeInsets.symmetric(
+                                      horizontal: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: _currentBannerIndex == index
+                                          ? Colors.black
+                                          : Colors.grey.shade300,
                                     ),
                                   ),
                                 ),
                               ),
-                              // Text & code chip
-                              Positioned(
-                                top: 20,
-                                left: 20,
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    SizedBox(
-                                      width: 160,
-                                      child: Text(
-                                        () {
-                                          final words = banner.title.split(' ');
-                                          if (words.length <= 1) {
-                                            return banner.title;
-                                          }
-                                          final mid = (words.length / 2).ceil();
-                                          return '${words.take(mid).join(' ')}\n${words.skip(mid).join(' ')}';
-                                        }(),
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 17,
-                                          fontWeight: FontWeight.w500,
-                                          fontFamily: 'Lufga',
-                                          height: 1.2,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 15),
-                                    // Code pill chip — tap to copy
-                                    GestureDetector(
-                                      onTap: () {
-                                        Clipboard.setData(
-                                          ClipboardData(text: banner.code),
-                                        );
-                                        showToast(
-                                          'Code "${banner.code}" copied!',
-                                        );
-                                      },
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 10,
-                                          vertical: 4,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white.withOpacity(0.20),
-                                          borderRadius: BorderRadius.circular(
-                                            20,
-                                          ),
-                                          border: Border.all(
-                                            color: Colors.white.withOpacity(
-                                              0.50,
-                                            ),
-                                            width: 1,
-                                          ),
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Text(
-                                              'USECODE ${banner.code}',
-                                              style: const TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w600,
-                                                fontFamily: 'Lufga',
-                                                letterSpacing: 0.5,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                            const SizedBox(width: 5),
-                                            const Icon(
-                                              Icons.copy_rounded,
-                                              color: Colors.white,
-                                              size: 12,
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
                             ],
-                          ),
+                          ],
                         );
                       },
                     ),
                     const SizedBox(height: 16),
-                    const Text(
-                      'Our Services',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        fontFamily: 'Lufga',
-                        color: Colors.black,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    // Services Grid
-                    BlocBuilder<IssueCategoryBloc, IssueCategoryState>(
-                      builder: (context, state) {
-                        if (state is IssueCategoryLoading) {
-                          return LayoutBuilder(
-                            builder: (context, constraints) {
-                              final double cardWidth =
-                                  (constraints.maxWidth - 13) / 2;
-                              return Wrap(
-                                spacing: 13,
-                                runSpacing: 13,
-                                children: List.generate(6, (index) {
-                                  return _buildShimmerServiceCard(cardWidth);
-                                }),
-                              );
-                            },
-                          );
-                        } else if (state is IssueCategoryError) {
-                          return Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  Icons.wifi_off_rounded,
-                                  size: 40,
-                                  color: Colors.grey,
-                                ),
-                                const SizedBox(height: 12),
-                                const Text(
-                                  "Couldn't load services",
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                    fontFamily: 'Lufga',
-                                    color: Colors.black,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  "Please check your internet connection",
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey.shade600,
-                                    fontFamily: 'Lufga',
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                SizedBox(
-                                  width: 120,
-                                  child: OneBtn(
-                                    text: "Retry",
-                                    onPressed: () {
-                                      context.read<IssueCategoryBloc>().add(
-                                        FetchIssueCategories(),
-                                      );
-                                    },
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        } else if (state is IssueCategoryLoaded) {
-                          // Filter out 'Other' if it exists in the API list to avoid duplication
-                          // Also filter out categories with null names
-                          var categories = state.categories
-                              .where((c) => c.name != null)
-                              .toList();
-
-                          if (_searchQuery.isNotEmpty) {
-                            categories = categories
-                                .where(
-                                  (c) => (c.name ?? '').toLowerCase().contains(
-                                    _searchQuery,
-                                  ),
-                                )
-                                .toList();
-                          }
-
-                          return LayoutBuilder(
-                            builder: (context, constraints) {
-                              final double cardWidth =
-                                  (constraints.maxWidth - 13) / 2;
-                              return Wrap(
-                                spacing: 13,
-                                runSpacing: 13,
-                                children: [
-                                  ...List.generate(categories.length, (index) {
-                                    final category = categories[index];
-                                    final categoryName =
-                                        category.name ?? 'Unknown';
-                                    return _buildServiceCard(
-                                      index,
-                                      categoryName,
-                                      _getCategoryIcon(categoryName),
-                                      cardWidth,
-                                      imageUrl: category.imageUrl,
-                                    );
-                                  }),
-                                ],
-                              );
-                            },
-                          );
-                        }
-                        return const SizedBox();
+                    HomeServices(
+                      searchQuery: _searchQuery,
+                      onServiceSelected: (categoryName) {
+                        _showVehicleSelectionBottomSheet(categoryName);
                       },
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 24),
+                    const HomeProducts(),
+                    const SizedBox(height: 100), // Bottom padding for scrolling
                   ],
                 ),
               ),
@@ -1767,188 +1771,6 @@ class HomeScreenState extends State<HomeScreen> {
                 ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  String _getCategoryIcon(String name) {
-    final lowerName = name.toLowerCase();
-    // Prioritize charging/station to distinguish from low battery
-    if (lowerName.contains('station') || lowerName.contains('charge')) {
-      return 'assets/home/chargingsation.png';
-    }
-    if (lowerName.contains('battery')) return 'assets/home/lowbattery.png';
-    if (lowerName.contains('mechanical') || lowerName.contains('engine')) {
-      return 'assets/home/mechanicalisuue.png';
-    }
-    if (lowerName.contains('tire') || lowerName.contains('tyre')) {
-      return 'assets/home/falttyre.png';
-    }
-    if (lowerName.contains('tow') || lowerName.contains('pickup')) {
-      return 'assets/home/pickupreqiure.png';
-    }
-    return '';
-  }
-
-  Widget _buildServiceCard(
-    int index,
-    String title,
-    String imagePath,
-    double width, {
-    String? imageUrl,
-  }) {
-    bool isSelected = selectedIndex == index;
-    bool isOther = title == 'Other';
-
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          selectedIndex = index;
-        });
-        _showVehicleSelectionBottomSheet(title);
-      },
-      child: Container(
-        width: width,
-        height: 150,
-        decoration: BoxDecoration(
-          color: isSelected ? Colors.black : const Color(0xffF5F5F5),
-          borderRadius: BorderRadius.circular(15),
-        ),
-        child: Stack(
-          children: [
-            if (!isOther)
-              Padding(
-                padding: const EdgeInsets.all(15),
-                child: Text(
-                  title,
-                  style: TextStyle(
-                    color: isSelected ? Colors.white : Colors.black,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    fontFamily: 'Lufga',
-                    height: 1.2,
-                  ),
-                ),
-              ),
-            if (!isOther && (imagePath.isNotEmpty || imageUrl != null))
-              (title.toLowerCase().contains('tow') ||
-                      title.toLowerCase().contains('pickup'))
-                  ? Positioned(
-                      right: -10,
-                      top: 40,
-                      bottom: 0,
-                      child: imageUrl != null
-                          ? Image.network(
-                              imageUrl,
-                              width: 110,
-                              fit: BoxFit.contain,
-                              color: isSelected
-                                  ? Colors.white.withOpacity(0.9)
-                                  : null,
-                              colorBlendMode: isSelected
-                                  ? BlendMode.modulate
-                                  : null,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  Image.asset(
-                                    imagePath,
-                                    width: 110,
-                                    fit: BoxFit.contain,
-                                    color: isSelected
-                                        ? Colors.white.withOpacity(0.9)
-                                        : null,
-                                    colorBlendMode: isSelected
-                                        ? BlendMode.modulate
-                                        : null,
-                                  ),
-                            )
-                          : Image.asset(
-                              imagePath,
-                              width: 110,
-                              fit: BoxFit.contain,
-                              color: isSelected
-                                  ? Colors.white.withOpacity(0.9)
-                                  : null,
-                              colorBlendMode: isSelected
-                                  ? BlendMode.modulate
-                                  : null,
-                            ),
-                    )
-                  : Positioned.fill(
-                      top: 30,
-                      child: Center(
-                        child: imageUrl != null
-                            ? Image.network(
-                                imageUrl,
-                                width: title.contains('Station') ? 60 : 120,
-                                height: title.contains('Station') ? 90 : 80,
-                                fit: BoxFit.contain,
-                                color: isSelected
-                                    ? Colors.white.withOpacity(0.9)
-                                    : null,
-                                colorBlendMode: isSelected
-                                    ? BlendMode.modulate
-                                    : null,
-                                errorBuilder: (context, error, stackTrace) =>
-                                    Image.asset(
-                                      imagePath,
-                                      width: title.contains('Station')
-                                          ? 60
-                                          : 120,
-                                      height: title.contains('Station')
-                                          ? 90
-                                          : 80,
-                                      fit: BoxFit.contain,
-                                      color: isSelected
-                                          ? Colors.white.withOpacity(0.9)
-                                          : null,
-                                      colorBlendMode: isSelected
-                                          ? BlendMode.modulate
-                                          : null,
-                                    ),
-                              )
-                            : Image.asset(
-                                imagePath,
-                                width: title.contains('Station') ? 60 : 120,
-                                height: title.contains('Station') ? 90 : 80,
-                                fit: BoxFit.contain,
-                                color: isSelected
-                                    ? Colors.white.withOpacity(0.9)
-                                    : null,
-                                colorBlendMode: isSelected
-                                    ? BlendMode.modulate
-                                    : null,
-                              ),
-                      ),
-                    ),
-            if (isOther)
-              Center(
-                child: Text(
-                  'Other',
-                  style: TextStyle(
-                    color: isSelected ? Colors.white : Colors.black,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    fontFamily: 'Lufga',
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildShimmerServiceCard(double width) {
-    return Shimmer.fromColors(
-      baseColor: const Color(0xffE0E0E0),
-      highlightColor: Colors.white,
-      child: Container(
-        width: width,
-        height: 150,
-        decoration: BoxDecoration(
-          color: const Color(0xffF5F5F5),
-          borderRadius: BorderRadius.circular(15),
         ),
       ),
     );

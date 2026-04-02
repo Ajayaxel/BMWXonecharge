@@ -38,6 +38,16 @@ import 'package:onecharge/logic/blocs/service_banner/service_banner_bloc.dart';
 import 'package:onecharge/logic/blocs/service_banner/service_banner_event.dart';
 import 'package:onecharge/data/repositories/wallet_repository.dart';
 import 'package:onecharge/logic/blocs/wallet/wallet_bloc.dart';
+import 'package:onecharge/data/repositories/product_repository.dart';
+import 'package:onecharge/logic/blocs/product/product_bloc.dart';
+import 'package:onecharge/logic/blocs/product/product_event.dart';
+import 'package:onecharge/logic/blocs/product_detail/product_detail_bloc.dart';
+import 'package:onecharge/logic/blocs/wishlist/wishlist_bloc.dart';
+import 'package:onecharge/logic/blocs/cart/cart_bloc.dart';
+import 'package:onecharge/logic/blocs/cart/cart_event.dart';
+import 'package:onecharge/logic/blocs/order/order_bloc.dart';
+import 'package:onecharge/logic/blocs/shop_category/shop_category_bloc.dart';
+import 'package:onecharge/logic/blocs/shop_category/shop_category_event.dart';
 import 'firebase_options.dart';
 
 // New Architecture Imports
@@ -91,6 +101,7 @@ void main() async {
   final companyCodeRepository = CompanyCodeRepository(apiClient: apiClient);
   final serviceBannerRepository = ServiceBannerRepository(apiClient: apiClient);
   final walletRepository = WalletRepository(apiClient: apiClient);
+  final productRepository = ProductRepository(apiClient: apiClient);
 
   runApp(
     MultiRepositoryProvider(
@@ -116,6 +127,7 @@ void main() async {
           value: serviceBannerRepository,
         ),
         RepositoryProvider<WalletRepository>.value(value: walletRepository),
+        RepositoryProvider<ProductRepository>.value(value: productRepository),
       ],
       child: MultiBlocProvider(
         providers: [
@@ -195,6 +207,27 @@ void main() async {
           BlocProvider<WalletBloc>(
             create: (context) =>
                 WalletBloc(walletRepository: walletRepository),
+          ),
+          BlocProvider<ProductBloc>(
+            create: (context) => ProductBloc(productRepository: productRepository)
+              ..add(FetchProductsEvent()),
+          ),
+          BlocProvider<ProductDetailBloc>(
+            create: (context) => ProductDetailBloc(productRepository: productRepository),
+          ),
+          BlocProvider<WishlistBloc>(
+            create: (context) => WishlistBloc(productRepository: productRepository),
+          ),
+          BlocProvider<CartBloc>(
+            create: (context) => CartBloc(productRepository: productRepository)
+              ..add(FetchCartEvent()),
+          ),
+          BlocProvider<OrderBloc>(
+            create: (context) => OrderBloc(productRepository: productRepository),
+          ),
+          BlocProvider<ShopCategoryBloc>(
+            create: (context) => ShopCategoryBloc(productRepository: productRepository)
+              ..add(FetchShopCategories()),
           ),
         ],
         child: const MyApp(),

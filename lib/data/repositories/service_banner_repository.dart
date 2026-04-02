@@ -6,12 +6,12 @@ class ServiceBannerRepository {
 
   ServiceBannerRepository({required this.apiClient});
 
-  Future<ServiceBanner> getServiceBanner() async {
+  Future<List<ServiceBanner>> getServiceBanner() async {
     try {
       final response = await apiClient.get('/customer/service-banner');
       if (response.data['success'] == true) {
-        final bannerJson = response.data['data']['banner'];
-        return ServiceBanner.fromJson(bannerJson);
+        final List<dynamic> bannersJson = response.data['data']['banners'] ?? [];
+        return bannersJson.map((json) => ServiceBanner.fromJson(json)).toList();
       } else {
         throw Exception(
           'Failed to load service banner: ${response.data['message']}',

@@ -856,7 +856,12 @@ class _LocationMapScreenState extends State<LocationMapScreen> {
                 onTap: () {
                   setState(() {
                     _selectedFloorCategory = cat;
-                    _selectedFloorValue = _floorMap[cat]![0];
+                    final floors = _floorMap[cat] ?? [];
+                    if (floors.isNotEmpty) {
+                      _selectedFloorValue = floors[0];
+                    } else {
+                      _selectedFloorValue = "";
+                    }
                   });
                 },
                 child: Container(
