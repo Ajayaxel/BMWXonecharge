@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:onecharge/const/onebtn.dart';
 import 'package:onecharge/logic/blocs/cart/cart_bloc.dart';
-import 'package:onecharge/logic/blocs/cart/cart_state.dart';
-import 'package:onecharge/logic/blocs/cart/cart_event.dart';
 import 'package:onecharge/models/cart_model.dart';
 import 'package:onecharge/screen/shop/checkout_screen.dart';
 import 'package:onecharge/utils/toast_utils.dart';
@@ -66,6 +64,7 @@ class CartScreen extends StatelessWidget {
                     ),
                   ),
                   _buildOrderSummary(context, cart),
+                  SizedBox(height: 40),
                 ],
               );
             } else if (state is CartFailure) {
@@ -189,52 +188,40 @@ class CartScreen extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 4,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF3F4F6),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        children: [
-                          _buildQtyButton(
-                            icon: Icons.remove,
-                            onTap: () {
-                              if (item.quantity > 1) {
-                                context.read<CartBloc>().add(
-                                  UpdateCartQuantityEvent(
-                                    productId: item.product.id,
-                                    quantity: item.quantity - 1,
-                                  ),
-                                );
-                              }
-                            },
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            child: Text(
-                              '${item.quantity}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                          _buildQtyButton(
-                            icon: Icons.add,
-                            onTap: () {
+                    Row(
+                      children: [
+                        _buildQtyButton(
+                          icon: Icons.remove,
+                          onTap: () {
+                            if (item.quantity > 1) {
                               context.read<CartBloc>().add(
                                 UpdateCartQuantityEvent(
                                   productId: item.product.id,
-                                  quantity: item.quantity + 1,
+                                  quantity: item.quantity - 1,
                                 ),
                               );
-                            },
+                            }
+                          },
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child: Text(
+                            '${item.quantity}',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
-                        ],
-                      ),
+                        ),
+                        _buildQtyButton(
+                          icon: Icons.add,
+                          onTap: () {
+                            context.read<CartBloc>().add(
+                              UpdateCartQuantityEvent(
+                                productId: item.product.id,
+                                quantity: item.quantity + 1,
+                              ),
+                            );
+                          },
+                        ),
+                      ],
                     ),
                     const SizedBox(width: 8),
                     Flexible(
@@ -279,61 +266,82 @@ class CartScreen extends StatelessWidget {
   Widget _buildOrderSummary(BuildContext context, CartData cart) {
     return Container(
       padding: const EdgeInsets.all(24),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(30),
+          topRight: Radius.circular(30),
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black12,
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 20,
-            offset: Offset(0, -5),
+            offset: const Offset(0, -5),
           ),
         ],
       ),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text('Total Items', style: TextStyle(color: Colors.grey)),
-              Text(
-                '${cart.totalCount}',
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Grand Total',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-              ),
-              Text(
-                '${cart.currency} ${cart.totalPrice}',
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 20,
-                  color: Colors.black,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          OneBtn(
-            text: 'Checkout',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => CheckoutScreen(cart: cart),
-                ),
-              );
-            },
-          ),
-        ],
+      child: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            _buildSummaryRow('Subtotal', '${cart.currency} ${cart.totalPrice}'),
+            const SizedBox(height: 12),
+            _buildSummaryRow('Shipping', 'Free', isGreen: true),
+            const SizedBox(height: 16),
+            const Divider(height: 1, color: Color(0xFFF3F4F6)),
+            const SizedBox(height: 16),
+            _buildSummaryRow(
+              'Total',
+              '${cart.currency} ${cart.totalPrice}',
+              isTotal: true,
+            ),
+            const SizedBox(height: 24),
+            OneBtn(
+              text: 'Checkout',
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => CheckoutScreen(cart: cart),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildSummaryRow(
+    String label,
+    String value, {
+    bool isTotal = false,
+    bool isGreen = false,
+  }) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: isTotal ? 18 : 14,
+            fontWeight: isTotal ? FontWeight.w700 : FontWeight.w500,
+            color: isTotal ? Colors.black : Colors.grey,
+            fontFamily: 'Lufga',
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: isTotal ? 18 : 14,
+            fontWeight: isTotal ? FontWeight.w700 : FontWeight.w600,
+            color: isGreen ? const Color(0xFF10B981) : Colors.black,
+            fontFamily: 'Lufga',
+          ),
+        ),
+      ],
     );
   }
 }

@@ -19,7 +19,7 @@ import 'package:onecharge/models/add_vehicle_model.dart';
 import 'package:onecharge/logic/blocs/add_vehicle/add_vehicle_bloc.dart';
 import 'package:onecharge/logic/blocs/add_vehicle/add_vehicle_event.dart';
 import 'package:onecharge/logic/blocs/add_vehicle/add_vehicle_state.dart';
-import 'package:onecharge/screen/home/home_screen.dart';
+import 'package:onecharge/screen/home/main_screen.dart';
 import 'package:onecharge/utils/toast_utils.dart';
 
 class VehicleSelection extends StatefulWidget {
@@ -243,7 +243,7 @@ class _VehicleSelectionState extends State<VehicleSelection> {
               onTap: () {
                 Navigator.pushReplacement(
                   context,
-                  MaterialPageRoute(builder: (context) => const HomeScreen()),
+                  MaterialPageRoute(builder: (context) => const MainScreen()),
                 );
               },
               child: const Padding(
@@ -1375,7 +1375,7 @@ class _VehicleSelectionState extends State<VehicleSelection> {
                     Navigator.pushAndRemoveUntil(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const HomeScreen(),
+                        builder: (context) => const MainScreen(),
                       ),
                       (route) => false,
                     );

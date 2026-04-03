@@ -2,11 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:onecharge/logic/blocs/product/product_bloc.dart';
 import 'package:onecharge/logic/blocs/product/product_state.dart';
-import 'package:onecharge/logic/blocs/wishlist/wishlist_bloc.dart';
-import 'package:onecharge/logic/blocs/wishlist/wishlist_event.dart';
-import 'package:onecharge/logic/blocs/wishlist/wishlist_state.dart';
 import 'package:onecharge/models/product_model.dart';
-import 'package:onecharge/screen/shop/product_detail_screen.dart';
+import 'package:onecharge/widgets/premium_product_card.dart';
 
 class AllProductsScreen extends StatefulWidget {
   final String? title;
@@ -42,17 +39,18 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
 
   void _applySort() {
     setState(() {
-      // First, get the baseline products (either from widget or BLoC result)
-      // Note: this assumes we only sort the current view's list.
       List<ProductModel> baselineProducts = widget.products != null
           ? List.from(widget.products!)
           : (context.read<ProductBloc>().state is ProductLoaded
-              ? List.from((context.read<ProductBloc>().state as ProductLoaded).data.data)
-              : []);
+                ? List.from(
+                    (context.read<ProductBloc>().state as ProductLoaded)
+                        .data
+                        .data,
+                  )
+                : []);
 
       if (baselineProducts.isEmpty) return;
 
-      // Filter by availability if toggled
       if (_showAvailableOnly) {
         baselineProducts = baselineProducts.where((p) => p.stock > 0).toList();
       }
@@ -76,7 +74,6 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
           baselineProducts.sort((a, b) => b.id.compareTo(a.id));
           break;
         case 'Rating':
-          // Proxy sort by name for now
           baselineProducts.sort((a, b) => a.name.compareTo(b.name));
           break;
       }
@@ -111,11 +108,7 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
         centerTitle: true,
         actions: [
           IconButton(
-            icon: const Icon(
-              Icons.tune,
-              color: Colors.black,
-              size: 24,
-            ),
+            icon: const Icon(Icons.tune, color: Colors.black, size: 24),
             onPressed: () => _showFilterBottomSheet(),
             tooltip: 'Filter & Sort',
           ),
@@ -135,7 +128,6 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
                         if (allProducts.isEmpty) {
                           return const Center(child: Text('No products found'));
                         }
-                        // Initialize if empty or if we need to update due to BLoC reload
                         if (_sortedProducts.isEmpty && allProducts.isNotEmpty) {
                           WidgetsBinding.instance.addPostFrameCallback((_) {
                             _applySort();
@@ -246,20 +238,31 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
                                   });
                                 },
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 20,
+                                    vertical: 12,
+                                  ),
                                   decoration: BoxDecoration(
-                                    color: isSelected ? const Color(0xFF1B1B1B) : Colors.white,
+                                    color: isSelected
+                                        ? const Color(0xFF1B1B1B)
+                                        : Colors.white,
                                     borderRadius: BorderRadius.circular(24),
                                     border: Border.all(
-                                      color: isSelected ? Colors.transparent : const Color(0xFFE5E7EB),
+                                      color: isSelected
+                                          ? Colors.transparent
+                                          : const Color(0xFFE5E7EB),
                                     ),
                                   ),
                                   child: Text(
                                     option,
                                     style: TextStyle(
-                                      color: isSelected ? Colors.white : const Color(0xFF374151),
+                                      color: isSelected
+                                          ? Colors.white
+                                          : const Color(0xFF374151),
                                       fontSize: 14,
-                                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                                      fontWeight: isSelected
+                                          ? FontWeight.w600
+                                          : FontWeight.w500,
                                       fontFamily: 'Lufga',
                                     ),
                                   ),
@@ -342,163 +345,17 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
       padding: const EdgeInsets.all(18),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        childAspectRatio: 0.75,
+        childAspectRatio: 0.65,
         crossAxisSpacing: 16,
         mainAxisSpacing: 16,
       ),
       itemCount: products.length,
       itemBuilder: (context, index) {
-        return ProductGridCard(product: products[index]);
-      },
-    );
-  }
-}
-
-class ProductGridCard extends StatefulWidget {
-  final ProductModel product;
-
-  const ProductGridCard({super.key, required this.product});
-
-  @override
-  State<ProductGridCard> createState() => _ProductGridCardState();
-}
-
-class _ProductGridCardState extends State<ProductGridCard> {
-  @override
-  void initState() {
-    super.initState();
-    context.read<WishlistBloc>().add(
-          InitializeProductWishlistStatusEvent(
-            productId: widget.product.id,
-            isWishlisted: widget.product.isWishlisted,
-          ),
+        return PremiumProductCard(
+          product: products[index],
+          categoryName: widget.title ?? 'Shop Category',
         );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return BlocListener<WishlistBloc, WishlistState>(
-      listenWhen: (previous, current) =>
-          current.error != null && current.loadingProductId == widget.product.id,
-      listener: (context, state) {
-        if (state.error != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(state.error!)),
-          );
-        }
       },
-      child: GestureDetector(
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => ProductDetailScreen(productId: widget.product.id),
-            ),
-          );
-        },
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Container(
-                  margin: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF3F4F6),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Stack(
-                    children: [
-                      Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: widget.product.mainImage.isNotEmpty
-                              ? Image.network(widget.product.mainImage, fit: BoxFit.contain)
-                              : const Icon(
-                                  Icons.image_not_supported,
-                                  color: Colors.grey,
-                                ),
-                        ),
-                      ),
-                      Positioned(
-                        top: 8,
-                        right: 8,
-                        child: BlocSelector<WishlistBloc, WishlistState, bool>(
-                          selector: (state) =>
-                              state.wishlistMap[widget.product.id] ??
-                              widget.product.isWishlisted,
-                          builder: (context, isWishlisted) {
-                            return GestureDetector(
-                              onTap: () {
-                                context.read<WishlistBloc>().add(
-                                      ToggleWishlistEvent(
-                                        productId: widget.product.id,
-                                      ),
-                                    );
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.all(6),
-                                decoration: const BoxDecoration(
-                                  color: Colors.white,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(
-                                  isWishlisted ? Icons.favorite : Icons.favorite_border,
-                                  color: isWishlisted ? Colors.red : Colors.black,
-                                  size: 16,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.product.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        fontFamily: 'Lufga',
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${widget.product.currency} ${widget.product.price}',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        fontFamily: 'Lufga',
-                        color: Color(0xFF1F2937),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

@@ -5,12 +5,10 @@ import 'package:onecharge/screen/home/widgets/service_notification.dart';
 import 'package:onecharge/screen/home/widgets/feedback_bottom_sheet.dart';
 import 'package:onecharge/screen/home/widgets/cancellation_bottom_sheet.dart';
 import 'package:onecharge/screen/home/widgets/home_services.dart';
-import 'package:onecharge/screen/home/widgets/home_products.dart';
+import 'package:onecharge/screen/home/widgets/home_header.dart';
 
-import 'package:onecharge/screen/home/settings_screen.dart';
 import 'package:onecharge/screen/home/tracking_map_screen.dart';
 import 'package:onecharge/logic/services/realtime_service.dart';
-import 'package:onecharge/core/services/push_notification_service.dart';
 import 'package:onecharge/screen/vehicle/vehicle_selection.dart';
 import 'package:onecharge/const/onebtn.dart';
 import 'dart:async';
@@ -21,21 +19,16 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:onecharge/logic/blocs/issue_category/issue_category_bloc.dart';
 import 'package:onecharge/logic/blocs/issue_category/issue_category_state.dart';
 import 'package:onecharge/logic/blocs/issue_category/issue_category_event.dart';
-import 'package:onecharge/features/auth/presentation/bloc/auth_bloc.dart';
-import 'package:onecharge/features/auth/presentation/bloc/auth_state.dart';
 import 'package:onecharge/logic/blocs/vehicle_list/vehicle_list_bloc.dart';
 import 'package:onecharge/logic/blocs/vehicle_list/vehicle_list_event.dart';
 import 'package:onecharge/logic/blocs/vehicle_list/vehicle_list_state.dart';
 import 'package:onecharge/models/vehicle_list_model.dart';
 import 'package:onecharge/models/ticket_model.dart';
 import 'package:onecharge/core/storage/vehicle_storage.dart';
-import 'package:onecharge/screen/wallet/wallet_screen.dart';
 import 'package:shimmer/shimmer.dart';
-import 'package:onecharge/screen/notification/notification_screen.dart';
+import 'package:onecharge/models/location_model.dart';
 import 'package:onecharge/core/storage/location_storage.dart';
 import 'package:onecharge/core/storage/token_storage.dart';
-import 'package:onecharge/screen/home/my_location_screen.dart';
-import 'package:onecharge/models/location_model.dart';
 import 'package:onecharge/logic/blocs/location/location_bloc.dart';
 import 'package:onecharge/logic/blocs/location/location_state.dart';
 import 'package:onecharge/logic/blocs/profile/profile_bloc.dart';
@@ -341,8 +334,6 @@ class HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  String _userName = 'Mishal';
-
   @override
   void initState() {
     super.initState();
@@ -351,13 +342,13 @@ class HomeScreenState extends State<HomeScreen> {
     _loadUserName();
     _fetchInitialData();
     CarPlayService.setupHandler();
-    
+
     // Initial CarPlay sync if categories are already loaded
     final initialCategoryState = context.read<IssueCategoryBloc>().state;
     if (initialCategoryState is IssueCategoryLoaded) {
       CarPlayService.updateServices(initialCategoryState.categories);
     }
-    
+
     _startBannerTimer();
   }
 
@@ -429,9 +420,7 @@ class HomeScreenState extends State<HomeScreen> {
     final name = await TokenStorage.readUserName();
     if (name != null) {
       if (mounted) {
-        setState(() {
-          _userName = name.split(' ')[0];
-        });
+        setState(() {});
       }
     }
   }
@@ -1206,216 +1195,27 @@ class HomeScreenState extends State<HomeScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: 10),
-                    // Top Header
-                    Row(
-                      children: [
-                        GestureDetector(
-                          onTap: () async {
-                            final result = await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const SettingsScreen(),
-                              ),
-                            );
-                            if (result is LocationModel) {
-                              setState(() {
-                                currentAddress = result.name.isNotEmpty
-                                    ? result.name
-                                    : result.address;
-                                _currentLatitude = result.latitude;
-                                _currentLongitude = result.longitude;
-                              });
-                            }
-                          },
-                          child: BlocBuilder<ProfileBloc, ProfileState>(
-                            builder: (context, state) {
-                              String? imageUrl;
-                              if (state is ProfileLoaded) {
-                                imageUrl = state.customer.profileImage;
-                              } else if (state is ProfileUpdated) {
-                                imageUrl = state.customer.profileImage;
-                              } else if (state is ProfileUpdating) {
-                                imageUrl = state.currentCustomer.profileImage;
-                              }
-                              return CircleAvatar(
-                                radius: 25,
-                                backgroundImage: NetworkImage(
-                                  imageUrl ??
-                                      'https://plus.unsplash.com/premium_photo-1689568126014-06fea9d5d341?fm=jpg&q=60&w=3000&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MXx8cHJvZmlsZXxlbnwwfHwwfHx8MA%3D%3D',
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              BlocBuilder<AuthBloc, AuthState>(
-                                builder: (context, state) {
-                                  String name = _userName;
-                                  if (state is Authenticated) {
-                                    name = state.user.name.split(' ')[0];
-                                  }
-                                  return Text(
-                                    'Hi $name',
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w600,
-                                      fontFamily: 'Lufga',
-                                      color: Colors.black,
-                                    ),
-                                  );
-                                },
-                              ),
-                              const SizedBox(height: 2),
-                              GestureDetector(
-                                onTap: () async {
-                                  final result =
-                                      await Navigator.push<LocationModel>(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) =>
-                                              const MyLocationScreen(
-                                                isPicker: true,
-                                              ),
-                                        ),
-                                      );
-                                  if (result != null) {
-                                    // Sync with BLoC
-                                    context.read<LocationBloc>().add(
-                                      SelectLocation(result),
-                                    );
-
-                                    setState(() {
-                                      currentAddress = result.name.isNotEmpty
-                                          ? result.name
-                                          : result.address;
-                                      _currentLatitude = result.latitude;
-                                      _currentLongitude = result.longitude;
-                                      _selectedLocationId = result.id;
-                                    });
-
-                                    // Secondary persistence (redundant but safe)
-                                    await LocationStorage.saveSelectedLocation(
-                                      address: currentAddress,
-                                      lat: _currentLatitude,
-                                      lng: _currentLongitude,
-                                      isManual: true,
-                                      id: result.id,
-                                    );
-                                  }
-                                },
-                                child: Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.location_on,
-                                      color: Color.fromARGB(255, 23, 23, 23),
-                                      size: 14,
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Expanded(
-                                      child: Text(
-                                        currentAddress,
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          color: const Color(
-                                            0xFF1D1B20,
-                                          ).withOpacity(0.6),
-                                          fontFamily: 'Lufga',
-                                          fontWeight: FontWeight.w400,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                        maxLines: 1,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        GestureDetector(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const WalletScreen(),
-                              ),
-                            );
-                          },
-                          child: CircleAvatar(
-                            radius: 25,
-                            backgroundColor: Colors.grey.shade200,
-                            child: Image.asset(
-                              "assets/home/mingcute_wallet-fill.png",
-                              height: 25,
-                              width: 25,
-                              color: Colors.black,
-                            ),
-                          ),
-                        ),
-                        SizedBox(width: 10),
-                        GestureDetector(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    const NotificationScreen(),
-                              ),
-                            );
-                          },
-                          onLongPress: () {
-                            PushNotificationService().triggerTestNotification();
-                            showToast(
-                              "Testing Notification... Check your tray!",
-                            );
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: const BoxDecoration(
-                              color: Color(0xffF5F5F5),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.notifications_none_outlined,
-                              size: 28,
-                            ),
-                          ),
-                        ),
-                      ],
+                    HomeHeader(
+                      currentAddress: currentAddress,
+                      searchController: _searchController,
+                      onSearchChanged: (value) {
+                        setState(() {
+                          _searchQuery = value.toLowerCase();
+                        });
+                      },
+                      onLocationChanged: (result) {
+                        setState(() {
+                          currentAddress = result.name.isNotEmpty
+                              ? result.name
+                              : result.address;
+                          _currentLatitude = result.latitude;
+                          _currentLongitude = result.longitude;
+                          _selectedLocationId = result.id;
+                        });
+                      },
                     ),
-                    const SizedBox(height: 24),
-                    // Search Bar
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                      decoration: BoxDecoration(
-                        color: const Color(0xffF5F5F5),
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                      child: TextField(
-                        controller: _searchController,
-                        onChanged: (value) {
-                          setState(() {
-                            _searchQuery = value.toLowerCase();
-                          });
-                        },
-                        decoration: const InputDecoration(
-                          hintText: 'Search for any services',
-                          hintStyle: TextStyle(
-                            color: Color(0xffB8B9BD),
-                            fontSize: 14,
-                            fontFamily: 'Lufga',
-                          ),
-                          icon: Icon(Icons.search, color: Colors.grey),
-                          border: InputBorder.none,
-                        ),
-                      ),
-                    ),
+                    const SizedBox(height: 16),
+
                     const SizedBox(height: 16),
                     // Banner
                     BlocBuilder<ServiceBannerBloc, ServiceBannerState>(
@@ -1515,13 +1315,16 @@ class HomeScreenState extends State<HomeScreen> {
                                             height: 180,
                                             fit: BoxFit.cover,
                                             errorBuilder:
-                                                (context, error, stackTrace) =>
-                                                    Image.asset(
-                                                      'assets/home/bannerBG.png',
-                                                      width: double.infinity,
-                                                      height: 180,
-                                                      fit: BoxFit.cover,
-                                                    ),
+                                                (
+                                                  context,
+                                                  error,
+                                                  stackTrace,
+                                                ) => Image.asset(
+                                                  'assets/home/bannerBG.png',
+                                                  width: double.infinity,
+                                                  height: 180,
+                                                  fit: BoxFit.cover,
+                                                ),
                                           ),
                                           // Dark gradient so text is always readable
                                           Positioned.fill(
@@ -1559,15 +1362,16 @@ class HomeScreenState extends State<HomeScreen> {
                                                       if (words.length <= 1) {
                                                         return banner.title;
                                                       }
-                                                      final mid = (words.length /
-                                                              2)
-                                                          .ceil();
+                                                      final mid =
+                                                          (words.length / 2)
+                                                              .ceil();
                                                       return '${words.take(mid).join(' ')}\n${words.skip(mid).join(' ')}';
                                                     }(),
                                                     style: const TextStyle(
                                                       color: Colors.white,
                                                       fontSize: 17,
-                                                      fontWeight: FontWeight.w500,
+                                                      fontWeight:
+                                                          FontWeight.w500,
                                                       fontFamily: 'Lufga',
                                                       height: 1.2,
                                                       overflow:
@@ -1680,8 +1484,7 @@ class HomeScreenState extends State<HomeScreen> {
                         _showVehicleSelectionBottomSheet(categoryName);
                       },
                     ),
-                    const SizedBox(height: 24),
-                    const HomeProducts(),
+
                     const SizedBox(height: 100), // Bottom padding for scrolling
                   ],
                 ),

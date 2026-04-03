@@ -8,8 +8,6 @@ import 'package:onecharge/logic/blocs/wishlist/wishlist_bloc.dart';
 import 'package:onecharge/logic/blocs/wishlist/wishlist_event.dart';
 import 'package:onecharge/logic/blocs/wishlist/wishlist_state.dart';
 import 'package:onecharge/logic/blocs/cart/cart_bloc.dart';
-import 'package:onecharge/logic/blocs/cart/cart_event.dart';
-import 'package:onecharge/logic/blocs/cart/cart_state.dart';
 import 'package:onecharge/models/product_model.dart';
 import 'package:onecharge/screen/shop/cart_screen.dart';
 import 'package:onecharge/utils/toast_utils.dart';
@@ -106,71 +104,111 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           // Product Image Box
-                          Container(
-                            height: 330,
-                            decoration: BoxDecoration(
-                              borderRadius: const BorderRadius.all(
-                                Radius.circular(15),
-                              ),
-                              color: Colors.grey.shade200.withValues(
-                                alpha: 0.5,
-                              ),
-                            ),
-                            child: Container(
-                              height: 250,
-                              margin: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                borderRadius: const BorderRadius.all(
-                                  Radius.circular(15),
-                                ),
-                                color: const Color(
-                                  0xFFE9EEEC,
-                                ).withValues(alpha: 0.9),
-                              ),
-                              child: Stack(
-                                alignment: Alignment.bottomCenter,
-                                children: [
-                                  // Main Image
-                                  Center(
-                                    child: Hero(
-                                      tag: 'product_${product.id}',
-                                      child: mainImageUrl.isNotEmpty
-                                          ? Image.network(
-                                              mainImageUrl,
-                                              height: 250,
-                                              width: 250,
-                                              fit: BoxFit.contain,
-                                              errorBuilder:
-                                                  (
-                                                    context,
-                                                    error,
-                                                    stackTrace,
-                                                  ) => const Icon(
+                          // Premium Product Image Section
+                          AspectRatio(
+                            aspectRatio: 0.95,
+                            child: Stack(
+                              children: [
+                                // Main Image with dark background and curved bottom
+                                Positioned.fill(
+                                  child: ClipPath(
+                                    clipper: ProductImageClipper(),
+                                    child: Container(
+                                      decoration: const BoxDecoration(
+                                        color: Color.fromARGB(
+                                          232,
+                                          231,
+                                          234,
+                                          234,
+                                        ),
+                                        borderRadius: BorderRadius.only(
+                                          topLeft: Radius.circular(40),
+                                          topRight: Radius.circular(40),
+                                          bottomLeft: Radius.circular(40),
+                                        ),
+                                      ),
+                                      child: Center(
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(32.0),
+                                          child: Hero(
+                                            tag: 'product_${product.id}',
+                                            child: mainImageUrl.isNotEmpty
+                                                ? Image.network(
+                                                    mainImageUrl,
+                                                    fit: BoxFit.contain,
+                                                    errorBuilder:
+                                                        (
+                                                          context,
+                                                          error,
+                                                          stackTrace,
+                                                        ) => const Icon(
+                                                          Icons
+                                                              .image_not_supported,
+                                                          size: 100,
+                                                          color: Colors.grey,
+                                                        ),
+                                                  )
+                                                : const Icon(
                                                     Icons.image_not_supported,
                                                     size: 100,
                                                     color: Colors.grey,
                                                   ),
-                                            )
-                                          : const Icon(
-                                              Icons.image_not_supported,
-                                              size: 100,
-                                              color: Colors.grey,
-                                            ),
+                                          ),
+                                        ),
+                                      ),
                                     ),
                                   ),
-                                  // Thumbnail Overlay
-                                  Positioned(
-                                    bottom: 15,
+                                ),
+
+                                // Wishlist Button (Top Right)
+                                Positioned(
+                                  top: 15,
+                                  right: 15,
+                                  child: _WishlistButton(product: product),
+                                ),
+
+                                // Price Tag Pill (Bottom Right placement inside the curve)
+                                Positioned(
+                                  bottom: 0,
+                                  right: 0,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 23,
+                                      vertical: 16,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black,
+                                      borderRadius: BorderRadius.circular(40),
+                                    ),
+                                    child: Text(
+                                      '${product.currency} ${product.price.toStringAsFixed(0)}',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 14,
+                                        fontFamily: 'Lufga',
+                                      ),
+                                    ),
+                                  ),
+                                ),
+
+                                // Thumbnail Overlay (Keep this functionality)
+                                Positioned(
+                                  bottom:
+                                      45, // Positioned above the price tag cutout
+                                  left: 0,
+                                  right: 0,
+                                  child: Center(
                                     child: Container(
-                                      padding: const EdgeInsets.all(8),
+                                      padding: const EdgeInsets.all(6),
                                       decoration: BoxDecoration(
                                         color: Colors.white.withValues(
-                                          alpha: 0.1,
+                                          alpha: 0.3,
                                         ),
                                         borderRadius: BorderRadius.circular(15),
                                         border: Border.all(
                                           color: Colors.white.withValues(
-                                            alpha: 0.9,
+                                            alpha: 0.5,
                                           ),
                                         ),
                                       ),
@@ -186,8 +224,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                       ),
                                     ),
                                   ),
-                                ],
-                              ),
+                                ),
+                              ],
                             ),
                           ),
                           const SizedBox(height: 20),
@@ -219,14 +257,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                   ],
                                 ),
                               ),
-                              Text(
-                                "${product.currency} ${product.price}",
-                                style: const TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w900,
-                                  color: Color(0xFF1F2937),
-                                ),
-                              ),
+                              // Text(
+                              //   "${product.currency} ${product.price}",
+                              //   style: const TextStyle(
+                              //     fontSize: 22,
+                              //     fontWeight: FontWeight.w900,
+                              //     color: Color(0xFF1F2937),
+                              //   ),
+                              // ),
                             ],
                           ),
                           const SizedBox(height: 24),
@@ -311,8 +349,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         ),
         Row(
           children: [
-            _WishlistButton(product: product),
-            const SizedBox(width: 15),
             GestureDetector(
               key: _cartKey,
               onTap: () {
@@ -422,8 +458,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-
-
   Widget _buildTab(String title, int index) {
     bool isSelected = _selectedTab == index;
     return GestureDetector(
@@ -527,7 +561,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.info_outline, size: 18, color: Colors.blueGrey),
+                  const Icon(
+                    Icons.info_outline,
+                    size: 18,
+                    color: Colors.blueGrey,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -549,7 +587,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.bolt, size: 18, color: Colors.orangeAccent),
+                    const Icon(
+                      Icons.bolt,
+                      size: 18,
+                      color: Colors.orangeAccent,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -680,10 +722,24 @@ class _WishlistButtonState extends State<_WishlistButton> {
                 ToggleWishlistEvent(productId: widget.product.id),
               );
             },
-            child: Icon(
-              isWishlisted ? Icons.favorite : Icons.favorite_border,
-              color: isWishlisted ? Colors.red : Colors.black,
-              size: 22,
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Icon(
+                isWishlisted ? Icons.favorite : Icons.favorite_border,
+                color: isWishlisted ? Colors.red : Colors.black,
+                size: 20,
+              ),
             ),
           );
         },
@@ -789,4 +845,65 @@ class _FlyingItemAnimationState extends State<_FlyingItemAnimation>
       },
     );
   }
+}
+
+class ProductImageClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) {
+    const double cutoutWidth = 120.0; // Exact match with premium card
+    const double cutoutHeight = 60.0;
+    const double radius = 47.0; // Match card border radius
+
+    final path = Path();
+
+    // Start at top left
+    path.moveTo(0, 0);
+
+    // Top right
+    path.lineTo(size.width, 0);
+
+    // Right side down to where curve starts
+    path.lineTo(size.width, size.height - cutoutHeight - 20);
+
+    // The concave curve for the "notch" - an inward scoop
+    path.cubicTo(
+      size.width,
+      size.height - cutoutHeight - 10,
+      size.width - 5,
+      size.height - cutoutHeight,
+      size.width - 30,
+      size.height - cutoutHeight,
+    );
+
+    // Horizontal line for cutout top
+    path.lineTo(size.width - cutoutWidth + 25, size.height - cutoutHeight);
+
+    // Another smooth transition down to the vertical wall
+    path.cubicTo(
+      size.width - cutoutWidth + 5,
+      size.height - cutoutHeight,
+      size.width - cutoutWidth,
+      size.height - cutoutHeight + 10,
+      size.width - cutoutWidth,
+      size.height - cutoutHeight + 25,
+    );
+
+    // Vertical wall down toward bottom, stopping early for radius
+    path.lineTo(size.width - cutoutWidth, size.height - radius);
+
+    // Border radius for the bottom corner of the container
+    path.arcToPoint(
+      Offset(size.width - cutoutWidth - radius, size.height),
+      radius: const Radius.circular(radius),
+    );
+
+    // Bottom edge to left
+    path.lineTo(0, size.height);
+
+    path.close();
+    return path;
+  }
+
+  @override
+  bool shouldReclip(CustomClipper<Path> oldClipper) => false;
 }

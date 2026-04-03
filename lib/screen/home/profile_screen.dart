@@ -372,12 +372,52 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
                   ),
-                  // Update Button
+                  // Delete Account & Update Button
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                    child: OneBtn(
-                      onPressed: isUpdating ? () {} : _updateProfile,
-                      text: 'Update',
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Column(
+                      children: [
+                        TextButton(
+                          onPressed: () {
+                            // Show delete confirmation dialog
+                            showDialog(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                backgroundColor: Colors.white,
+                                title: const Text("Delete Account"),
+                                content: const Text("Are you sure you want to delete your account? This action cannot be undone."),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(context),
+                                    child: const Text("Cancel", style: TextStyle(color: Colors.black)),
+                                  ),
+                                  TextButton(
+                                    onPressed: () {
+                                      // Logic to delete account
+                                      Navigator.pop(context);
+                                    },
+                                    child: const Text("Delete", style: TextStyle(color: Colors.red)),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                          child: const Text(
+                            "Delete account",
+                            style: TextStyle(
+                              color: Color(0xFFFF4B4B),
+                              fontWeight: FontWeight.w500,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        OneBtn(
+                          onPressed: isUpdating ? () {} : _updateProfile,
+                          text: 'Update',
+                        ),
+                        const SizedBox(height: 10),
+                      ],
                     ),
                   ),
                 ],

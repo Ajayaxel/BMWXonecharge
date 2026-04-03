@@ -25,7 +25,7 @@ class MyApp extends StatelessWidget {
         brightness: Brightness.light, // Keep light aesthetics as per design
       ),
       themeMode: ThemeMode.light, // Explicitly force light mode for now
-      home: const SplashScreen(),
+      home: SplashScreen(),
     );
   }
 }

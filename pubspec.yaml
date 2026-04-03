@@ -63,6 +63,7 @@ dependencies:
   firebase_messaging: ^16.1.1
   flutter_local_notifications: ^20.1.0
   flutter_markdown: ^0.7.4
+  flutter_custom_clippers: ^2.1.0
 
 dependency_overrides:
   http: ^1.1.0

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:onecharge/core/storage/token_storage.dart';
 import 'package:onecharge/core/storage/secure_storage_service.dart';
 import 'package:onecharge/core/storage/vehicle_storage.dart';
-import 'package:onecharge/screen/home/home_screen.dart';
+import 'package:onecharge/screen/home/main_screen.dart';
 import 'package:onecharge/screen/onbording/onbording_screen.dart';
 import 'package:onecharge/screen/vehicle/vehicle_selection.dart';
 import 'package:onecharge/test/testlogin.dart';
@@ -61,7 +61,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
+          MaterialPageRoute(builder: (_) => const MainScreen()),
         );
         return;
       }
@@ -86,7 +86,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (_) => const HomeScreen()),
+            MaterialPageRoute(builder: (_) => const MainScreen()),
           );
           return;
         }
