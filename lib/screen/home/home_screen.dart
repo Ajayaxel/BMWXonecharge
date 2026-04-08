@@ -1,33 +1,23 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:onecharge/screen/home/issue_reporting_bottom_sheet.dart';
 import 'package:onecharge/screen/home/widgets/service_notification.dart';
 import 'package:onecharge/screen/home/widgets/feedback_bottom_sheet.dart';
 import 'package:onecharge/screen/home/widgets/cancellation_bottom_sheet.dart';
-import 'package:onecharge/screen/home/widgets/home_services.dart';
 import 'package:onecharge/screen/home/widgets/home_header.dart';
+import 'package:onecharge/screen/home/widgets/home_banner.dart';
+import 'package:onecharge/core/mixins/location_handler_mixin.dart';
 
-import 'package:onecharge/screen/home/tracking_map_screen.dart';
+import 'package:onecharge/screen/home/widgets/tracking_map_screen.dart';
 import 'package:onecharge/logic/services/realtime_service.dart';
-import 'package:onecharge/screen/vehicle/vehicle_selection.dart';
-import 'package:onecharge/const/onebtn.dart';
 import 'dart:async';
 import 'dart:developer' as developer;
-import 'package:geolocator/geolocator.dart';
-import 'package:geocoding/geocoding.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:onecharge/logic/blocs/issue_category/issue_category_bloc.dart';
 import 'package:onecharge/logic/blocs/issue_category/issue_category_state.dart';
 import 'package:onecharge/logic/blocs/issue_category/issue_category_event.dart';
 import 'package:onecharge/logic/blocs/vehicle_list/vehicle_list_bloc.dart';
 import 'package:onecharge/logic/blocs/vehicle_list/vehicle_list_event.dart';
-import 'package:onecharge/logic/blocs/vehicle_list/vehicle_list_state.dart';
-import 'package:onecharge/models/vehicle_list_model.dart';
 import 'package:onecharge/models/ticket_model.dart';
 import 'package:onecharge/core/storage/vehicle_storage.dart';
-import 'package:shimmer/shimmer.dart';
-import 'package:onecharge/models/location_model.dart';
-import 'package:onecharge/core/storage/location_storage.dart';
 import 'package:onecharge/core/storage/token_storage.dart';
 import 'package:onecharge/logic/blocs/location/location_bloc.dart';
 import 'package:onecharge/logic/blocs/location/location_state.dart';
@@ -46,10 +36,20 @@ import 'package:onecharge/logic/blocs/location/location_event.dart';
 import 'package:onecharge/logic/blocs/brand/brand_bloc.dart';
 import 'package:onecharge/logic/blocs/vehicle_model/vehicle_model_bloc.dart';
 import 'package:onecharge/logic/blocs/charging_type/charging_type_bloc.dart';
-import 'package:onecharge/logic/blocs/service_banner/service_banner_bloc.dart';
-import 'package:onecharge/logic/blocs/service_banner/service_banner_state.dart';
 import 'package:onecharge/logic/blocs/shop_category/shop_category_bloc.dart';
 import 'package:onecharge/logic/blocs/shop_category/shop_category_event.dart';
+import 'package:onecharge/screen/home/widgets/home_service_groups.dart';
+import 'package:onecharge/logic/blocs/service_group/service_group_bloc.dart';
+import 'package:onecharge/logic/blocs/service_group/service_group_event.dart';
+import 'package:onecharge/logic/blocs/product_group/product_group_bloc.dart';
+import 'package:onecharge/logic/blocs/product_group/product_group_event.dart';
+import 'package:onecharge/screen/home/widgets/home_product_groups.dart';
+import 'package:onecharge/screen/home/widgets/vehicle_selection_bottom_sheet.dart';
+import 'package:onecharge/widgets/banner_section.dart';
+import 'package:onecharge/logic/blocs/combo_offer/presentation/bloc/combo_offer_bloc.dart';
+import 'package:onecharge/logic/blocs/combo_offer/presentation/bloc/combo_offer_event.dart';
+import 'package:onecharge/logic/blocs/combo_offer/presentation/bloc/combo_offer_state.dart';
+import 'package:onecharge/logic/blocs/combo_offer/presentation/screens/combo_buy_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -58,28 +58,18 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => HomeScreenState();
 }
 
-class HomeScreenState extends State<HomeScreen> {
+class HomeScreenState extends State<HomeScreen> with LocationHandlerMixin {
   static HomeScreenState? activeState;
   int selectedIndex = -1;
-  int selectedVehicleIndex = 0;
-  List<VehicleListItem> vehicles = [];
-  bool isLoadingVehicles = true;
-  String currentAddress = "Fetching location...";
-  double _currentLatitude = 0.0;
-  double _currentLongitude = 0.0;
-  int? _selectedLocationId;
   String _currentServiceStage = 'none';
   double _serviceProgress = 0.0;
   Timer? _serviceTimer;
   Timer? _pollingTimer;
   RealtimeService? _realtimeService;
-  final TextEditingController _searchController = TextEditingController();
-  String _searchQuery = '';
   Ticket? _currentTicket;
   bool _isConnectingRealtime = false;
-  final PageController _bannerController = PageController();
-  int _currentBannerIndex = 0;
-  Timer? _bannerTimer;
+  final TextEditingController searchController = TextEditingController();
+  String searchQuery = "";
 
   /// Returns true if the driver's last location update is within the last
   /// [maxAgeMinutes] minutes (default: 30), meaning it is fresh enough to use.
@@ -338,7 +328,7 @@ class HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     activeState = this;
-    _loadSavedLocation();
+    loadSavedLocation();
     _loadUserName();
     _fetchInitialData();
     CarPlayService.setupHandler();
@@ -349,24 +339,8 @@ class HomeScreenState extends State<HomeScreen> {
       CarPlayService.updateServices(initialCategoryState.categories);
     }
 
-    _startBannerTimer();
-  }
-
-  void _startBannerTimer() {
-    _bannerTimer?.cancel();
-    _bannerTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
-      if (_bannerController.hasClients) {
-        final state = context.read<ServiceBannerBloc>().state;
-        if (state is ServiceBannerLoaded && state.banners.length > 1) {
-          final nextIndex = (_currentBannerIndex + 1) % state.banners.length;
-          _bannerController.animateToPage(
-            nextIndex,
-            duration: const Duration(milliseconds: 400),
-            curve: Curves.easeInOut,
-          );
-        }
-      }
-    });
+    _fetchInitialData();
+    CarPlayService.setupHandler();
   }
 
   void _fetchInitialData() {
@@ -381,39 +355,10 @@ class HomeScreenState extends State<HomeScreen> {
       context.read<ProfileBloc>().add(FetchProfile());
       context.read<LocationBloc>().add(FetchLocations());
       context.read<ShopCategoryBloc>().add(FetchShopCategories());
+      context.read<ServiceGroupBloc>().add(const FetchServiceGroups());
+      context.read<ProductGroupBloc>().add(FetchProductGroups());
+      context.read<ComboOfferBloc>().add(FetchComboOffers());
     });
-  }
-
-  Future<void> _loadSavedLocation() async {
-    final saved = await LocationStorage.getSelectedLocation();
-    if (saved != null && saved['isManual'] == true) {
-      if (mounted) {
-        setState(() {
-          currentAddress = saved['address'];
-          _currentLatitude = saved['lat'];
-          _currentLongitude = saved['lng'];
-          _selectedLocationId = saved['id'];
-        });
-      }
-    } else {
-      await _getCurrentLocation();
-    }
-  }
-
-  void _validateCurrentLocation(List<LocationModel> locations) async {
-    if (_selectedLocationId != null) {
-      final exists = locations.any((loc) => loc.id == _selectedLocationId);
-      if (!exists) {
-        // Current location was deleted, fallback to GPS
-        await LocationStorage.clearSelectedLocation();
-        if (mounted) {
-          setState(() {
-            _selectedLocationId = null;
-          });
-          await _getCurrentLocation();
-        }
-      }
-    }
   }
 
   Future<void> _loadUserName() async {
@@ -425,96 +370,13 @@ class HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _getCurrentLocation() async {
-    bool serviceEnabled;
-    LocationPermission permission;
-
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      setState(() {
-        currentAddress = "Location services disabled";
-      });
-      return;
-    }
-
-    permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        setState(() {
-          currentAddress = "Location permission denied";
-        });
-        return;
-      }
-    }
-
-    if (permission == LocationPermission.deniedForever) {
-      setState(() {
-        currentAddress = "Location permission permanently denied";
-      });
-      return;
-    }
-
-    try {
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
-
-      List<Placemark> placemarks = await placemarkFromCoordinates(
-        position.latitude,
-        position.longitude,
-      );
-
-      if (placemarks.isNotEmpty) {
-        Placemark place = placemarks[0];
-        setState(() {
-          // Construct a readable address
-          List<String> addressParts = [];
-          if (place.name != null && place.name!.isNotEmpty) {
-            addressParts.add(place.name!);
-          }
-          if (place.subLocality != null && place.subLocality!.isNotEmpty) {
-            addressParts.add(place.subLocality!);
-          }
-          if (place.locality != null && place.locality!.isNotEmpty) {
-            addressParts.add(place.locality!);
-          }
-
-          currentAddress = addressParts.join(", ");
-          _currentLatitude = position.latitude;
-          _currentLongitude = position.longitude;
-          _selectedLocationId = null; // GPS location has no ID
-
-          // Save current location as non-manual by default
-          LocationStorage.saveSelectedLocation(
-            address: currentAddress,
-            lat: _currentLatitude,
-            lng: _currentLongitude,
-            isManual: false,
-          );
-
-          if (currentAddress.isEmpty) {
-            currentAddress =
-                "${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}";
-          }
-        });
-      }
-    } catch (e) {
-      setState(() {
-        currentAddress = "Failed to get location";
-      });
-    }
-  }
-
   @override
   void dispose() {
     activeState = null;
     _serviceTimer?.cancel();
     _pollingTimer?.cancel();
-    _bannerTimer?.cancel();
     _realtimeService?.disconnect();
-    _searchController.dispose();
-    _bannerController.dispose();
+    searchController.dispose();
     _toastEntry?.remove();
     super.dispose();
   }
@@ -523,14 +385,14 @@ class HomeScreenState extends State<HomeScreen> {
     if (mounted) {
       // If address is null or empty, fallback to current location
       if (address.isEmpty || address == "Fetching location...") {
-        _getCurrentLocation();
+        getCurrentLocation();
         return;
       }
       setState(() {
         currentAddress = address;
-        _currentLatitude = lat;
-        _currentLongitude = lng;
-        _selectedLocationId = id;
+        currentLatitude = lat;
+        currentLongitude = lng;
+        selectedLocationId = id;
       });
     }
   }
@@ -781,8 +643,8 @@ class HomeScreenState extends State<HomeScreen> {
       modelId: modelId,
       numberPlate: vehiclePlate,
       location: currentAddress,
-      latitude: _currentLatitude,
-      longitude: _currentLongitude,
+      latitude: currentLatitude,
+      longitude: currentLongitude,
       bookingType: "instant",
       scheduledAt: DateFormat(
         'yyyy-MM-dd HH:mm:ss',
@@ -795,316 +657,6 @@ class HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _showVehicleSelectionBottomSheet(String category) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          padding: const EdgeInsets.all(20.00),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              BlocBuilder<VehicleListBloc, VehicleListState>(
-                buildWhen: (previous, current) => previous != current,
-                builder: (context, state) {
-                  if (state is VehicleListLoading) {
-                    final skeletonCount =
-                        (state.totalCount > 0 ? state.totalCount : 3).clamp(
-                          1,
-                          5,
-                        );
-                    return Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const SizedBox(height: 10),
-                        ...List.generate(
-                          skeletonCount,
-                          (index) => Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: _buildShimmerCarItem(),
-                          ),
-                        ),
-                      ],
-                    );
-                  }
-
-                  if (state is VehicleListError) {
-                    return Center(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 40),
-                        child: Text(
-                          'Error: ${state.message}',
-                          style: const TextStyle(fontFamily: 'Lufga'),
-                        ),
-                      ),
-                    );
-                  }
-
-                  final vehicleList = state is VehicleListLoaded
-                      ? state.vehicles
-                      : <VehicleListItem>[];
-
-                  if (vehicleList.isEmpty) {
-                    return const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 20),
-                      child: Text(
-                        'No vehicles found. Please add a vehicle.',
-                        style: TextStyle(fontFamily: 'Lufga'),
-                      ),
-                    );
-                  }
-
-                  return StatefulBuilder(
-                    builder: (context, setListState) {
-                      return ListView.builder(
-                        padding: EdgeInsets.only(bottom: 16),
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: vehicleList.length,
-                        itemBuilder: (context, index) {
-                          final vehicle = vehicleList[index];
-                          final isSelected = selectedVehicleIndex == index;
-                          return GestureDetector(
-                            onTap: () async {
-                              setListState(() {
-                                selectedVehicleIndex = index;
-                              });
-
-                              // Save vehicle IDs to storage before opening Issue Reporting
-                              await VehicleStorage.saveVehicleInfo(
-                                name: vehicle.vehicleName,
-                                number: vehicle.vehicleNumber,
-                                image: vehicle.vehicleImage,
-                                vehicleTypeId: vehicle.vehicleTypeId,
-                                brandId: vehicle.brandId,
-                                modelId: vehicle.modelId,
-                              );
-
-                              // Close current sheet and open Issue Reporting
-                              if (!context.mounted) return;
-                              Navigator.pop(context);
-                              showModalBottomSheet(
-                                context: context,
-                                backgroundColor: Colors.transparent,
-                                isScrollControlled: true,
-                                builder: (context) => IssueReportingBottomSheet(
-                                  vehicleName: vehicle.vehicleName,
-                                  vehiclePlate: vehicle.vehicleNumber,
-                                  currentAddress: currentAddress,
-                                  latitude: _currentLatitude,
-                                  longitude: _currentLongitude,
-                                  locationId: _selectedLocationId,
-                                  initialCategory: category,
-                                ),
-                              );
-                            },
-                            child: Padding(
-                              padding: EdgeInsets.only(
-                                bottom: index == vehicleList.length - 1
-                                    ? 0
-                                    : 12,
-                              ),
-                              child: _buildCarItem(
-                                title: vehicle.vehicleName,
-                                subtitle: vehicle.vehicleNumber,
-                                imageUrl: vehicle.vehicleImage,
-                                isSelected: isSelected,
-                              ),
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  );
-                },
-              ),
-              const SizedBox(height: 8),
-              // Add Vehicle Button
-              OneBtn(
-                text: "Add Vehicle",
-                onPressed: () async {
-                  final homeContext = this.context;
-                  // Close the bottom sheet
-                  Navigator.pop(context);
-                  // Navigate to Vehicle Selection screen
-                  await Navigator.push(
-                    homeContext,
-                    MaterialPageRoute(
-                      builder: (context) => const VehicleSelection(),
-                    ),
-                  );
-                  // Refresh the vehicle list after returning
-                  if (homeContext.mounted) {
-                    homeContext.read<VehicleListBloc>().add(
-                      const FetchVehicles(forceRefresh: true),
-                    );
-                  }
-                },
-              ),
-              const SizedBox(height: 10),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildCarItem({
-    required String title,
-    required String subtitle,
-    String? imageUrl,
-    bool isSelected = false,
-  }) {
-    Widget imageWidget;
-    final String imgPath = imageUrl?.trim() ?? '';
-
-    if (imgPath.isNotEmpty) {
-      if (imgPath.startsWith('http')) {
-        imageWidget = Image.network(
-          imgPath,
-          fit: BoxFit.contain,
-          alignment: Alignment.centerRight,
-          errorBuilder: (context, error, stackTrace) =>
-              const Icon(Icons.directions_car, size: 50, color: Colors.grey),
-        );
-      } else if (imgPath.startsWith('assets/')) {
-        imageWidget = Image.asset(
-          imgPath,
-          fit: BoxFit.contain,
-          alignment: Alignment.centerRight,
-          errorBuilder: (context, error, stackTrace) =>
-              const Icon(Icons.directions_car, size: 50, color: Colors.grey),
-        );
-      } else {
-        imageWidget = Image.network(
-          imgPath,
-          fit: BoxFit.contain,
-          alignment: Alignment.centerRight,
-          errorBuilder: (context, error, stackTrace) =>
-              const Icon(Icons.directions_car, size: 50, color: Colors.grey),
-        );
-      }
-    } else {
-      imageWidget = const Icon(
-        Icons.directions_car,
-        size: 50,
-        color: Colors.grey,
-      );
-    }
-
-    return Container(
-      height: 80,
-      padding: const EdgeInsets.only(left: 16),
-      decoration: BoxDecoration(
-        color: const Color(0xffF5F5F5),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isSelected ? Colors.black : Colors.transparent,
-          width: 1.2,
-        ),
-      ),
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    fontFamily: 'Lufga',
-                    color: Colors.black,
-                  ),
-                ),
-                Text(
-                  subtitle,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF757575),
-                    fontFamily: 'Lufga',
-                    fontWeight: FontWeight.w400,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Positioned(right: 0, top: 0, bottom: 0, child: imageWidget),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildShimmerCarItem() {
-    return Shimmer.fromColors(
-      baseColor: const Color(0xffE0E0E0),
-      highlightColor: Colors.white,
-      child: Container(
-        height: 80,
-        padding: const EdgeInsets.only(left: 16),
-        decoration: BoxDecoration(
-          color: const Color(0xffF5F5F5),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Stack(
-          children: [
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 120,
-                    height: 16,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    width: 80,
-                    height: 12,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Positioned(
-              right: 0,
-              top: 5,
-              bottom: 5,
-              child: Container(
-                width: 130,
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.only(
-                    topRight: Radius.circular(12),
-                    bottomRight: Radius.circular(12),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return MultiBlocListener(
@@ -1114,15 +666,15 @@ class HomeScreenState extends State<HomeScreen> {
             if (state is LocationAdded) {
               showToast('Location added successfully');
             } else if (state is LocationsLoaded) {
-              _validateCurrentLocation(state.locations);
+              validateCurrentLocation(state.locations);
 
               if (state.selectedLocation != null) {
                 final loc = state.selectedLocation!;
                 setState(() {
                   currentAddress = loc.name.isNotEmpty ? loc.name : loc.address;
-                  _currentLatitude = loc.latitude;
-                  _currentLongitude = loc.longitude;
-                  _selectedLocationId = loc.id;
+                  currentLatitude = loc.latitude;
+                  currentLongitude = loc.longitude;
+                  selectedLocationId = loc.id;
                 });
               }
             }
@@ -1195,12 +747,13 @@ class HomeScreenState extends State<HomeScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: 10),
+                    //header  sectionn
                     HomeHeader(
                       currentAddress: currentAddress,
-                      searchController: _searchController,
+                      searchController: searchController,
                       onSearchChanged: (value) {
                         setState(() {
-                          _searchQuery = value.toLowerCase();
+                          searchQuery = value.toLowerCase();
                         });
                       },
                       onLocationChanged: (result) {
@@ -1208,283 +761,80 @@ class HomeScreenState extends State<HomeScreen> {
                           currentAddress = result.name.isNotEmpty
                               ? result.name
                               : result.address;
-                          _currentLatitude = result.latitude;
-                          _currentLongitude = result.longitude;
-                          _selectedLocationId = result.id;
+                          currentLatitude = result.latitude;
+                          currentLongitude = result.longitude;
+                          selectedLocationId = result.id;
                         });
                       },
                     ),
                     const SizedBox(height: 16),
+                    // Banner section.
+                    HomeBanner(onToast: showToast),
 
-                    const SizedBox(height: 16),
-                    // Banner
-                    BlocBuilder<ServiceBannerBloc, ServiceBannerState>(
-                      builder: (context, state) {
-                        // ── Shimmer while loading ──────────────────────────
-                        if (state is ServiceBannerInitial ||
-                            state is ServiceBannerLoading) {
-                          return Shimmer.fromColors(
-                            baseColor: const Color(0xFFE0E0E0),
-                            highlightColor: const Color(0xFFF5F5F5),
-                            child: Container(
-                              width: double.infinity,
-                              height: 180,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                          );
-                        }
-
-                        // ── Error: fall back to static asset banner ────────
-                        if (state is ServiceBannerError) {
-                          return Stack(
-                            children: [
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
-                                child: Image.asset(
-                                  'assets/home/bannerBG.png',
-                                  width: double.infinity,
-                                  height: 180,
-                                  fit: BoxFit.cover,
-                                ),
-                              ),
-                              const Positioned(
-                                top: 20,
-                                left: 20,
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Save 30% off\nfirst 2 booking',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w500,
-                                        fontFamily: 'Lufga',
-                                        height: 1.2,
-                                      ),
-                                    ),
-                                    SizedBox(height: 5),
-                                    Text(
-                                      'USECODE 125MND',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 12,
-                                        fontFamily: 'Lufga',
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          );
-                        }
-
-                        // ── Loaded: API banners ────────────────────────────
-                        final banners = (state as ServiceBannerLoaded).banners;
-                        if (banners.isEmpty) return const SizedBox.shrink();
-
-                        return Column(
-                          children: [
-                            SizedBox(
-                              height: 180,
-                              child: PageView.builder(
-                                controller: _bannerController,
-                                onPageChanged: (index) {
-                                  setState(() {
-                                    _currentBannerIndex = index;
-                                  });
-                                },
-                                itemCount: banners.length,
-                                itemBuilder: (context, index) {
-                                  final banner = banners[index];
-                                  return Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 0,
-                                    ),
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(12),
-                                      child: Stack(
-                                        children: [
-                                          // Background image
-                                          Image.network(
-                                            banner.bgImage,
-                                            width: double.infinity,
-                                            height: 180,
-                                            fit: BoxFit.cover,
-                                            errorBuilder:
-                                                (
-                                                  context,
-                                                  error,
-                                                  stackTrace,
-                                                ) => Image.asset(
-                                                  'assets/home/bannerBG.png',
-                                                  width: double.infinity,
-                                                  height: 180,
-                                                  fit: BoxFit.cover,
-                                                ),
-                                          ),
-                                          // Dark gradient so text is always readable
-                                          Positioned.fill(
-                                            child: DecoratedBox(
-                                              decoration: BoxDecoration(
-                                                gradient: LinearGradient(
-                                                  begin: Alignment.centerLeft,
-                                                  end: Alignment.centerRight,
-                                                  colors: [
-                                                    Colors.black.withOpacity(
-                                                      0.55,
-                                                    ),
-                                                    Colors.black.withOpacity(
-                                                      0.10,
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                          // Text & code chip
-                                          Positioned(
-                                            top: 20,
-                                            left: 20,
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                SizedBox(
-                                                  width: 160,
-                                                  child: Text(
-                                                    () {
-                                                      final words = banner.title
-                                                          .split(' ');
-                                                      if (words.length <= 1) {
-                                                        return banner.title;
-                                                      }
-                                                      final mid =
-                                                          (words.length / 2)
-                                                              .ceil();
-                                                      return '${words.take(mid).join(' ')}\n${words.skip(mid).join(' ')}';
-                                                    }(),
-                                                    style: const TextStyle(
-                                                      color: Colors.white,
-                                                      fontSize: 17,
-                                                      fontWeight:
-                                                          FontWeight.w500,
-                                                      fontFamily: 'Lufga',
-                                                      height: 1.2,
-                                                      overflow:
-                                                          TextOverflow.ellipsis,
-                                                    ),
-                                                  ),
-                                                ),
-                                                const SizedBox(height: 15),
-                                                // Code pill chip — tap to copy
-                                                GestureDetector(
-                                                  onTap: () {
-                                                    Clipboard.setData(
-                                                      ClipboardData(
-                                                        text: banner.code,
-                                                      ),
-                                                    );
-                                                    showToast(
-                                                      'Code "${banner.code}" copied!',
-                                                    );
-                                                  },
-                                                  child: Container(
-                                                    padding:
-                                                        const EdgeInsets.symmetric(
-                                                          horizontal: 10,
-                                                          vertical: 4,
-                                                        ),
-                                                    decoration: BoxDecoration(
-                                                      color: Colors.white
-                                                          .withOpacity(0.20),
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                            20,
-                                                          ),
-                                                      border: Border.all(
-                                                        color: Colors.white
-                                                            .withOpacity(0.50),
-                                                        width: 1,
-                                                      ),
-                                                    ),
-                                                    child: Row(
-                                                      mainAxisSize:
-                                                          MainAxisSize.min,
-                                                      children: [
-                                                        Text(
-                                                          'USECODE ${banner.code}',
-                                                          style: const TextStyle(
-                                                            color: Colors.white,
-                                                            fontSize: 12,
-                                                            fontWeight:
-                                                                FontWeight.w600,
-                                                            fontFamily: 'Lufga',
-                                                            letterSpacing: 0.5,
-                                                            overflow:
-                                                                TextOverflow
-                                                                    .ellipsis,
-                                                          ),
-                                                        ),
-                                                        const SizedBox(
-                                                          width: 5,
-                                                        ),
-                                                        const Icon(
-                                                          Icons.copy_rounded,
-                                                          color: Colors.white,
-                                                          size: 12,
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
-                            if (banners.length > 1) ...[
-                              const SizedBox(height: 8),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: List.generate(
-                                  banners.length,
-                                  (index) => Container(
-                                    width: 8,
-                                    height: 8,
-                                    margin: const EdgeInsets.symmetric(
-                                      horizontal: 4,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: _currentBannerIndex == index
-                                          ? Colors.black
-                                          : Colors.grey.shade300,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ],
+                    // services section
+                    HomeServiceGroups(
+                      searchQuery: searchQuery,
+                      onServiceSelected: (categoryName, categoryId) {
+                        VehicleSelectionBottomSheet.show(
+                          context,
+                          category: categoryName,
+                          currentAddress: currentAddress,
+                          currentLatitude: currentLatitude,
+                          currentLongitude: currentLongitude,
+                          selectedLocationId: selectedLocationId,
                         );
                       },
                     ),
-                    const SizedBox(height: 16),
-                    HomeServices(
-                      searchQuery: _searchQuery,
-                      onServiceSelected: (categoryName) {
-                        _showVehicleSelectionBottomSheet(categoryName);
+                    SizedBox(height: 16),
+                    BlocBuilder<ComboOfferBloc, ComboOfferState>(
+                      builder: (context, state) {
+                        final offer = state is ComboOfferLoaded &&
+                                state.comboOffers.isNotEmpty
+                            ? state.comboOffers.firstWhere(
+                                (o) => o.id == 2,
+                                orElse: () => state.comboOffers.first,
+                              )
+                            : null;
+
+                        return BannerSection(
+                          image: offer != null
+                              ? offer.imageUrl
+                              : "https://static.vecteezy.com/system/resources/previews/059/007/249/non_2x/ev-charger-station-transparent-background-free-png.png",
+                          title: offer != null
+                              ? offer.name
+                              : "Mega Deals on EV Accessories ⚡",
+                          subtitle: offer != null
+                              ? offer.description
+                              : "Grab exclusive discounts on top-quality upgrades for your ride.",
+                          buttonText: "Shop Deals",
+                          comboPrice: offer?.comboPrice,
+                          originalPrice: offer?.originalPrice,
+                          onTap: () {
+                            if (offer != null) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => ComboBuyScreen(
+                                    offer: offer,
+                                    initialAddress: currentAddress,
+                                    initialLatitude: currentLatitude,
+                                    initialLongitude: currentLongitude,
+                                  ),
+                                ),
+                              );
+                            } else {
+                              showToast("Fetching latest deals...");
+                              context.read<ComboOfferBloc>().add(
+                                    FetchComboOffers(),
+                                  );
+                            }
+                          },
+                        );
                       },
                     ),
 
+                    const SizedBox(height: 16),
+                    HomeProductGroups(searchQuery: searchQuery),
                     const SizedBox(height: 100), // Bottom padding for scrolling
                   ],
                 ),

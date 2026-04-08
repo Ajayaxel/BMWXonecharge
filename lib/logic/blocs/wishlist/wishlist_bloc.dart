@@ -6,7 +6,8 @@ import 'wishlist_state.dart';
 class WishlistBloc extends Bloc<WishlistEvent, WishlistState> {
   final ProductRepository productRepository;
 
-  WishlistBloc({required this.productRepository}) : super(const WishlistState()) {
+  WishlistBloc({required this.productRepository})
+    : super(const WishlistState()) {
     on<InitializeProductWishlistStatusEvent>(_onInitializeStatus);
     on<ToggleWishlistEvent>(_onToggleWishlist);
   }
@@ -15,7 +16,6 @@ class WishlistBloc extends Bloc<WishlistEvent, WishlistState> {
     InitializeProductWishlistStatusEvent event,
     Emitter<WishlistState> emit,
   ) {
-    // Only initialize if we haven't seen this product yet, to avoid overwriting changes
     if (!state.wishlistMap.containsKey(event.productId)) {
       final newMap = Map<int, bool>.from(state.wishlistMap);
       newMap[event.productId] = event.isWishlisted;
@@ -27,17 +27,19 @@ class WishlistBloc extends Bloc<WishlistEvent, WishlistState> {
     ToggleWishlistEvent event,
     Emitter<WishlistState> emit,
   ) async {
-    final bool currentlyInWishlist = state.wishlistMap[event.productId] ?? false;
-    
+    final bool currentlyInWishlist = state.wishlistMap[event.productId] ?? event.isWishlisted;
+
     // Optimistically update the UI
     final optimisticMap = Map<int, bool>.from(state.wishlistMap);
     optimisticMap[event.productId] = !currentlyInWishlist;
-    emit(state.copyWith(
-      wishlistMap: optimisticMap,
-      loadingProductId: event.productId,
-      error: null,
-      message: null,
-    ));
+    emit(
+      state.copyWith(
+        wishlistMap: optimisticMap,
+        loadingProductId: () => event.productId,
+        error: () => null,
+        message: () => null,
+      ),
+    );
 
     try {
       bool success;
@@ -48,29 +50,37 @@ class WishlistBloc extends Bloc<WishlistEvent, WishlistState> {
       }
 
       if (success) {
-        emit(state.copyWith(
-          loadingProductId: null,
-          message: currentlyInWishlist ? 'Removed from wishlist' : 'Added to wishlist',
-        ));
+        emit(
+          state.copyWith(
+            loadingProductId: () => null,
+            message:
+                () =>
+                    currentlyInWishlist
+                        ? 'Removed from wishlist'
+                        : 'Added to wishlist',
+          ),
+        );
       } else {
-        // Revert optimistic update
         final revertedMap = Map<int, bool>.from(state.wishlistMap);
         revertedMap[event.productId] = currentlyInWishlist;
-        emit(state.copyWith(
-          wishlistMap: revertedMap,
-          loadingProductId: null,
-          error: 'Failed to update wishlist',
-        ));
+        emit(
+          state.copyWith(
+            wishlistMap: revertedMap,
+            loadingProductId: () => null,
+            error: () => 'Failed to update wishlist',
+          ),
+        );
       }
     } catch (e) {
-      // Revert optimistic update
       final revertedMap = Map<int, bool>.from(state.wishlistMap);
       revertedMap[event.productId] = currentlyInWishlist;
-      emit(state.copyWith(
-        wishlistMap: revertedMap,
-        loadingProductId: null,
-        error: e.toString(),
-      ));
+      emit(
+        state.copyWith(
+          wishlistMap: revertedMap,
+          loadingProductId: () => null,
+          error: () => e.toString(),
+        ),
+      );
     }
   }
 }

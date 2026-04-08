@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:onecharge/const/onebtn.dart';
 import 'package:onecharge/logic/blocs/cart/cart_bloc.dart';
 import 'package:onecharge/models/cart_model.dart';
+import 'package:onecharge/screen/bottmnav/main_screen.dart';
 import 'package:onecharge/screen/shop/checkout_screen.dart';
 import 'package:onecharge/utils/toast_utils.dart';
 
@@ -16,14 +17,14 @@ class CartScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new,
-            color: Colors.black,
-            size: 20,
-          ),
-          onPressed: () => Navigator.pop(context),
-        ),
+        // leading: IconButton(
+        //   icon: const Icon(
+        //     Icons.arrow_back_ios_new,
+        //     color: Colors.black,
+        //     size: 20,
+        //   ),
+        //   onPressed: () => Navigator.pop(context),
+        // ),
         title: const Text(
           'My Cart',
           style: TextStyle(
@@ -59,7 +60,42 @@ class CartScreen extends StatelessWidget {
                       padding: const EdgeInsets.all(16),
                       itemCount: cart.items.length,
                       itemBuilder: (context, index) {
-                        return _buildCartItem(context, cart.items[index]);
+                        final item = cart.items[index];
+                        return Dismissible(
+                          key: Key('cart_item_${item.product.id}'),
+                          direction: DismissDirection.endToStart,
+                          onDismissed: (direction) {
+                            context.read<CartBloc>().add(
+                                  RemoveFromCartEvent(
+                                    productId: item.product.id,
+                                  ),
+                                );
+                          },
+                          background: Container(
+                            margin: const EdgeInsets.only(bottom: 16),
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: Colors.redAccent,
+                              borderRadius: BorderRadius.circular(15),
+                            ),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.delete, color: Colors.white),
+                                SizedBox(width: 8),
+                                Text(
+                                  "Delete",
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          child: _buildCartItem(context, item),
+                        );
                       },
                     ),
                   ),
@@ -98,7 +134,20 @@ class CartScreen extends StatelessWidget {
           ),
           const SizedBox(height: 24),
           ElevatedButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              final mainState = MainScreen.of(context);
+              if (mainState != null) {
+                mainState.setIndex(0); // Switch to Shop tab (index 0)
+              } else {
+                // If the screen is pushed standalone, navigate fresh to MainScreen's Shop tab
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(
+                    builder: (context) => const MainScreen(initialIndex: 0),
+                  ),
+                  (route) => false,
+                );
+              }
+            },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.black,
               shape: RoundedRectangleBorder(

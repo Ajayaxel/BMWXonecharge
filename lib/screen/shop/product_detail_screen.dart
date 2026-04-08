@@ -9,7 +9,9 @@ import 'package:onecharge/logic/blocs/wishlist/wishlist_event.dart';
 import 'package:onecharge/logic/blocs/wishlist/wishlist_state.dart';
 import 'package:onecharge/logic/blocs/cart/cart_bloc.dart';
 import 'package:onecharge/models/product_model.dart';
+import 'package:onecharge/models/cart_model.dart';
 import 'package:onecharge/screen/shop/cart_screen.dart';
+import 'package:onecharge/screen/shop/checkout_screen.dart';
 import 'package:onecharge/utils/toast_utils.dart';
 
 class ProductDetailScreen extends StatefulWidget {
@@ -34,6 +36,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     context.read<ProductDetailBloc>().add(
       FetchProductDetailEvent(widget.productId),
     );
+    context.read<CartBloc>().add(FetchCartEvent());
   }
 
   String _getImageUrl(String path) {
@@ -642,7 +645,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: BlocListener<CartBloc, CartState>(
+            child: BlocConsumer<CartBloc, CartState>(
               listener: (context, state) {
                 if (state is CartActionSuccess) {
                   ToastUtils.showToast(context, state.message);
@@ -650,27 +653,50 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   ToastUtils.showToast(context, state.error, isError: true);
                 }
               },
-              child: ElevatedButton(
-                key: _btnKey,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.black,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                ),
-                onPressed: () {
-                  _runAddToCartAnimation(imageUrl);
-                  context.read<CartBloc>().add(
-                    AddToCartEvent(productId: product.id, quantity: _quantity),
+              builder: (context, state) {
+                bool isInCart = false;
+                CartData? cartData;
+                if (state is CartLoaded) {
+                  isInCart = state.cart.items.any(
+                    (item) => item.product.id == product.id,
                   );
-                },
-                child: const Text(
-                  "Add to Cart",
-                  style: TextStyle(fontWeight: FontWeight.w700),
-                ),
-              ),
+                  cartData = state.cart;
+                }
+
+                return ElevatedButton(
+                  key: _btnKey,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.black,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                  ),
+                  onPressed: () {
+                    if (isInCart && cartData != null) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => CheckoutScreen(cart: cartData!),
+                        ),
+                      );
+                    } else {
+                      _runAddToCartAnimation(imageUrl);
+                      context.read<CartBloc>().add(
+                        AddToCartEvent(
+                          productId: product.id,
+                          quantity: _quantity,
+                        ),
+                      );
+                    }
+                  },
+                  child: Text(
+                    isInCart ? "Checkout" : "Add to Cart",
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                );
+              },
             ),
           ),
         ],
@@ -691,12 +717,24 @@ class _WishlistButtonState extends State<_WishlistButton> {
   @override
   void initState() {
     super.initState();
+    _initializeWishlistStatus();
+  }
+
+  @override
+  void didUpdateWidget(_WishlistButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.product.id != widget.product.id) {
+      _initializeWishlistStatus();
+    }
+  }
+
+  void _initializeWishlistStatus() {
     context.read<WishlistBloc>().add(
-      InitializeProductWishlistStatusEvent(
-        productId: widget.product.id,
-        isWishlisted: widget.product.isWishlisted,
-      ),
-    );
+          InitializeProductWishlistStatusEvent(
+            productId: widget.product.id,
+            isWishlisted: widget.product.isWishlisted,
+          ),
+        );
   }
 
   @override
@@ -719,8 +757,11 @@ class _WishlistButtonState extends State<_WishlistButton> {
           return GestureDetector(
             onTap: () {
               context.read<WishlistBloc>().add(
-                ToggleWishlistEvent(productId: widget.product.id),
-              );
+                    ToggleWishlistEvent(
+                      productId: widget.product.id,
+                      isWishlisted: isWishlisted,
+                    ),
+                  );
             },
             child: Container(
               padding: const EdgeInsets.all(8),

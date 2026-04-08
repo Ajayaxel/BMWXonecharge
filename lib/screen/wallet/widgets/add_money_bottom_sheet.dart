@@ -40,9 +40,7 @@ class _AddMoneyBottomSheetState extends State<AddMoneyBottomSheet> {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => PaymentWebViewScreen(
-          paymentUrl: checkoutUrl,
-        ),
+        builder: (context) => PaymentWebViewScreen(paymentUrl: checkoutUrl),
       ),
     );
 
@@ -175,7 +173,7 @@ class _AddMoneyBottomSheetState extends State<AddMoneyBottomSheet> {
           const SizedBox(height: 16),
           PaymentOptionTile(
             icon: Icons.account_balance_wallet_outlined,
-            label: 'Pay mob',
+            label: 'Pay Now',
             isSelected: _selectedMethod == 'Pay mob',
             onTap: () => setState(() => _selectedMethod = 'PAY MOB'),
           ),
@@ -187,13 +185,16 @@ class _AddMoneyBottomSheetState extends State<AddMoneyBottomSheet> {
                 _navigateToPayment(context, state.data.checkoutUrl);
               } else if (state is WalletFailure) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(state.error), backgroundColor: Colors.red),
+                  SnackBar(
+                    content: Text(state.error),
+                    backgroundColor: Colors.red,
+                  ),
                 );
               }
             },
             child: SizedBox(
               width: double.infinity,
-              height: 56,
+              height: 45,
               child: BlocBuilder<WalletBloc, WalletState>(
                 builder: (context, state) {
                   final isLoading = state is WalletLoading;
@@ -201,14 +202,17 @@ class _AddMoneyBottomSheetState extends State<AddMoneyBottomSheet> {
                     onPressed: _amountController.text.isEmpty || isLoading
                         ? null
                         : () {
-                            final amount = double.tryParse(_amountController.text) ?? 0;
-                            context.read<WalletBloc>().add(TopUpWalletEvent(amount: amount));
+                            final amount =
+                                double.tryParse(_amountController.text) ?? 0;
+                            context.read<WalletBloc>().add(
+                              TopUpWalletEvent(amount: amount),
+                            );
                           },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.black,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(8),
                       ),
                       elevation: 0,
                       disabledBackgroundColor: Colors.grey[300],
@@ -225,9 +229,9 @@ class _AddMoneyBottomSheetState extends State<AddMoneyBottomSheet> {
                         : const Text(
                             'Confirm Payment',
                             style: TextStyle(
-                              fontSize: 16,
+                              fontSize: 14,
                               fontFamily: 'Lufga',
-                              fontWeight: FontWeight.bold,
+                              fontWeight: FontWeight.w400,
                             ),
                           ),
                   );

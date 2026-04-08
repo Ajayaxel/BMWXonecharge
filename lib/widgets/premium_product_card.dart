@@ -28,13 +28,24 @@ class _PremiumProductCardState extends State<PremiumProductCard> {
   @override
   void initState() {
     super.initState();
-    // Initialize wishlist status in the BLoC for this product
+    _initializeWishlistStatus();
+  }
+
+  @override
+  void didUpdateWidget(PremiumProductCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.product.id != widget.product.id) {
+      _initializeWishlistStatus();
+    }
+  }
+
+  void _initializeWishlistStatus() {
     context.read<WishlistBloc>().add(
-      InitializeProductWishlistStatusEvent(
-        productId: widget.product.id,
-        isWishlisted: widget.product.isWishlisted,
-      ),
-    );
+          InitializeProductWishlistStatusEvent(
+            productId: widget.product.id,
+            isWishlisted: widget.product.isWishlisted,
+          ),
+        );
   }
 
   @override
@@ -121,8 +132,11 @@ class _PremiumProductCardState extends State<PremiumProductCard> {
                         return GestureDetector(
                           onTap: () {
                             context.read<WishlistBloc>().add(
-                              ToggleWishlistEvent(productId: widget.product.id),
-                            );
+                                  ToggleWishlistEvent(
+                                    productId: widget.product.id,
+                                    isWishlisted: isWishlisted,
+                                  ),
+                                );
                           },
                           child: Container(
                             padding: const EdgeInsets.all(8),

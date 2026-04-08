@@ -8,7 +8,7 @@ import 'package:onecharge/features/auth/presentation/bloc/auth_event.dart';
 import 'package:onecharge/features/auth/presentation/bloc/auth_state.dart';
 
 import 'package:onecharge/screen/vehicle/vehicle_selection.dart';
-import 'package:onecharge/test/testlogin.dart';
+import 'package:onecharge/screen/login/login_screen.dart';
 
 class OtpVerificationScreen extends StatefulWidget {
   final String email;

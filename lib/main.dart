@@ -44,10 +44,18 @@ import 'package:onecharge/logic/blocs/product/product_event.dart';
 import 'package:onecharge/logic/blocs/product_detail/product_detail_bloc.dart';
 import 'package:onecharge/logic/blocs/wishlist/wishlist_bloc.dart';
 import 'package:onecharge/logic/blocs/cart/cart_bloc.dart';
-import 'package:onecharge/logic/blocs/cart/cart_event.dart';
 import 'package:onecharge/logic/blocs/order/order_bloc.dart';
 import 'package:onecharge/logic/blocs/shop_category/shop_category_bloc.dart';
 import 'package:onecharge/logic/blocs/shop_category/shop_category_event.dart';
+import 'package:onecharge/data/repositories/service_group_repository.dart';
+import 'package:onecharge/logic/blocs/service_group/service_group_bloc.dart';
+import 'package:onecharge/logic/blocs/service_group/service_group_event.dart';
+import 'package:onecharge/logic/blocs/combo_offer/data/repositories/combo_offer_repository.dart';
+import 'package:onecharge/logic/blocs/combo_offer/presentation/bloc/combo_offer_bloc.dart';
+import 'package:onecharge/logic/blocs/combo_offer/presentation/bloc/combo_offer_event.dart';
+import 'package:onecharge/data/repositories/product_group_repository.dart';
+import 'package:onecharge/logic/blocs/product_group/product_group_bloc.dart';
+import 'package:onecharge/logic/blocs/product_group/product_group_event.dart';
 import 'firebase_options.dart';
 
 // New Architecture Imports
@@ -102,6 +110,9 @@ void main() async {
   final serviceBannerRepository = ServiceBannerRepository(apiClient: apiClient);
   final walletRepository = WalletRepository(apiClient: apiClient);
   final productRepository = ProductRepository(apiClient: apiClient);
+  final serviceGroupRepository = ServiceGroupRepository(apiClient: apiClient);
+  final productGroupRepository = ProductGroupRepository(apiClient: apiClient);
+  final comboOfferRepository = ComboOfferRepository(apiClient: apiClient);
 
   runApp(
     MultiRepositoryProvider(
@@ -128,6 +139,9 @@ void main() async {
         ),
         RepositoryProvider<WalletRepository>.value(value: walletRepository),
         RepositoryProvider<ProductRepository>.value(value: productRepository),
+        RepositoryProvider<ServiceGroupRepository>.value(value: serviceGroupRepository),
+        RepositoryProvider<ProductGroupRepository>.value(value: productGroupRepository),
+        RepositoryProvider<ComboOfferRepository>.value(value: comboOfferRepository),
       ],
       child: MultiBlocProvider(
         providers: [
@@ -228,6 +242,21 @@ void main() async {
           BlocProvider<ShopCategoryBloc>(
             create: (context) => ShopCategoryBloc(productRepository: productRepository)
               ..add(FetchShopCategories()),
+          ),
+          BlocProvider<ServiceGroupBloc>(
+            create: (context) => ServiceGroupBloc(
+              serviceGroupRepository: serviceGroupRepository,
+            )..add(const FetchServiceGroups()),
+          ),
+          BlocProvider<ProductGroupBloc>(
+            create: (context) => ProductGroupBloc(
+              repository: productGroupRepository,
+            )..add(FetchProductGroups()),
+          ),
+          BlocProvider<ComboOfferBloc>(
+            create: (context) => ComboOfferBloc(
+              repository: comboOfferRepository,
+            )..add(FetchComboOffers()),
           ),
         ],
         child: const MyApp(),

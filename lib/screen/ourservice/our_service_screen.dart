@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:lottie/lottie.dart';
 import 'package:onecharge/screen/home/widgets/home_header.dart';
 import 'package:onecharge/screen/home/widgets/home_services.dart';
-import 'package:onecharge/core/storage/location_storage.dart';
 import 'package:onecharge/models/location_model.dart';
-import 'package:onecharge/screen/home/vehicle_selection_bottom_sheet.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:geocoding/geocoding.dart';
+import 'package:onecharge/screen/home/widgets/vehicle_selection_bottom_sheet.dart';
+import 'package:onecharge/core/mixins/location_handler_mixin.dart';
 
 class OurServiceScreen extends StatefulWidget {
   const OurServiceScreen({super.key});
@@ -14,91 +13,17 @@ class OurServiceScreen extends StatefulWidget {
   State<OurServiceScreen> createState() => _OurServiceScreenState();
 }
 
-class _OurServiceScreenState extends State<OurServiceScreen> {
-  final TextEditingController _searchController = TextEditingController();
-  String _searchQuery = '';
-  String currentAddress = "Fetching location...";
-  double _currentLatitude = 0.0;
-  double _currentLongitude = 0.0;
-  int? _selectedLocationId;
-
-
+class _OurServiceScreenState extends State<OurServiceScreen>
+    with LocationHandlerMixin {
   @override
   void initState() {
     super.initState();
-    _loadSavedLocation();
+    loadSavedLocation();
   }
-
-  Future<void> _loadSavedLocation() async {
-    final saved = await LocationStorage.getSelectedLocation();
-    if (saved != null) {
-      if (mounted) {
-        setState(() {
-          currentAddress = saved['address'];
-          _currentLatitude = saved['lat'];
-          _currentLongitude = saved['lng'];
-          _selectedLocationId = saved['id'];
-        });
-      }
-    } else {
-      await _getCurrentLocation();
-    }
-  }
-
-  Future<void> _getCurrentLocation() async {
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      if (mounted)
-        setState(() => currentAddress = "Location services disabled");
-      return;
-    }
-
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        if (mounted)
-          setState(() => currentAddress = "Location permission denied");
-        return;
-      }
-    }
-
-    try {
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
-      List<Placemark> placemarks = await placemarkFromCoordinates(
-        position.latitude,
-        position.longitude,
-      );
-
-      if (placemarks.isNotEmpty && mounted) {
-        Placemark place = placemarks[0];
-        List<String> addressParts = [];
-        if (place.name?.isNotEmpty ?? false) addressParts.add(place.name!);
-        if (place.subLocality?.isNotEmpty ?? false)
-          addressParts.add(place.subLocality!);
-        if (place.locality?.isNotEmpty ?? false)
-          addressParts.add(place.locality!);
-
-        setState(() {
-          currentAddress = addressParts.isEmpty
-              ? "${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}"
-              : addressParts.join(", ");
-          _currentLatitude = position.latitude;
-          _currentLongitude = position.longitude;
-        });
-      }
-    } catch (e) {
-      if (mounted) setState(() => currentAddress = "Failed to get location");
-    }
-  }
-
-
 
   @override
   void dispose() {
-    _searchController.dispose();
+    disposeLocation();
     super.dispose();
   }
 
@@ -110,34 +35,108 @@ class _OurServiceScreenState extends State<OurServiceScreen> {
         child: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.start,
             children: [
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: HomeHeader(
                   currentAddress: currentAddress,
-                  searchController: _searchController,
+                  searchController: searchController,
                   onSearchChanged: (value) =>
-                      setState(() => _searchQuery = value.toLowerCase()),
+                      setState(() => searchQuery = value.toLowerCase()),
                   onLocationChanged: (LocationModel result) {
                     setState(() {
                       currentAddress = result.name.isNotEmpty
                           ? result.name
                           : result.address;
-                      _currentLatitude = result.latitude;
-                      _currentLongitude = result.longitude;
-                      _selectedLocationId = result.id;
+                      currentLatitude = result.latitude;
+                      currentLongitude = result.longitude;
+                      selectedLocationId = result.id;
                     });
                   },
                 ),
               ),
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEAEAEA),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      /// LEFT CONTENT
+                      Expanded(
+                        flex: 3,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              "Our Services",
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.black,
+                              ),
+                            ),
+                            SizedBox(height: 6),
 
-              Container(
-                height: 300,
-                width: double.infinity,
-                decoration: const BoxDecoration(
-                  image: DecorationImage(
-                    image: AssetImage('assets/home/map.png'),
-                    fit: BoxFit.cover,
+                            Text(
+                              "Stuck on the road? Get instant tyre and battery assistance.",
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.black54,
+                                height: 1.4,
+                              ),
+                            ),
+   
+                            SizedBox(height: 10),
+
+                            Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.black,
+                                borderRadius: BorderRadius.circular(5),
+                              ),
+                              child: Text(
+                                "Explore",
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      /// RIGHT ANIMATION
+                      Expanded(
+                        flex: 2,
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: Lottie.asset(
+                            'assets/home/charger.json',
+                            height: 120,
+                            width: 150,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -145,16 +144,16 @@ class _OurServiceScreenState extends State<OurServiceScreen> {
               Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: HomeServices(
-                  searchQuery: _searchQuery,
+                  searchQuery: searchQuery,
                   onServiceSelected: (categoryName) =>
                       VehicleSelectionBottomSheet.show(
-                    context,
-                    category: categoryName,
-                    currentAddress: currentAddress,
-                    currentLatitude: _currentLatitude,
-                    currentLongitude: _currentLongitude,
-                    selectedLocationId: _selectedLocationId,
-                  ),
+                        context,
+                        category: categoryName,
+                        currentAddress: currentAddress,
+                        currentLatitude: currentLatitude,
+                        currentLongitude: currentLongitude,
+                        selectedLocationId: selectedLocationId,
+                      ),
                 ),
               ),
               const SizedBox(height: 100),

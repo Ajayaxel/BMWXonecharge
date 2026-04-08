@@ -19,7 +19,7 @@ import 'package:onecharge/models/add_vehicle_model.dart';
 import 'package:onecharge/logic/blocs/add_vehicle/add_vehicle_bloc.dart';
 import 'package:onecharge/logic/blocs/add_vehicle/add_vehicle_event.dart';
 import 'package:onecharge/logic/blocs/add_vehicle/add_vehicle_state.dart';
-import 'package:onecharge/screen/home/main_screen.dart';
+import 'package:onecharge/screen/bottmnav/main_screen.dart';
 import 'package:onecharge/utils/toast_utils.dart';
 
 class VehicleSelection extends StatefulWidget {

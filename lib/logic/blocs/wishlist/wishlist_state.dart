@@ -15,15 +15,16 @@ class WishlistState extends Equatable {
 
   WishlistState copyWith({
     Map<int, bool>? wishlistMap,
-    int? loadingProductId,
-    String? error,
-    String? message,
+    int? Function()? loadingProductId,
+    String? Function()? error,
+    String? Function()? message,
   }) {
     return WishlistState(
       wishlistMap: wishlistMap ?? this.wishlistMap,
-      loadingProductId: loadingProductId,
-      error: error,
-      message: message,
+      loadingProductId:
+          loadingProductId != null ? loadingProductId() : this.loadingProductId,
+      error: error != null ? error() : this.error,
+      message: message != null ? message() : this.message,
     );
   }
 

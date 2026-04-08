@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:onecharge/const/onebtn.dart';
 import 'package:onecharge/resources/app_resources.dart';
-import 'package:onecharge/test/testlogin.dart';
+import 'package:onecharge/screen/login/login_screen.dart';
 import 'package:onecharge/utils/onboarding_service.dart';
 
 class OnboardingScreen extends StatefulWidget {

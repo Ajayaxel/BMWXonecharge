@@ -22,11 +22,13 @@ class InitializeProductWishlistStatusEvent extends WishlistEvent {
 
 class ToggleWishlistEvent extends WishlistEvent {
   final int productId;
+  final bool isWishlisted;
 
   const ToggleWishlistEvent({
     required this.productId,
+    required this.isWishlisted,
   });
 
   @override
-  List<Object?> get props => [productId];
+  List<Object?> get props => [productId, isWishlisted];
 }

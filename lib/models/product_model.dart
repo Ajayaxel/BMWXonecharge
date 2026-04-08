@@ -92,6 +92,7 @@ class ProductModel {
   final String? updatedAt;
   final bool isWishlisted;
   final List<ProductImageModel>? images;
+  ComboProductPivot? comboPivot;
 
   ProductModel({
     required this.id,
@@ -114,11 +115,11 @@ class ProductModel {
 
   factory ProductModel.fromJson(Map<String, dynamic> json) {
     return ProductModel(
-      id: json['id'] ?? 0,
+      id: json['id'] ?? json['product_id'] ?? 0,
       name: json['name'] ?? '',
       slug: json['slug'] ?? '',
       sku: json['sku'] ?? '',
-      image: json['primary_image'] ?? json['image'],
+      image: json['primary_image'] ?? json['image'] ?? json['image_url'],
       shortDescription: json['short_description'] ?? '',
       description: json['description'] ?? '',
       keyFeature: json['key_feature'],
@@ -128,7 +129,7 @@ class ProductModel {
       isActive: (json['is_active'] == 1 || json['is_active'] == true),
       createdAt: json['created_at'],
       updatedAt: json['updated_at'],
-      isWishlisted: json['is_wishlist'] ?? false,
+      isWishlisted: (json['is_wishlist'] == 1 || json['is_wishlist'] == true),
       images: json['images'] != null
           ? (json['images'] as List)
               .map((i) => ProductImageModel.fromJson(i))
@@ -223,12 +224,32 @@ class ShopCategoryModel {
 
   factory ShopCategoryModel.fromJson(Map<String, dynamic> json) {
     return ShopCategoryModel(
-      id: json['id'] ?? 0,
+      id: json['id'] ?? json['category_id'] ?? 0,
       name: json['name'] ?? '',
       slug: json['slug'] ?? '',
       products: (json['products'] as List? ?? [])
           .map((i) => ProductModel.fromJson(i))
           .toList(),
+    );
+  }
+}
+
+class ComboProductPivot {
+  final int comboOfferId;
+  final int productId;
+  final int quantity;
+
+  ComboProductPivot({
+    required this.comboOfferId,
+    required this.productId,
+    required this.quantity,
+  });
+
+  factory ComboProductPivot.fromJson(Map<String, dynamic> json) {
+    return ComboProductPivot(
+      comboOfferId: json['combo_offer_id'] ?? 0,
+      productId: json['product_id'] ?? 0,
+      quantity: json['quantity'] ?? 0,
     );
   }
 }

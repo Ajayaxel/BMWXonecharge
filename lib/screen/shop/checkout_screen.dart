@@ -2,6 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:onecharge/const/onebtn.dart';
 import 'package:onecharge/logic/blocs/cart/cart_bloc.dart';
+import 'package:onecharge/logic/blocs/location/location_bloc.dart';
+import 'package:onecharge/logic/blocs/location/location_event.dart';
+import 'package:onecharge/logic/blocs/location/location_state.dart';
+import 'package:onecharge/logic/blocs/profile/profile_bloc.dart';
+import 'package:onecharge/logic/blocs/profile/profile_event.dart';
+import 'package:onecharge/logic/blocs/profile/profile_state.dart';
 import 'package:onecharge/models/cart_model.dart';
 import 'package:onecharge/screen/payment/payment_webview_screen.dart';
 
@@ -25,6 +31,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final _promoController = TextEditingController();
 
   String _selectedPaymentMethod = 'paymob';
+
+  @override
+  void initState() {
+    super.initState();
+    context.read<ProfileBloc>().add(FetchProfile());
+    context.read<LocationBloc>().add(FetchLocations());
+  }
 
   @override
   void dispose() {
@@ -109,7 +122,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       barrierDismissible: false,
       builder: (context) => Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        backgroundColor: const Color(0xFFF3EDF7), // Matching the lavender tint in screenshot
+        backgroundColor: const Color(
+          0xFFF3EDF7,
+        ), // Matching the lavender tint in screenshot
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
           child: Column(
@@ -118,7 +133,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: isSuccess ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
+                  color: isSuccess
+                      ? Colors.green.withOpacity(0.1)
+                      : Colors.red.withOpacity(0.1),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
@@ -181,16 +198,55 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocListener<CartBloc, CartState>(
-      listener: (context, state) {
-        if (state is CheckoutSuccess) {
-          _handleCheckoutSuccess(state.data);
-        } else if (state is CartFailure) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(state.error)),
-          );
-        }
-      },
+    return MultiBlocListener(
+      listeners: [
+        BlocListener<CartBloc, CartState>(
+          listener: (context, state) {
+            if (state is CheckoutSuccess) {
+              _handleCheckoutSuccess(state.data);
+            } else if (state is CartFailure) {
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(SnackBar(content: Text(state.error)));
+            }
+          },
+        ),
+        BlocListener<ProfileBloc, ProfileState>(
+          listener: (context, state) {
+            if (state is ProfileLoaded) {
+              if (_nameController.text.isEmpty) {
+                _nameController.text = state.customer.name;
+              }
+              if (_phoneController.text.isEmpty) {
+                _phoneController.text = state.customer.phone;
+              }
+              if (_emailController.text.isEmpty) {
+                _emailController.text = state.customer.email;
+              }
+            }
+          },
+        ),
+        BlocListener<LocationBloc, LocationState>(
+          listener: (context, state) {
+            if (state is LocationsLoaded) {
+              final location = state.selectedLocation ??
+                  (state.locations.isNotEmpty ? state.locations.first : null);
+
+              if (location != null) {
+                if (_cityController.text.isEmpty) {
+                  _cityController.text = location.roadArea ?? '';
+                }
+                if (_addressController.text.isEmpty) {
+                  _addressController.text = location.address;
+                }
+                if (_buildingController.text.isEmpty) {
+                  _buildingController.text = location.towerBuildingName ?? '';
+                }
+              }
+            }
+          },
+        ),
+      ],
       child: Scaffold(
         backgroundColor: const Color(0xFFF9FAFB),
         appBar: AppBar(
@@ -512,7 +568,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           GestureDetector(
             onTap: () => setState(() => _selectedPaymentMethod = 'paymob'),
             child: _buildPaymentOption(
-              'Pay mob',
+              'Pay Now',
               Icons.payments_outlined,
               isSelected: _selectedPaymentMethod == 'paymob',
             ),
@@ -607,10 +663,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Widget _buildBottomButton(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 30, left: 16, right: 16),
-      child: OneBtn(
-        text: 'Place Order',
-        onPressed: _onPlaceOrder,
-      ),
+      child: OneBtn(text: 'Place Order', onPressed: _onPlaceOrder),
     );
   }
 }
