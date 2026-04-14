@@ -30,7 +30,7 @@ class ShopProductScreen extends StatefulWidget {
 class _ShopProductScreenState extends State<ShopProductScreen>
     with LocationHandlerMixin {
   int _selectedCategoryId = 0; // 0 for "All"
-  List<ShopCategoryModel> _cachedCategories = []; 
+  List<ShopCategoryModel> _cachedCategories = [];
   late PageController _productPageController;
   double _currentProductPage = 0.0;
 
@@ -80,8 +80,11 @@ class _ShopProductScreenState extends State<ShopProductScreen>
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.error_outline_rounded,
-                      size: 48, color: Colors.grey),
+                  const Icon(
+                    Icons.error_outline_rounded,
+                    size: 48,
+                    color: Colors.grey,
+                  ),
                   const SizedBox(height: 16),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -100,7 +103,9 @@ class _ShopProductScreenState extends State<ShopProductScreen>
                   const SizedBox(height: 24),
                   ElevatedButton.icon(
                     onPressed: () {
-                      context.read<ShopCategoryBloc>().add(FetchShopCategories());
+                      context.read<ShopCategoryBloc>().add(
+                        FetchShopCategories(),
+                      );
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF1B1B1B),
@@ -151,8 +156,8 @@ class _ShopProductScreenState extends State<ShopProductScreen>
         final List<ProductModel> currentProducts = baseProducts.where((p) {
           if (searchController.text.isEmpty) return true;
           return p.name.toLowerCase().contains(
-                searchController.text.toLowerCase(),
-              );
+            searchController.text.toLowerCase(),
+          );
         }).toList();
 
         return Scaffold(
@@ -225,21 +230,21 @@ class _ShopProductScreenState extends State<ShopProductScreen>
                             initialLongitude: currentLongitude,
                           );
                         }
-                        
+
                         // Fallback or skeleton
                         if (state is ComboOfferLoading) {
-                           return Shimmer.fromColors(
-                             baseColor: Colors.grey[200]!,
-                             highlightColor: Colors.grey[100]!,
-                             child: Container(
-                               height: 150,
-                               width: double.infinity,
-                               decoration: BoxDecoration(
-                                 color: Colors.white,
-                                 borderRadius: BorderRadius.circular(16),
-                               ),
-                             ),
-                           );
+                          return Shimmer.fromColors(
+                            baseColor: Colors.grey[200]!,
+                            highlightColor: Colors.grey[100]!,
+                            child: Container(
+                              height: 150,
+                              width: double.infinity,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                          );
                         }
 
                         return const BannerSection(
@@ -262,10 +267,12 @@ class _ShopProductScreenState extends State<ShopProductScreen>
                         itemCount: categories.length + 1,
                         itemBuilder: (context, index) {
                           final bool isAll = index == 0;
-                          final String name =
-                              isAll ? 'All' : categories[index - 1].name;
-                          final int categoryId =
-                              isAll ? 0 : categories[index - 1].id;
+                          final String name = isAll
+                              ? 'All'
+                              : categories[index - 1].name;
+                          final int categoryId = isAll
+                              ? 0
+                              : categories[index - 1].id;
                           final bool isSelected =
                               _selectedCategoryId == categoryId;
 
@@ -275,7 +282,7 @@ class _ShopProductScreenState extends State<ShopProductScreen>
                                 setState(() {
                                   _selectedCategoryId = categoryId;
                                 });
-                                
+
                                 // Reset carousel index to 0 for the new category
                                 if (_productPageController.hasClients) {
                                   _productPageController.jumpToPage(0);
@@ -285,9 +292,9 @@ class _ShopProductScreenState extends State<ShopProductScreen>
                                 });
 
                                 // Properly fetching on tab switch as requested
-                                context
-                                    .read<ShopCategoryBloc>()
-                                    .add(FetchShopCategories());
+                                context.read<ShopCategoryBloc>().add(
+                                  FetchShopCategories(),
+                                );
                               }
                             },
                             child: Container(
@@ -391,127 +398,126 @@ class _ShopProductScreenState extends State<ShopProductScreen>
                               children: [
                                 // Visual Stack
                                 if (currentProducts.isNotEmpty)
-                                        for (int i = 4; i >= 0; i--) ...[
-                                          if (i + _currentProductPage.floor() <
-                                              currentProducts.length)
-                                            Builder(
-                                              builder: (context) {
-                                                final int itemIndex =
-                                                    i + _currentProductPage.floor();
-                                                final product =
-                                                    currentProducts[itemIndex];
-                                                final double relativePos =
-                                                    itemIndex - _currentProductPage;
+                                  for (int i = 4; i >= 0; i--) ...[
+                                    if (i + _currentProductPage.floor() <
+                                        currentProducts.length)
+                                      Builder(
+                                        builder: (context) {
+                                          final int itemIndex =
+                                              i + _currentProductPage.floor();
+                                          final product =
+                                              currentProducts[itemIndex];
+                                          final double relativePos =
+                                              itemIndex - _currentProductPage;
 
-                                                double leftOffset;
-                                                if (relativePos < 0) {
-                                                  leftOffset = relativePos * 300;
-                                                } else {
-                                                  leftOffset = relativePos * 35.0;
-                                                }
+                                          double leftOffset;
+                                          if (relativePos < 0) {
+                                            leftOffset = relativePos * 300;
+                                          } else {
+                                            leftOffset = relativePos * 35.0;
+                                          }
 
-                                                return Positioned(
-                                                  left: leftOffset,
-                                                  top: (relativePos.clamp(0, 4)) *
-                                                      6.0,
-                                                  bottom:
-                                                      (relativePos.clamp(0, 4)) *
-                                                          6.0,
-                                                  child: itemIndex ==
-                                                          _currentProductPage
-                                                              .floor()
-                                                      ? _FloatingCard(
-                                                          child: _ProductCard(
-                                                            product: product,
-                                                            bgColor: _getBgColor(
-                                                              itemIndex,
-                                                            ),
-                                                            isFront: true,
-                                                          ),
-                                                        )
-                                                      : _ProductCard(
-                                                          product: product,
-                                                          bgColor: _getBgColor(
-                                                            itemIndex,
-                                                          ),
-                                                          isFront: false,
+                                          return Positioned(
+                                            left: leftOffset,
+                                            top:
+                                                (relativePos.clamp(0, 4)) * 6.0,
+                                            bottom:
+                                                (relativePos.clamp(0, 4)) * 6.0,
+                                            child:
+                                                itemIndex ==
+                                                    _currentProductPage.floor()
+                                                ? _FloatingCard(
+                                                    child: _ProductCard(
+                                                      product: product,
+                                                      bgColor: _getBgColor(
+                                                        itemIndex,
+                                                      ),
+                                                      isFront: true,
+                                                    ),
+                                                  )
+                                                : _ProductCard(
+                                                    product: product,
+                                                    bgColor: _getBgColor(
+                                                      itemIndex,
+                                                    ),
+                                                    isFront: false,
+                                                  ),
+                                          );
+                                        },
+                                      ),
+                                  ],
+                                // Gesture Layer
+                                Positioned.fill(
+                                  child: PageView.builder(
+                                    controller: _productPageController,
+                                    itemCount: currentProducts.length,
+                                    itemBuilder: (context, index) {
+                                      final product = currentProducts[index];
+                                      return Stack(
+                                        children: [
+                                          Positioned(
+                                            left: 0,
+                                            width: 280,
+                                            height: 250,
+                                            child: GestureDetector(
+                                              behavior: HitTestBehavior.opaque,
+                                              onTap: () {
+                                                Navigator.push(
+                                                  context,
+                                                  MaterialPageRoute(
+                                                    builder: (context) =>
+                                                        ProductDetailScreen(
+                                                          productId: product.id,
                                                         ),
+                                                  ),
                                                 );
                                               },
-                                            ),
-                                        ],
-                                      // Gesture Layer
-                                      Positioned.fill(
-                                        child: PageView.builder(
-                                          controller: _productPageController,
-                                          itemCount: currentProducts.length,
-                                          itemBuilder: (context, index) {
-                                            final product = currentProducts[index];
-                                            return Stack(
-                                              children: [
-                                                Positioned(
-                                                  left: 0,
-                                                  width: 280,
-                                                  height: 250,
-                                                  child: GestureDetector(
-                                                    behavior:
-                                                        HitTestBehavior.opaque,
-                                                    onTap: () {
-                                                      Navigator.push(
-                                                        context,
-                                                        MaterialPageRoute(
-                                                          builder: (context) =>
-                                                              ProductDetailScreen(
-                                                                productId:
-                                                                    product.id,
-                                                              ),
+                                              child: Stack(
+                                                children: [
+                                                  if (index ==
+                                                      _currentProductPage
+                                                          .floor())
+                                                    Positioned(
+                                                      top: 16,
+                                                      right: 16,
+                                                      child: GestureDetector(
+                                                        onTap: () {
+                                                          context
+                                                              .read<
+                                                                WishlistBloc
+                                                              >()
+                                                              .add(
+                                                                ToggleWishlistEvent(
+                                                                  productId:
+                                                                      product
+                                                                          .id,
+                                                                  isWishlisted:
+                                                                      product
+                                                                          .isWishlisted,
+                                                                ),
+                                                              );
+                                                        },
+                                                        child: Container(
+                                                          width: 40,
+                                                          height: 40,
+                                                          color: Colors
+                                                              .transparent,
                                                         ),
-                                                      );
-                                                    },
-                                                    child: Stack(
-                                                      children: [
-                                                        if (index ==
-                                                            _currentProductPage
-                                                                .floor())
-                                                          Positioned(
-                                                            top: 16,
-                                                            right: 16,
-                                                            child: GestureDetector(
-                                                              onTap: () {
-                                                                context
-                                                                    .read<
-                                                                        WishlistBloc>()
-                                                                    .add(
-                                                                      ToggleWishlistEvent(
-                                                                        productId:
-                                                                            product
-                                                                                .id,
-                                                                        isWishlisted:
-                                                                            product
-                                                                                .isWishlisted,
-                                                                      ),
-                                                                    );
-                                                              },
-                                                              child: Container(
-                                                                width: 40,
-                                                                height: 40,
-                                                                color: Colors.transparent,
-                                                              ),
-                                                            ),
-                                                          ),
-                                                      ],
+                                                      ),
                                                     ),
-                                                  ),
-                                                ),
-                                              ],
-                                            );
-                                          },
-                                        ),
-                                      ),
-                                    ],
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      );
+                                    },
                                   ),
+                                ),
+                              ],
+                            ),
                           ),
-                          const SizedBox(height: 30),
+                          const SizedBox(height: 50),
                         ],
                       ),
                   ],
@@ -639,11 +645,11 @@ class _ProductCardState extends State<_ProductCard> {
 
   void _initializeWishlistStatus() {
     context.read<WishlistBloc>().add(
-          InitializeProductWishlistStatusEvent(
-            productId: widget.product.id,
-            isWishlisted: widget.product.isWishlisted,
-          ),
-        );
+      InitializeProductWishlistStatusEvent(
+        productId: widget.product.id,
+        isWishlisted: widget.product.isWishlisted,
+      ),
+    );
   }
 
   @override
@@ -1041,4 +1047,3 @@ class _FloatingCardState extends State<_FloatingCard>
     );
   }
 }
-
