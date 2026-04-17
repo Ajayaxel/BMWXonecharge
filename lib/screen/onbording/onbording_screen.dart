@@ -1,39 +1,42 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:onecharge/const/onebtn.dart';
-import 'package:onecharge/resources/app_resources.dart';
 import 'package:onecharge/screen/login/login_screen.dart';
 import 'package:onecharge/utils/onboarding_service.dart';
+import 'package:smoke_effect/smoke_effect.dart';
 
-class OnboardingScreen extends StatefulWidget {
-  const OnboardingScreen({super.key});
+class OnbordingScreen extends StatefulWidget {
+  const OnbordingScreen({super.key});
 
   @override
-  State<OnboardingScreen> createState() => _OnboardingScreenState();
+  State<OnbordingScreen> createState() => _OnbordingScreenState();
 }
 
-class _OnboardingScreenState extends State<OnboardingScreen> {
+class _OnbordingScreenState extends State<OnbordingScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
 
-  final List<OnboardingPageData> _pages = [
-    OnboardingPageData(
-      title: "Discover",
-      description:
-          "From low battery to flat tyres — OneCharge\ngets you moving again, fast.",
-      image: AppOnbordImages.onbord1,
-    ),
-    OnboardingPageData(
-      title: "Discover",
-      description:
-          "Book mechanical help, battery swaps, or\ntowing with one app",
-      image: AppOnbordImages.onbord3,
-    ),
-    OnboardingPageData(
-      title: "Discover",
-      description:
-          "Share your issue with photos or video\n— we handle the rest.",
-      image: AppOnbordImages.onbord2,
-    ),
+  final List<Map<String, String>> _pages = [
+    {
+      'image': 'assets/onbord/car_onboarding.png',
+      'title': "Premium EV Accessories",
+      'subtitle':
+          "OneCharge delivers quick, reliable support\nwhenever your vehicle needs it.",
+    },
+    {
+      'image': 'assets/onbord/onbord2.png',
+      'title': "Roadside Assistance",
+      'subtitle':
+          "From flat tyres to mechanical issues,\nwe get you moving again, fast.",
+    },
+
+    {
+      'image': 'assets/onbord/onbord4.png',
+      'title': "Reliable Towing",
+      'subtitle':
+          "Professional towing services across the city,\navailable whenever you're stuck.",
+    },
   ];
 
   @override
@@ -42,314 +45,236 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     super.dispose();
   }
 
-  void _nextPage() async {
+  void _nextPage() {
     if (_currentPage < _pages.length - 1) {
       _pageController.nextPage(
-        duration: const Duration(milliseconds: 300),
+        duration: const Duration(milliseconds: 400),
         curve: Curves.easeInOut,
       );
     } else {
-      // Mark onboarding as completed
-      await OnboardingService.completeOnboarding();
-      if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => Testlogin()),
-      );
+      _finishOnboarding();
     }
+  }
+
+  Future<void> _finishOnboarding() async {
+    await OnboardingService.completeOnboarding();
+    if (!mounted) return;
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const Testlogin()),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final screenHeight = MediaQuery.of(context).size.height;
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isSmallScreen = screenHeight < 700;
-    final isLargeScreen = screenHeight > 900;
-
     return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Top section with logo and tagline
-            Padding(
-              padding: EdgeInsets.only(
-                top: isSmallScreen ? 10 : 20,
-                bottom: 2,
-                left: 16,
-                right: 16,
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: [
+          // Background Image (behind everything, changes with PageView)
+          Positioned.fill(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 500),
+              child: Image.asset(
+                _pages[_currentPage]['image']!,
+                key: ValueKey<int>(_currentPage),
+                fit: BoxFit.cover,
+                alignment: Alignment.center,
+                width: double.infinity,
+                height: double.infinity,
               ),
+            ),
+          ),
+          // Full Page Smoke Effect
+          const Positioned.fill(
+            child: Opacity(
+              opacity: 0.6,
+              child: IgnorePointer(
+                child: SmokeEffect(
+                  gradientSmoke: true,
+                  singleSmokeColor: Colors.white,
+                ),
+              ),
+            ),
+          ),
+          // Content Layout
+          Column(
+            children: [
+              // Top section (visual only, for height distribution)
+              const Expanded(flex: 6, child: SizedBox.shrink()),
+
+              // Bottom section - 40% of screen height with glass effect
+              Expanded(
+                flex: 4,
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(30),
+                    topRight: Radius.circular(30),
+                  ),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                    child: Container(
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.03),
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(30),
+                          topRight: Radius.circular(30),
+                        ),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 40,
+                      ),
+                      child: Stack(
+                        children: [
+                          PageView.builder(
+                            controller: _pageController,
+                            onPageChanged: (index) {
+                              setState(() {
+                                _currentPage = index;
+                              });
+                            },
+                            itemCount: _pages.length,
+                            itemBuilder: (context, index) {
+                              return Column(
+                                children: [
+                                  Text(
+                                    _pages[index]['title']!,
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      fontFamily: 'Lufga',
+                                      color: Colors.white,
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.bold,
+                                      height: 1.2,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    _pages[index]['subtitle']!,
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      fontFamily: 'Lufga',
+                                      color: Colors.white,
+                                      fontSize: 14,
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          // Overlay UI Elements (indicators and skip)
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               child: Column(
                 children: [
-                  Image.asset(
-                    AppImages.logo,
-                    width: AppHeights.logoWidth,
-                    height: AppHeights.logoHeight,
-                    fit: BoxFit.cover,
-                  ),
-                  SizedBox(height: isSmallScreen ? 12 : 16),
-                  Text(
-                    "OneCharge delivers quick, reliable EV support\nanytime you need it.",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: isSmallScreen ? 12 : 14,
-                      color: AppColors.textColor,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children:
+                        List.generate(_pages.length, (index) {
+                              return _buildTopIndicator(_currentPage == index);
+                            })
+                            .map(
+                              (e) => Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                ),
+                                child: e,
+                              ),
+                            )
+                            .toList(),
                   ),
                 ],
               ),
             ),
-
-            // PageView for onboarding pages
-            Expanded(
-              child: PageView.builder(
-                controller: _pageController,
-                onPageChanged: (index) {
-                  setState(() {
-                    _currentPage = index;
-                  });
-                },
-                itemCount: _pages.length,
-                itemBuilder: (context, index) {
-                  return OnboardingPageWidget(
-                    pageData: _pages[index],
-                    pageIndex: index,
-                    currentPage: _currentPage,
-                    screenHeight: screenHeight,
-                    screenWidth: screenWidth,
-                    isSmallScreen: isSmallScreen,
-                    isLargeScreen: isLargeScreen,
-                  );
-                },
-              ),
-            ),
-
-            // Pagination indicators
-            Padding(
-              padding: EdgeInsets.symmetric(vertical: isSmallScreen ? 12 : 20),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(
-                  _pages.length,
-                  (index) => AnimatedContainer(
-                    duration: const Duration(milliseconds: 300),
-                    curve: Curves.easeInOut,
-                    margin: const EdgeInsets.symmetric(horizontal: 4),
-                    width: _currentPage == index ? 24 : 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: _currentPage == index
-                          ? AppColors.textColor
-                          : Colors.grey.shade400,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
+          ),
+          // Skip Button
+          Positioned(
+            top: MediaQuery.of(context).padding.top + -10,
+            right: 20,
+            child: GestureDetector(
+              onTap: () {
+                // Skip logic - mark complete and go to login
+                _finishOnboarding();
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.4),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Text(
+                  "Skip",
+                  style: TextStyle(
+                    fontFamily: 'Lufga',
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ),
             ),
-            SizedBox(height: isSmallScreen ? 12 : 20),
-
-            // Continue button
-            Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: isSmallScreen ? 12 : 20,
-              ),
-              child: OneBtn(
-                text: _currentPage == _pages.length - 1
-                    ? "Get Started"
-                    : "Continue",
-                onPressed: _nextPage,
-              ),
+          ),
+          // Bottom Navigation (Dots and Button)
+          Positioned(
+            bottom: 40,
+            left: 24,
+            right: 24,
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(_pages.length, (index) {
+                    return Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 4),
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: _currentPage == index
+                            ? Colors.white
+                            : Colors.white30,
+                      ),
+                    );
+                  }),
+                ),
+                const SizedBox(height: 40),
+                OneBtn(
+                  onPressed: _nextPage,
+                  text: _currentPage == _pages.length - 1
+                      ? "Get Started"
+                      : "Next",
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
-}
 
-class OnboardingPageData {
-  final String title;
-  final String description;
-  final String image;
-
-  OnboardingPageData({
-    required this.title,
-    required this.description,
-    required this.image,
-  });
-}
-
-class OnboardingPageWidget extends StatefulWidget {
-  final OnboardingPageData pageData;
-  final int pageIndex;
-  final int currentPage;
-  final double screenHeight;
-  final double screenWidth;
-  final bool isSmallScreen;
-  final bool isLargeScreen;
-
-  const OnboardingPageWidget({
-    super.key,
-    required this.pageData,
-    required this.pageIndex,
-    required this.currentPage,
-    required this.screenHeight,
-    required this.screenWidth,
-    required this.isSmallScreen,
-    required this.isLargeScreen,
-  });
-
-  @override
-  State<OnboardingPageWidget> createState() => _OnboardingPageWidgetState();
-}
-
-class _OnboardingPageWidgetState extends State<OnboardingPageWidget>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _animationController;
-  late Animation<double> _fadeAnimation;
-  late Animation<Offset> _slideAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 600),
-    );
-
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
-    );
-
-    _slideAnimation =
-        Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
-          CurvedAnimation(
-            parent: _animationController,
-            curve: Curves.easeOutCubic,
-          ),
-        );
-
-    // Start animation when page becomes visible
-    if (widget.pageIndex == widget.currentPage) {
-      _animationController.forward();
-    }
-  }
-
-  @override
-  void didUpdateWidget(OnboardingPageWidget oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    // Animate when page becomes active
-    if (widget.pageIndex == widget.currentPage &&
-        oldWidget.currentPage != widget.currentPage) {
-      _animationController.reset();
-      _animationController.forward();
-    } else if (widget.pageIndex != widget.currentPage) {
-      _animationController.reset();
-    }
-  }
-
-  @override
-  void dispose() {
-    _animationController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    // Calculate responsive heights based on screen size
-    final imageHeight = widget.isSmallScreen
-        ? widget.screenHeight * 0.25
-        : widget.isLargeScreen
-        ? widget.screenHeight * 0.35
-        : widget.screenHeight * 0.30;
-
-    final titleSpacing = widget.isSmallScreen ? 20.0 : 30.0;
-    final descriptionSpacing = widget.isSmallScreen ? 8.0 : 10.0;
-    final titleFontSize = widget.isSmallScreen
-        ? 20.0
-        : widget.isLargeScreen
-        ? 28.0
-        : 24.0;
-    final descriptionFontSize = widget.isSmallScreen
-        ? 12.0
-        : widget.isLargeScreen
-        ? 16.0
-        : 14.0;
-
-    return SingleChildScrollView(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(minHeight: widget.screenHeight * 0.5),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Animated illustration - responsive height
-            SizedBox(
-              height: imageHeight,
-              width: double.infinity,
-              child: FadeTransition(
-                opacity: _fadeAnimation,
-                child: SlideTransition(
-                  position: _slideAnimation,
-                  child: Align(
-                    alignment: widget.pageIndex == 0
-                        ? Alignment.centerLeft
-                        : widget.pageIndex == 1
-                        ? Alignment.centerRight
-                        : Alignment.center,
-                    child: Image.asset(
-                      widget.pageData.image,
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
-            SizedBox(height: titleSpacing),
-
-            // Animated title - with padding
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: FadeTransition(
-                opacity: _fadeAnimation,
-                child: SlideTransition(
-                  position: _slideAnimation,
-                  child: Text(
-                    widget.pageData.title,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: titleFontSize,
-                      color: AppColors.textColor,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
-            SizedBox(height: descriptionSpacing),
-
-            // Animated description - with padding
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: FadeTransition(
-                opacity: _fadeAnimation,
-                child: SlideTransition(
-                  position: _slideAnimation,
-                  child: Text(
-                    widget.pageData.description,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: descriptionFontSize,
-                      color: AppColors.textColor,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
+  Widget _buildTopIndicator(bool isActive) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      width: isActive ? 40 : 20,
+      height: 2,
+      decoration: BoxDecoration(
+        color: isActive ? Colors.white : Colors.white24,
+        borderRadius: BorderRadius.circular(1),
       ),
     );
   }

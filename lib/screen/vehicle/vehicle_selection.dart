@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:onecharge/logic/blocs/vehicle_list/vehicle_list_bloc.dart';
+import 'package:onecharge/logic/blocs/vehicle_list/vehicle_list_event.dart';
+import 'package:onecharge/models/brand_model.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:onecharge/const/onebtn.dart';
 import 'package:onecharge/core/storage/vehicle_storage.dart';
@@ -30,7 +33,7 @@ class VehicleSelection extends StatefulWidget {
 }
 
 class _VehicleSelectionState extends State<VehicleSelection> {
-  String? selectedBrand = 'BMW';
+  String? selectedBrand;
   String selectedVehicleType = 'Sedan';
   VehicleModel? selectedVehicle; // Track selected vehicle
   final TextEditingController searchController = TextEditingController();
@@ -49,6 +52,9 @@ class _VehicleSelectionState extends State<VehicleSelection> {
       final brandState = context.read<BrandBloc>().state;
       if (brandState is! BrandLoaded) {
         context.read<BrandBloc>().add(FetchBrands());
+      } else {
+        // If already loaded, set initial defaults
+        _setInitialDefaults(brandState.brands);
       }
 
       final vehicleModelState = context.read<VehicleModelBloc>().state;
@@ -74,6 +80,24 @@ class _VehicleSelectionState extends State<VehicleSelection> {
     final maxScroll = _scrollController.position.maxScrollExtent;
     final currentScroll = _scrollController.offset;
     return currentScroll >= (maxScroll * 0.9);
+  }
+
+  void _setInitialDefaults(List<Brand> brands) {
+    if (brands.isNotEmpty && selectedBrand == null) {
+      // Find BMW if exists, else first brand
+      final brand = brands.any((b) => b.name == 'BMW')
+          ? brands.firstWhere((b) => b.name == 'BMW')
+          : brands.first;
+
+      setState(() {
+        selectedBrand = brand.name;
+        if (brand.vehicleType?.name != null) {
+          selectedVehicleType = brand.vehicleType!.name!;
+        } else if (brand.vehicleCategories.isNotEmpty) {
+          selectedVehicleType = brand.vehicleCategories.first.name;
+        }
+      });
+    }
   }
 
   @override
@@ -338,6 +362,13 @@ class _VehicleSelectionState extends State<VehicleSelection> {
           );
         } else if (state is BrandLoaded) {
           final brands = state.brands;
+          // Set initial defaults when brands are first loaded
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (selectedBrand == null) {
+              _setInitialDefaults(brands);
+            }
+          });
+          
           return SizedBox(
             height: 110,
             child: ListView.builder(
@@ -351,6 +382,11 @@ class _VehicleSelectionState extends State<VehicleSelection> {
                   onTap: () {
                     setState(() {
                       selectedBrand = brand.name;
+                      if (brand.vehicleType?.name != null) {
+                        selectedVehicleType = brand.vehicleType!.name!;
+                      } else if (brand.vehicleCategories.isNotEmpty) {
+                        selectedVehicleType = brand.vehicleCategories.first.name;
+                      }
                     });
                   },
                   child: Padding(
@@ -410,25 +446,32 @@ class _VehicleSelectionState extends State<VehicleSelection> {
   }
 
   Widget _buildVehicleTypeFilters() {
-    return BlocBuilder<VehicleModelBloc, VehicleModelState>(
+    return BlocBuilder<BrandBloc, BrandState>(
       builder: (context, state) {
         List<String> dynamicVehicleTypes = [];
 
-        if (state is VehicleModelLoaded || state is VehicleModelPaginationLoading) {
-          dynamicVehicleTypes = state.models
-              .map((m) => m.vehicleCategory?.name)
-              .where((name) => name != null && name.isNotEmpty)
-              .toSet()
-              .cast<String>()
-              .toList();
+        if (state is BrandLoaded) {
+          if (selectedBrand != null) {
+            final brand = state.brands.firstWhere(
+              (b) => b.name == selectedBrand,
+              orElse: () => state.brands.first,
+            );
+            dynamicVehicleTypes = brand.vehicleCategories.map((c) => c.name).toList();
+          } else {
+            dynamicVehicleTypes = state.brands
+                .expand((b) => b.vehicleCategories)
+                .map((c) => c.name)
+                .toSet()
+                .toList();
+          }
         }
 
         if (dynamicVehicleTypes.isEmpty) {
-          dynamicVehicleTypes = ['Sedan', 'SUV']; // Fallback while loading
+          dynamicVehicleTypes = ['Sedan', 'SUV']; // Fallback
         }
 
-        // If current selection is not in the list (and not initial state), maybe we don't change selection, 
-        // just let it highlight if matched.
+        // If current selection is not in the list anymore, maybe reset it?
+        // But usually we update it on brand tap.
 
         return SingleChildScrollView(
           scrollDirection: Axis.horizontal,
@@ -1228,13 +1271,13 @@ class _VehicleSelectionState extends State<VehicleSelection> {
                                                   brand.name == selectedBrand,
                                             );
                                         vehicleTypeId =
-                                            selectedBrandData.vehicleTypeId;
+                                            selectedBrandData.vehicleTypeId ?? 1;
                                         brandId = selectedBrandData.id;
                                       } catch (e) {
                                         final firstBrand =
                                             brandState.brands.first;
                                         vehicleTypeId =
-                                            firstBrand.vehicleTypeId;
+                                            firstBrand.vehicleTypeId ?? 1;
                                         brandId = firstBrand.id;
                                       }
                                     }
@@ -1372,7 +1415,15 @@ class _VehicleSelectionState extends State<VehicleSelection> {
 
                     // Navigate to HomeScreen and remove all previous routes
                     if (!mounted) return;
+                    
+                    // Force refresh vehicle list to show the newly added vehicle
+                    // ignore: use_build_context_synchronously
+                    context.read<VehicleListBloc>().add(
+                          const FetchVehicles(forceRefresh: true),
+                        );
+
                     Navigator.pushAndRemoveUntil(
+                      // ignore: use_build_context_synchronously
                       context,
                       MaterialPageRoute(
                         builder: (context) => const MainScreen(),

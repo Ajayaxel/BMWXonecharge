@@ -1109,6 +1109,14 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  smoke_effect:
+    dependency: "direct main"
+    description:
+      name: smoke_effect
+      sha256: "2db8ffed4b37123595c1d34bec4f49d881fdce7be9f626744d21a0e9766e36fc"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.0.6"
   source_span:
     dependency: transitive
     description:

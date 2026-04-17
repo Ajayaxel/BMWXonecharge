@@ -66,6 +66,12 @@ class IssueRepository {
           'company_code': request.companyCode,
         if (request.companyCodeId != null)
           'company_code_id': request.companyCodeId,
+        if (request.parkingFloor != null && request.parkingFloor!.isNotEmpty)
+          'parking_floor': request.parkingFloor,
+        if (request.parkingNumber != null && request.parkingNumber!.isNotEmpty)
+          'parking_number': request.parkingNumber,
+        if (request.parkingType != null && request.parkingType!.isNotEmpty)
+          'parking_type': request.parkingType,
       });
 
       // Add attachments if any

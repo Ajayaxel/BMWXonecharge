@@ -9,6 +9,7 @@ class IssueSubType extends Equatable {
   final String vat;
   final String? iconImage;
   final String? iconImageUrl;
+  final String? backgroundColor;
 
   const IssueSubType({
     required this.id,
@@ -19,6 +20,7 @@ class IssueSubType extends Equatable {
     required this.vat,
     this.iconImage,
     this.iconImageUrl,
+    this.backgroundColor,
   });
 
   factory IssueSubType.fromJson(Map<String, dynamic> json) {
@@ -31,11 +33,22 @@ class IssueSubType extends Equatable {
       vat: json['vat']?.toString() ?? '0.00',
       iconImage: json['icon_image'],
       iconImageUrl: json['icon_image_url'],
+      backgroundColor: json['background_color'],
     );
   }
 
   @override
-  List<Object?> get props => [id, issueCategoryId, name, serviceCost, serviceCharge, vat, iconImage, iconImageUrl];
+  List<Object?> get props => [
+        id,
+        issueCategoryId,
+        name,
+        serviceCost,
+        serviceCharge,
+        vat,
+        iconImage,
+        iconImageUrl,
+        backgroundColor,
+      ];
 }
 
 class IssueCategory extends Equatable {

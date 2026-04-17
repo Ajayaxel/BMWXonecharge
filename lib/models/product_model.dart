@@ -91,6 +91,8 @@ class ProductModel {
   final String? createdAt;
   final String? updatedAt;
   final bool isWishlisted;
+  final String? subtitle;
+  final String? backgroundColor;
   final List<ProductImageModel>? images;
   ComboProductPivot? comboPivot;
 
@@ -110,6 +112,8 @@ class ProductModel {
     this.createdAt,
     this.updatedAt,
     this.isWishlisted = false,
+    this.subtitle,
+    this.backgroundColor,
     this.images,
   });
 
@@ -130,6 +134,8 @@ class ProductModel {
       createdAt: json['created_at'],
       updatedAt: json['updated_at'],
       isWishlisted: (json['is_wishlist'] == 1 || json['is_wishlist'] == true),
+      subtitle: json['subtitle'],
+      backgroundColor: json['background_color'],
       images: json['images'] != null
           ? (json['images'] as List)
               .map((i) => ProductImageModel.fromJson(i))

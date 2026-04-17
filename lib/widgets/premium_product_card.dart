@@ -48,6 +48,23 @@ class _PremiumProductCardState extends State<PremiumProductCard> {
         );
   }
 
+  Color _getBgColor() {
+    if (widget.product.backgroundColor != null &&
+        widget.product.backgroundColor!.isNotEmpty) {
+      try {
+        final hexColor = widget.product.backgroundColor!.replaceAll('#', '');
+        if (hexColor.length == 6) {
+          return Color(int.parse('FF$hexColor', radix: 16));
+        } else if (hexColor.length == 8) {
+          return Color(int.parse(hexColor, radix: 16));
+        }
+      } catch (e) {
+        // Fallback to default
+      }
+    }
+    return const Color(0xFFE7EAEA);
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocListener<WishlistBloc, WishlistState>(
@@ -79,19 +96,14 @@ class _PremiumProductCardState extends State<PremiumProductCard> {
               aspectRatio: 0.95, // Slightly taller than square for premium feel
               child: Stack(
                 children: [
-                  // Main Image with dark background and curved bottom
+                  // Main Image with dynamic background and curved bottom
                   Positioned.fill(
                     child: ClipPath(
                       clipper: ProductImageClipper(),
                       child: Container(
-                        decoration: const BoxDecoration(
-                          color: Color.fromARGB(
-                            232,
-                            231,
-                            234,
-                            234,
-                          ), // Dark background
-                          borderRadius: BorderRadius.only(
+                        decoration: BoxDecoration(
+                          color: _getBgColor(),
+                          borderRadius: const BorderRadius.only(
                             topLeft: Radius.circular(24),
                             topRight: Radius.circular(24),
                             bottomLeft: Radius.circular(24),

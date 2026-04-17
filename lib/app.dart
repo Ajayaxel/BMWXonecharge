@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:onecharge/screen/onbording/splash.dart';
 
 import 'package:onecharge/core/navigation/navigation_service.dart';
-import 'package:onecharge/test.dart';
+import 'package:onecharge/test.dart' hide Card;
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});

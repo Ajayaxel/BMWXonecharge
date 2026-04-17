@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:onecharge/const/onebtn.dart';
 import 'package:onecharge/core/storage/vehicle_storage.dart';
+import 'package:onecharge/logic/blocs/vehicle_list/vehicle_list_bloc.dart';
+import 'package:onecharge/logic/blocs/vehicle_list/vehicle_list_event.dart';
 import 'package:onecharge/resources/app_resources.dart';
 import 'package:onecharge/core/config/app_config.dart';
 import 'package:onecharge/screen/vehicle/vehicle_selection.dart';
@@ -89,7 +92,12 @@ class _VehicleManagementDialogState extends State<VehicleManagementDialog> {
 
   Future<void> _deleteVehicle(UserVehicle vehicle) async {
     await VehicleStorage.removeVehicle(vehicle.id);
-    _loadAllVehicles();
+    if (mounted) {
+      // Parse ID to int if possible, otherwise default to 0 (or handle as needed)
+      final intId = int.tryParse(vehicle.id) ?? 0;
+      context.read<VehicleListBloc>().add(RemoveVehicleFromList(intId));
+      _loadAllVehicles();
+    }
   }
 
   @override

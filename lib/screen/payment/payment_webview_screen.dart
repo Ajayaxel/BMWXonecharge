@@ -30,6 +30,17 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setNavigationDelegate(
         NavigationDelegate(
+          onNavigationRequest: (NavigationRequest request) {
+            final url = request.url;
+            print('🔄 [PaymentWebView] Navigation Request: $url');
+
+            // Catch success/cancel patterns early in navigation request
+            if (_checkStatusAndHandle(url)) {
+              return NavigationDecision.prevent;
+            }
+
+            return NavigationDecision.navigate;
+          },
           onPageStarted: (String url) {
             print('🌐 [PaymentWebView] Page Started: $url');
             setState(() {
@@ -42,32 +53,7 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
               _isLoading = false;
             });
 
-            // Check based on standard Paymob redirection or query parameters
-            final uri = Uri.parse(url);
-            final success = uri.queryParameters['success'] == 'true';
-            final approved =
-                uri.queryParameters['txn_response_code'] == 'APPROVED';
-
-            // Some integrations use a 'success' part in the path or 'payment-success'
-            final pathContainsSuccess =
-                url.contains('success') || url.contains('payment-success');
-
-            print(
-              '🔍 [PaymentWebView] Checking status: success=$success, approved=$approved, pathContainsSuccess=$pathContainsSuccess',
-            );
-
-            if (success || approved || pathContainsSuccess) {
-              print('✅ [PaymentWebView] Payment Status detected as SUCCESS');
-              _handlePaymentSuccess();
-            } else if (url.contains('cancel') ||
-                url.contains('payment-cancel')) {
-              print('⚠️ [PaymentWebView] Payment Status detected as CANCELED');
-              _handlePaymentCancel();
-            } else {
-              print(
-                'ℹ️ [PaymentWebView] Payment Status still PENDING or Unknown (URL: $url)',
-              );
-            }
+            _checkStatusAndHandle(url);
           },
           onWebResourceError: (WebResourceError error) {
             print('❌ [PaymentWebView] Error: ${error.description}');
@@ -75,6 +61,45 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
         ),
       )
       ..loadRequest(Uri.parse(widget.paymentUrl));
+  }
+
+  bool _checkStatusAndHandle(String url) {
+    if (!mounted) return false;
+
+    // Check based on standard Paymob redirection or query parameters
+    final uri = Uri.parse(url);
+    final success =
+        uri.queryParameters['success'] == 'true' ||
+        uri.queryParameters['success'] == '1';
+    final approved =
+        uri.queryParameters['txn_response_code'] == 'APPROVED' ||
+        uri.queryParameters['status']?.toLowerCase() == 'approved';
+
+    // Some integrations use a 'success' part in the path or 'payment-success'
+    final pathContainsSuccess =
+        url.contains('success') && !url.contains('success=false');
+    final pathContainsCompleted = url.contains('completed') || url.contains('done');
+
+    print(
+      '🔍 [PaymentWebView] Checking status: success=$success, approved=$approved, pathContainsSuccess=$pathContainsSuccess, pathContainsCompleted=$pathContainsCompleted',
+    );
+
+    if (success || approved || pathContainsSuccess || pathContainsCompleted) {
+      print('✅ [PaymentWebView] Payment Status detected as SUCCESS');
+      _handlePaymentSuccess();
+      return true;
+    } else if (url.contains('cancel') ||
+        url.contains('payment-cancel') ||
+        uri.queryParameters['success'] == 'false') {
+      print('⚠️ [PaymentWebView] Payment Status detected as CANCELED');
+      _handlePaymentCancel();
+      return true;
+    }
+
+    print(
+      'ℹ️ [PaymentWebView] Payment Status still PENDING or Unknown (URL: $url)',
+    );
+    return false;
   }
 
   void _handlePaymentSuccess() {

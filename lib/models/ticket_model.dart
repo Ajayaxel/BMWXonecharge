@@ -14,13 +14,14 @@ class CreateTicketRequest extends Equatable {
   final double longitude;
   final List<File>? attachments;
   final String? redeemCode;
-  final String?
-  paymentMethod; // "cod" for cash on delivery, null for online payment
-  final String bookingType; // "instant" or "scheduled"
-  final String?
-  scheduledAt; // DateTime string in format "YYYY-MM-DD HH:mm:ss", null for instant booking
+  final String? paymentMethod;
+  final String bookingType;
+  final String? scheduledAt;
   final String? companyCode;
   final int? companyCodeId;
+  final String? parkingFloor;
+  final String? parkingNumber;
+  final String? parkingType;
 
   const CreateTicketRequest({
     required this.issueCategoryId,
@@ -40,6 +41,9 @@ class CreateTicketRequest extends Equatable {
     this.scheduledAt,
     this.companyCode,
     this.companyCodeId,
+    this.parkingFloor,
+    this.parkingNumber,
+    this.parkingType,
   });
 
   @override
@@ -61,6 +65,9 @@ class CreateTicketRequest extends Equatable {
     scheduledAt,
     companyCode,
     companyCodeId,
+    parkingFloor,
+    parkingNumber,
+    parkingType,
   ];
 }
 
@@ -150,6 +157,9 @@ class Ticket extends Equatable {
   final double serviceCharge;
   final double vat;
   final double totalAmount;
+  final String? parkingFloor;
+  final String? parkingNumber;
+  final String? parkingType;
 
   const Ticket({
     required this.id,
@@ -173,6 +183,9 @@ class Ticket extends Equatable {
     this.serviceCharge = 0.0,
     this.vat = 0.0,
     this.totalAmount = 0.0,
+    this.parkingFloor,
+    this.parkingNumber,
+    this.parkingType,
   });
 
   Ticket copyWith({
@@ -220,6 +233,9 @@ class Ticket extends Equatable {
       serviceCharge: serviceCharge ?? this.serviceCharge,
       vat: vat ?? this.vat,
       totalAmount: totalAmount ?? this.totalAmount,
+      parkingFloor: parkingFloor ?? this.parkingFloor,
+      parkingNumber: parkingNumber ?? this.parkingNumber,
+      parkingType: parkingType ?? this.parkingType,
     );
   }
 
@@ -340,6 +356,9 @@ class Ticket extends Equatable {
       serviceCharge: (json['service_charge'] ?? 0).toDouble(),
       vat: (json['vat'] ?? 0).toDouble(),
       totalAmount: (json['total_amount'] ?? 0).toDouble(),
+      parkingFloor: json['parking_floor']?.toString(),
+      parkingNumber: json['parking_number']?.toString(),
+      parkingType: json['parking_type']?.toString(),
     );
   }
 
@@ -366,6 +385,9 @@ class Ticket extends Equatable {
     serviceCharge,
     vat,
     totalAmount,
+    parkingFloor,
+    parkingNumber,
+    parkingType,
   ];
 }
 

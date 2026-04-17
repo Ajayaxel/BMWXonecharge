@@ -230,6 +230,21 @@ class BookingDetailScreen extends StatelessWidget {
                     : '-',
               ),
               _buildDetailRow('Location', location, isMultiLine: true),
+              if (ticket.parkingFloor != null ||
+                  ticket.parkingNumber != null ||
+                  ticket.parkingType != null) ...[
+                const SizedBox(height: 10),
+                _buildSectionHeader('Parking Details'),
+                if (ticket.parkingFloor != null &&
+                    ticket.parkingFloor!.isNotEmpty)
+                  _buildDetailRow('Parking Floor', ticket.parkingFloor!),
+                if (ticket.parkingNumber != null &&
+                    ticket.parkingNumber!.isNotEmpty)
+                  _buildDetailRow('Parking Number', ticket.parkingNumber!),
+                if (ticket.parkingType != null &&
+                    ticket.parkingType!.isNotEmpty)
+                  _buildDetailRow('Parking Type', ticket.parkingType!),
+              ],
 
               const SizedBox(height: 10),
               _buildSectionHeader('Payment Details'),

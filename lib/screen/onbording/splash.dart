@@ -110,7 +110,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
     final destination = isCompleted
         ? const Testlogin()
-        : const OnboardingScreen();
+        : const OnbordingScreen();
 
     Navigator.pushReplacement(
       context,

@@ -431,6 +431,7 @@ class _ShopProductScreenState extends State<ShopProductScreen>
                                                       product: product,
                                                       bgColor: _getBgColor(
                                                         itemIndex,
+                                                        product,
                                                       ),
                                                       isFront: true,
                                                     ),
@@ -439,6 +440,7 @@ class _ShopProductScreenState extends State<ShopProductScreen>
                                                     product: product,
                                                     bgColor: _getBgColor(
                                                       itemIndex,
+                                                      product,
                                                     ),
                                                     isFront: false,
                                                   ),
@@ -602,7 +604,20 @@ class _ShopProductScreenState extends State<ShopProductScreen>
     );
   }
 
-  Color _getBgColor(int index) {
+  Color _getBgColor(int index, ProductModel product) {
+    if (product.backgroundColor != null &&
+        product.backgroundColor!.isNotEmpty) {
+      try {
+        final hexColor = product.backgroundColor!.replaceAll('#', '');
+        if (hexColor.length == 6) {
+          return Color(int.parse('FF$hexColor', radix: 16));
+        } else if (hexColor.length == 8) {
+          return Color(int.parse(hexColor, radix: 16));
+        }
+      } catch (e) {
+        // Fallback to cycling colors
+      }
+    }
     final colors = [
       const Color(0xFFFEE4E2),
       const Color(0xFFE0F2FE),
