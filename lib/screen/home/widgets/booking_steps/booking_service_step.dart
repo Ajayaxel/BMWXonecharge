@@ -296,9 +296,7 @@ class BookingServiceStep extends StatelessWidget {
                               ? _parseColor(subType.backgroundColor!)
                               : const Color(0xFFEAEEF1),
                       borderRadius: BorderRadius.circular(18),
-                      border: isSelected
-                          ? Border.all(color: Colors.black, width: 1.5)
-                          : null,
+                      border: null,
                     ),
                   ),
                   // The exact image positioning from snippet

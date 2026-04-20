@@ -174,8 +174,8 @@ class _ProductGroupCarouselState extends State<ProductGroupCarousel> {
                 child: _ProductCard(
                   product: product,
                   backgroundColor: index % 2 == 0
-                      ? const Color(0xffE3E9F9)
-                      : const Color(0xffF9EBE3),
+                      ? const Color(0xffF5F5F5)
+                      : const Color(0xffF5F5F5),
                   onTap: () {
                     Navigator.push(
                       context,

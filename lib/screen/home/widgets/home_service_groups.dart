@@ -49,8 +49,11 @@ class _HomeServiceGroupsState extends State<HomeServiceGroups> {
 
     if (widget.searchQuery.isNotEmpty) {
       categories = categories
-          .where((c) =>
-              (c.name ?? '').toLowerCase().contains(widget.searchQuery.toLowerCase()))
+          .where(
+            (c) => (c.name ?? '').toLowerCase().contains(
+              widget.searchQuery.toLowerCase(),
+            ),
+          )
           .toList();
     }
 
@@ -60,7 +63,7 @@ class _HomeServiceGroupsState extends State<HomeServiceGroups> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16),
+          padding: const EdgeInsets.symmetric(vertical: 5),
           child: Text(
             group.name,
             style: const TextStyle(
@@ -83,7 +86,8 @@ class _HomeServiceGroupsState extends State<HomeServiceGroups> {
                   title: categoryName,
                   width: cardWidth,
                   imageUrl: category.imageUrl,
-                  onTap: () => widget.onServiceSelected(categoryName, category.id),
+                  onTap: () =>
+                      widget.onServiceSelected(categoryName, category.id),
                 );
               }).toList(),
             );
@@ -117,7 +121,10 @@ class _HomeServiceGroupsState extends State<HomeServiceGroups> {
             Wrap(
               spacing: 13,
               runSpacing: 13,
-              children: List.generate(4, (index) => _buildShimmerCard(cardWidth)),
+              children: List.generate(
+                4,
+                (index) => _buildShimmerCard(cardWidth),
+              ),
             ),
           ],
         );
@@ -192,7 +199,9 @@ class _HomeServiceGroupsState extends State<HomeServiceGroups> {
             child: OneBtn(
               text: "Retry",
               onPressed: () {
-                context.read<ServiceGroupBloc>().add(const FetchServiceGroups(forceRefresh: true));
+                context.read<ServiceGroupBloc>().add(
+                  const FetchServiceGroups(forceRefresh: true),
+                );
               },
             ),
           ),
@@ -244,8 +253,7 @@ class _ServiceCard extends StatelessWidget {
                   ),
                 ),
               ),
-            if (!isOther && imageUrl != null)
-              _buildImage(),
+            if (!isOther && imageUrl != null) _buildImage(),
             if (isOther)
               const Center(
                 child: Text(
@@ -265,8 +273,10 @@ class _ServiceCard extends StatelessWidget {
   }
 
   Widget _buildImage() {
-    final bool isTow = title.toLowerCase().contains('tow') || title.toLowerCase().contains('pickup');
-    
+    final bool isTow =
+        title.toLowerCase().contains('tow') ||
+        title.toLowerCase().contains('pickup');
+
     return Positioned(
       right: isTow ? -10 : 0,
       left: isTow ? null : 0,

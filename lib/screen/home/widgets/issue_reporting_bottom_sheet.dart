@@ -583,36 +583,43 @@ class _IssueReportingScreenState extends State<IssueReportingScreen> {
 
   Widget _buildStepper() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+      color: Colors.white,
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (_currentStep == 0) ...[
-            GestureDetector(
-              onTap: () => Navigator.pop(context),
-              child: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.grey.shade200),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: const Icon(
-                  Icons.arrow_back_ios_new,
-                  size: 18,
-                  color: Colors.black,
-                ),
+          GestureDetector(
+            onTap: () {
+              if (_currentStep > 0) {
+                _pageController.previousPage(
+                  duration: const Duration(milliseconds: 400),
+                  curve: Curves.fastLinearToSlowEaseIn,
+                );
+              } else {
+                Navigator.pop(context);
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.grey.shade100),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.04),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.arrow_back_ios_new_rounded,
+                size: 16,
+                color: Colors.black,
               ),
             ),
-            const SizedBox(width: 16),
-          ],
+          ),
+          const SizedBox(width: 20),
           Expanded(
             child: Row(
               children: [
@@ -644,41 +651,53 @@ class _IssueReportingScreenState extends State<IssueReportingScreen> {
   }) {
     bool isActive = _currentStep == step;
     bool isCompleted = _currentStep > step;
+
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          width: 32,
-          height: 32,
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          width: 36,
+          height: 36,
           decoration: BoxDecoration(
-            color: isActive || isCompleted ? Colors.black : Colors.white,
+            color: isActive ? Colors.black : (isCompleted ? Colors.black : Colors.white),
             shape: BoxShape.circle,
             border: Border.all(
               color: isActive || isCompleted
-                  ? Colors.black
-                  : Colors.grey.shade300,
+                  ? Colors.transparent
+                  : Colors.grey.shade200,
               width: 1.5,
             ),
+            boxShadow: isActive
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.2),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ]
+                : null,
           ),
           child: Center(
-            child: Text(
-              "$displayNumber",
-              style: TextStyle(
-                color: isActive || isCompleted ? Colors.white : Colors.black,
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                fontFamily: 'Lufga',
-              ),
-            ),
+            child: isCompleted
+                ? const Icon(Icons.check, color: Colors.white, size: 18)
+                : Text(
+                    "$displayNumber",
+                    style: TextStyle(
+                      color: isActive ? Colors.white : Colors.black,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Lufga',
+                    ),
+                  ),
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 8),
         Text(
           label,
           style: TextStyle(
-            color: isActive || isCompleted
-                ? Colors.black
-                : Colors.grey.shade500,
-            fontSize: 10,
+            color: isActive ? Colors.black : const Color(0xFF9CA3AF),
+            fontSize: 11,
             fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
             fontFamily: 'Lufga',
           ),
@@ -692,11 +711,15 @@ class _IssueReportingScreenState extends State<IssueReportingScreen> {
     return Expanded(
       child: Container(
         height: 2,
-        margin: const EdgeInsets.only(bottom: 18),
-        color: isCompleted ? Colors.black : Colors.grey.shade300,
+        margin: const EdgeInsets.only(bottom: 22), // Align with circles
+        decoration: BoxDecoration(
+          color: isCompleted ? Colors.black : Colors.grey.shade200,
+          borderRadius: BorderRadius.circular(1),
+        ),
       ),
     );
   }
+
 
   Widget _buildStepContainer({required Widget child}) {
     return AnimatedSwitcher(

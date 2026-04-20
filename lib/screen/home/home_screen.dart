@@ -1,10 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:shimmer/shimmer.dart';
+import 'dart:ui';
+import 'package:onecharge/screen/home/widgets/carbon/carbon_banner.dart';
 import 'package:onecharge/screen/home/widgets/service_notification.dart';
 import 'package:onecharge/screen/home/widgets/feedback_bottom_sheet.dart';
 import 'package:onecharge/screen/home/widgets/cancellation_bottom_sheet.dart';
-import 'package:onecharge/screen/home/widgets/home_header.dart';
-import 'package:onecharge/screen/home/widgets/home_banner.dart';
 import 'package:onecharge/core/mixins/location_handler_mixin.dart';
+import 'package:onecharge/models/location_model.dart';
+import 'package:onecharge/screen/settings/my_location_screen.dart';
+import 'package:onecharge/screen/settings/settings_screen.dart';
+import 'package:onecharge/screen/notification/notification_screen.dart';
+import 'package:onecharge/screen/wallet/wallet_screen.dart';
+import 'package:onecharge/core/storage/location_storage.dart';
 
 import 'package:onecharge/screen/home/widgets/tracking_map_screen.dart';
 import 'package:onecharge/logic/services/realtime_service.dart';
@@ -51,6 +59,11 @@ import 'package:onecharge/logic/blocs/combo_offer/presentation/bloc/combo_offer_
 import 'package:onecharge/logic/blocs/combo_offer/presentation/bloc/combo_offer_state.dart';
 import 'package:onecharge/logic/blocs/combo_offer/presentation/screens/combo_buy_screen.dart';
 
+import 'package:onecharge/logic/blocs/service_banner/service_banner_bloc.dart';
+import 'package:onecharge/logic/blocs/service_banner/service_banner_event.dart';
+import 'package:onecharge/logic/blocs/service_banner/service_banner_state.dart';
+import 'package:onecharge/models/service_banner_model.dart';
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -70,6 +83,32 @@ class HomeScreenState extends State<HomeScreen> with LocationHandlerMixin {
   bool _isConnectingRealtime = false;
   final TextEditingController searchController = TextEditingController();
   String searchQuery = "";
+
+  late PageController _pageController;
+  int _currentPage = 0;
+  Timer? _carouselTimer;
+
+  int _bannerCount = 0;
+
+  void _startCarouselTimer() {
+    _carouselTimer = Timer.periodic(const Duration(seconds: 6), (Timer timer) {
+      if (_bannerCount > 0) {
+        if (_currentPage < _bannerCount - 1) {
+          _currentPage++;
+        } else {
+          _currentPage = 0;
+        }
+
+        if (_pageController.hasClients) {
+          _pageController.animateToPage(
+            _currentPage,
+            duration: const Duration(milliseconds: 1000),
+            curve: Curves.easeInOutCubic,
+          );
+        }
+      }
+    });
+  }
 
   /// Returns true if the driver's last location update is within the last
   /// [maxAgeMinutes] minutes (default: 30), meaning it is fresh enough to use.
@@ -328,6 +367,8 @@ class HomeScreenState extends State<HomeScreen> with LocationHandlerMixin {
   void initState() {
     super.initState();
     activeState = this;
+    _pageController = PageController(initialPage: 0);
+    _startCarouselTimer();
     loadSavedLocation();
     _loadUserName();
     _fetchInitialData();
@@ -358,6 +399,7 @@ class HomeScreenState extends State<HomeScreen> with LocationHandlerMixin {
       context.read<ServiceGroupBloc>().add(const FetchServiceGroups());
       context.read<ProductGroupBloc>().add(FetchProductGroups());
       context.read<ComboOfferBloc>().add(FetchComboOffers());
+      context.read<ServiceBannerBloc>().add(FetchServiceBanner());
     });
   }
 
@@ -376,6 +418,8 @@ class HomeScreenState extends State<HomeScreen> with LocationHandlerMixin {
     _serviceTimer?.cancel();
     _pollingTimer?.cancel();
     _realtimeService?.disconnect();
+    _pageController.dispose();
+    _carouselTimer?.cancel();
     searchController.dispose();
     _toastEntry?.remove();
     super.dispose();
@@ -737,193 +781,689 @@ class HomeScreenState extends State<HomeScreen> with LocationHandlerMixin {
       ],
       child: Scaffold(
         backgroundColor: Colors.white,
-        body: SafeArea(
-          bottom: false,
-          child: Stack(
-            children: [
-              SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 10),
-                    //header  sectionn
-                    HomeHeader(
-                      currentAddress: currentAddress,
-                      searchController: searchController,
-                      onSearchChanged: (value) {
-                        setState(() {
-                          searchQuery = value.toLowerCase();
-                        });
-                      },
-                      onLocationChanged: (result) {
-                        setState(() {
-                          currentAddress = result.name.isNotEmpty
-                              ? result.name
-                              : result.address;
-                          currentLatitude = result.latitude;
-                          currentLongitude = result.longitude;
-                          selectedLocationId = result.id;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    // Banner section.
-                    HomeBanner(onToast: showToast),
+        body: Stack(
+          children: [
+            SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // New Immersive Header & Carousel Section
+                  SizedBox(
+                    height: MediaQuery.of(context).size.height * 0.62,
+                    child: Stack(
+                      children: [
+                        // Auto-Scrolling Background Carousel
+                        BlocBuilder<ServiceBannerBloc, ServiceBannerState>(
+                          builder: (context, state) {
+                            if (state is ServiceBannerLoaded) {
+                              final banners = state.banners;
+                              // Update banner count for timer safety
+                              _bannerCount = banners.length;
 
-                    // services section
-                    HomeServiceGroups(
-                      searchQuery: searchQuery,
-                      onServiceSelected: (categoryName, categoryId) {
-                        VehicleSelectionBottomSheet.show(
-                          context,
-                          category: categoryName,
-                          currentAddress: currentAddress,
-                          currentLatitude: currentLatitude,
-                          currentLongitude: currentLongitude,
-                          selectedLocationId: selectedLocationId,
-                        );
-                      },
-                    ),
-                    SizedBox(height: 16),
-                    BlocBuilder<ComboOfferBloc, ComboOfferState>(
-                      builder: (context, state) {
-                        final offer = state is ComboOfferLoaded &&
-                                state.comboOffers.isNotEmpty
-                            ? state.comboOffers.firstWhere(
-                                (o) => o.id == 2,
-                                orElse: () => state.comboOffers.first,
-                              )
-                            : null;
+                              if (banners.isEmpty) {
+                                return Container(
+                                  color: Colors.grey[200],
+                                  child: const Center(
+                                    child: Text("No banners available"),
+                                  ),
+                                );
+                              }
+                              return PageView.builder(
+                                controller: _pageController,
+                                onPageChanged: (int page) {
+                                  setState(() {
+                                    _currentPage = page;
+                                  });
+                                },
+                                itemCount: banners.length,
+                                itemBuilder: (context, index) {
+                                  return _buildCarouselItem(banners[index]);
+                                },
+                              );
+                            }
+                            return _buildBannerSkeleton();
+                          },
+                        ),
 
-                        return BannerSection(
-                          image: offer != null
-                              ? offer.imageUrl
-                              : "https://static.vecteezy.com/system/resources/previews/059/007/249/non_2x/ev-charger-station-transparent-background-free-png.png",
-                          title: offer != null
-                              ? offer.name
-                              : "Mega Deals on EV Accessories ⚡",
-                          subtitle: offer != null
-                              ? offer.description
-                              : "Grab exclusive discounts on top-quality upgrades for your ride.",
-                          buttonText: "Shop Deals",
-                          comboPrice: offer?.comboPrice,
-                          originalPrice: offer?.originalPrice,
-                          onTap: () {
-                            if (offer != null) {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => ComboBuyScreen(
-                                    offer: offer,
-                                    initialAddress: currentAddress,
-                                    initialLatitude: currentLatitude,
-                                    initialLongitude: currentLongitude,
+                        // Static UI overlay (Header & Search)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                          child: Column(
+                            children: [
+                              const SizedBox(height: 60),
+                              // Custom Header Row
+                              Row(
+                                children: [
+                                  GestureDetector(
+                                    onTap: () async {
+                                      final result = await Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              const SettingsScreen(),
+                                        ),
+                                      );
+                                      if (result is LocationModel) {
+                                        updateLocation(
+                                          result.name.isNotEmpty
+                                              ? result.name
+                                              : result.address,
+                                          result.latitude,
+                                          result.longitude,
+                                          id: result.id,
+                                        );
+                                      }
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.all(2),
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: Colors.white.withOpacity(0.3),
+                                        ),
+                                      ),
+                                      child:
+                                          BlocBuilder<
+                                            ProfileBloc,
+                                            ProfileState
+                                          >(
+                                            builder: (context, state) {
+                                              String? imageUrl;
+                                              if (state is ProfileLoaded) {
+                                                imageUrl =
+                                                    state.customer.profileImage;
+                                              }
+                                              return CircleAvatar(
+                                                radius: 20,
+                                                backgroundColor: Colors.white10,
+                                                backgroundImage:
+                                                    imageUrl != null &&
+                                                        imageUrl.isNotEmpty
+                                                    ? NetworkImage(imageUrl)
+                                                    : null,
+                                                child:
+                                                    imageUrl == null ||
+                                                        imageUrl.isEmpty
+                                                    ? const Icon(
+                                                        Icons.person_rounded,
+                                                        color: Colors.white,
+                                                        size: 24,
+                                                      )
+                                                    : null,
+                                              );
+                                            },
+                                          ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  BlocBuilder<ProfileBloc, ProfileState>(
+                                    builder: (context, state) {
+                                      String firstName = "User";
+                                      if (state is ProfileLoaded) {
+                                        firstName = state.customer.name
+                                            .split(' ')
+                                            .first;
+                                      }
+                                      return Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            firstName,
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.w700,
+                                              fontFamily: 'Lufga',
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          GestureDetector(
+                                            onTap: () async {
+                                              final result =
+                                                  await Navigator.push<
+                                                    LocationModel
+                                                  >(
+                                                    context,
+                                                    MaterialPageRoute(
+                                                      builder: (context) =>
+                                                          const MyLocationScreen(
+                                                            isPicker: true,
+                                                          ),
+                                                    ),
+                                                  );
+                                              if (result != null) {
+                                                context
+                                                    .read<LocationBloc>()
+                                                    .add(
+                                                      SelectLocation(result),
+                                                    );
+                                                updateLocation(
+                                                  result.name.isNotEmpty
+                                                      ? result.name
+                                                      : result.address,
+                                                  result.latitude,
+                                                  result.longitude,
+                                                  id: result.id,
+                                                );
+                                                await LocationStorage.saveSelectedLocation(
+                                                  address:
+                                                      result.name.isNotEmpty
+                                                      ? result.name
+                                                      : result.address,
+                                                  lat: result.latitude,
+                                                  lng: result.longitude,
+                                                  isManual: true,
+                                                  id: result.id,
+                                                );
+                                              }
+                                            },
+                                            child: Row(
+                                              children: [
+                                                Icon(
+                                                  Icons.location_on,
+                                                  color: Colors.white
+                                                      .withOpacity(0.8),
+                                                  size: 12,
+                                                ),
+                                                const SizedBox(width: 4),
+                                                SizedBox(
+                                                  width:
+                                                      MediaQuery.of(
+                                                        context,
+                                                      ).size.width *
+                                                      0.4,
+                                                  child: Text(
+                                                    currentAddress,
+                                                    style: TextStyle(
+                                                      color: Colors.white
+                                                          .withOpacity(0.8),
+                                                      fontSize: 11,
+                                                      fontFamily: 'Lufga',
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      );
+                                    },
+                                  ),
+                                  const Spacer(),
+                                  Container(
+                                    height: 44,
+                                    width: 44,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.1),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: IconButton(
+                                      icon: const Icon(
+                                        Icons.account_balance_wallet_outlined,
+                                        color: Colors.white,
+                                        size: 20,
+                                      ),
+                                      onPressed: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                const WalletScreen(),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    height: 44,
+                                    width: 44,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.1),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: IconButton(
+                                      icon: const Icon(
+                                        Icons.notifications_none_rounded,
+                                        color: Colors.white,
+                                        size: 20,
+                                      ),
+                                      onPressed: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                const NotificationScreen(),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 32),
+                              // Search Component
+                              Container(
+                                height: 50,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: Colors.white.withOpacity(0.1),
                                   ),
                                 ),
-                              );
-                            } else {
-                              showToast("Fetching latest deals...");
-                              context.read<ComboOfferBloc>().add(
-                                    FetchComboOffers(),
-                                  );
-                            }
-                          },
-                        );
-                      },
-                    ),
-
-                    const SizedBox(height: 16),
-                    HomeProductGroups(searchQuery: searchQuery),
-                    const SizedBox(height: 100), // Bottom padding for scrolling
-                  ],
-                ),
-              ),
-              // Floating Notification Overlay (PURELY REACTIVE)
-              if (_currentServiceStage != 'none')
-                ServiceNotificationOverlay(
-                  stage: _currentServiceStage,
-                  progress: _serviceProgress,
-                  ticket: _currentTicket,
-                  onDismiss: () {
-                    showToast("Our customer support will contact you shortly");
-                    setState(() {
-                      _currentServiceStage = 'none';
-                      _stopPolling();
-                      _currentTicket = null;
-                    });
-                  },
-                  onCancel: () async {
-                    if (_currentTicket?.id == null) return;
-                    final shouldClear = await showModalBottomSheet<bool>(
-                      context: context,
-                      backgroundColor: Colors.transparent,
-                      isScrollControlled: true,
-                      builder: (context) =>
-                          CancellationBottomSheet(ticketId: _currentTicket!.id),
-                    );
-
-                    if (shouldClear == true) {
-                      setState(() {
-                        _currentServiceStage = 'none';
-                        _stopPolling();
-                        _realtimeService?.disconnect();
-                        _currentTicket = null;
-                      });
-                    }
-                  },
-                  onSolved: () {
-                    final tId = _currentTicket?.id;
-                    setState(() {
-                      _currentServiceStage = 'none';
-                      _stopPolling();
-                      _currentTicket = null;
-                    });
-                    if (tId != null) {
-                      showModalBottomSheet(
-                        context: context,
-                        isScrollControlled: true,
-                        backgroundColor: Colors.transparent,
-                        builder: (context) =>
-                            FeedbackBottomSheet(ticketId: tId),
-                      );
-                    }
-                  },
-                  onTap: () {
-                    if (_currentTicket != null) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => TrackingMapScreen(
-                            ticket: _currentTicket!,
-                            stage: _currentServiceStage,
-                            progress: _serviceProgress,
+                                child: TextField(
+                                  controller: searchController,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      searchQuery = value.toLowerCase();
+                                    });
+                                  },
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontFamily: 'Lufga',
+                                  ),
+                                  decoration: const InputDecoration(
+                                    hintText: "Search your Service",
+                                    hintStyle: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 14,
+                                      fontFamily: 'Lufga',
+                                    ),
+                                    prefixIcon: Icon(
+                                      Icons.search_rounded,
+                                      color: Colors.white70,
+                                    ),
+                                    border: InputBorder.none,
+                                    contentPadding: EdgeInsets.symmetric(
+                                      vertical: 16,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ).then((showFeedback) {
-                        if (showFeedback == true && _currentTicket != null) {
-                          final tId = _currentTicket?.id;
+                      ],
+                    ),
+                  ),
+
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // services section
+                        HomeServiceGroups(
+                          searchQuery: searchQuery,
+                          onServiceSelected: (categoryName, categoryId) {
+                            VehicleSelectionBottomSheet.show(
+                              context,
+                              category: categoryName,
+                              currentAddress: currentAddress,
+                              currentLatitude: currentLatitude,
+                              currentLongitude: currentLongitude,
+                              selectedLocationId: selectedLocationId,
+                            );
+                          },
+                        ),
+                        SizedBox(height: 16),
+                        //carbon emmision banner
+                        BlocBuilder<ProfileBloc, ProfileState>(
+                          builder: (context, state) {
+                            String? firstName;
+                            if (state is ProfileLoaded) {
+                              firstName = state.customer.name.split(' ').first;
+                            }
+                            return CarbonBanner(userName: firstName);
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        //products section
+                        HomeProductGroups(searchQuery: searchQuery),
+                        SizedBox(height: 20),
+                        BlocBuilder<ComboOfferBloc, ComboOfferState>(
+                          builder: (context, state) {
+                            final offer =
+                                state is ComboOfferLoaded &&
+                                    state.comboOffers.isNotEmpty
+                                ? state.comboOffers.firstWhere(
+                                    (o) => o.id == 2,
+                                    orElse: () => state.comboOffers.first,
+                                  )
+                                : null;
+
+                            return BannerSection(
+                              image: offer != null
+                                  ? offer.imageUrl
+                                  : "https://static.vecteezy.com/system/resources/previews/059/007/249/non_2x/ev-charger-station-transparent-background-free-png.png",
+                              title: offer != null
+                                  ? offer.name
+                                  : "Mega Deals on EV Accessories ⚡",
+                              subtitle: offer != null
+                                  ? offer.description
+                                  : "Grab exclusive discounts on top-quality upgrades for your ride.",
+                              buttonText: "Shop Deals",
+                              comboPrice: offer?.comboPrice,
+                              originalPrice: offer?.originalPrice,
+                              onTap: () {
+                                if (offer != null) {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => ComboBuyScreen(
+                                        offer: offer,
+                                        initialAddress: currentAddress,
+                                        initialLatitude: currentLatitude,
+                                        initialLongitude: currentLongitude,
+                                      ),
+                                    ),
+                                  );
+                                } else {
+                                  showToast("Fetching latest deals...");
+                                  context.read<ComboOfferBloc>().add(
+                                    FetchComboOffers(),
+                                  );
+                                }
+                              },
+                            );
+                          },
+                        ),
+
+                        const SizedBox(
+                          height: 100,
+                        ), // Bottom padding for scrolling
+                      ],
+                    ),
+                  ),
+                  // Floating Notification Overlay (PURELY REACTIVE)
+                  if (_currentServiceStage != 'none')
+                    ServiceNotificationOverlay(
+                      stage: _currentServiceStage,
+                      progress: _serviceProgress,
+                      ticket: _currentTicket,
+                      onDismiss: () {
+                        showToast(
+                          "Our customer support will contact you shortly",
+                        );
+                        setState(() {
+                          _currentServiceStage = 'none';
+                          _stopPolling();
+                          _currentTicket = null;
+                        });
+                      },
+                      onCancel: () async {
+                        if (_currentTicket?.id == null) return;
+                        final shouldClear = await showModalBottomSheet<bool>(
+                          context: context,
+                          backgroundColor: Colors.transparent,
+                          isScrollControlled: true,
+                          builder: (context) => CancellationBottomSheet(
+                            ticketId: _currentTicket!.id,
+                          ),
+                        );
+
+                        if (shouldClear == true) {
                           setState(() {
                             _currentServiceStage = 'none';
                             _stopPolling();
+                            _realtimeService?.disconnect();
                             _currentTicket = null;
                           });
-                          if (tId != null) {
-                            showModalBottomSheet(
-                              context: context,
-                              isScrollControlled: true,
-                              backgroundColor: Colors.transparent,
-                              builder: (context) =>
-                                  FeedbackBottomSheet(ticketId: tId),
-                            );
-                          }
                         }
-                      });
-                    }
-                  },
-                ),
-            ],
+                      },
+                      onSolved: () {
+                        final tId = _currentTicket?.id;
+                        setState(() {
+                          _currentServiceStage = 'none';
+                          _stopPolling();
+                          _currentTicket = null;
+                        });
+                        if (tId != null) {
+                          showModalBottomSheet(
+                            context: context,
+                            isScrollControlled: true,
+                            backgroundColor: Colors.transparent,
+                            builder: (context) =>
+                                FeedbackBottomSheet(ticketId: tId),
+                          );
+                        }
+                      },
+                      onTap: () {
+                        if (_currentTicket != null) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => TrackingMapScreen(
+                                ticket: _currentTicket!,
+                                stage: _currentServiceStage,
+                                progress: _serviceProgress,
+                              ),
+                            ),
+                          ).then((showFeedback) {
+                            if (showFeedback == true &&
+                                _currentTicket != null) {
+                              final tId = _currentTicket?.id;
+                              setState(() {
+                                _currentServiceStage = 'none';
+                                _stopPolling();
+                                _currentTicket = null;
+                              });
+                              if (tId != null) {
+                                showModalBottomSheet(
+                                  context: context,
+                                  isScrollControlled: true,
+                                  backgroundColor: Colors.transparent,
+                                  builder: (context) =>
+                                      FeedbackBottomSheet(ticketId: tId),
+                                );
+                              }
+                            }
+                          });
+                        }
+                      },
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCarouselItem(ServiceBanner banner) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        image: DecorationImage(
+          image: NetworkImage(banner.bgImage),
+          fit: BoxFit.cover,
+        ),
+      ),
+      child: Stack(
+        children: [
+          // Overlay Gradients
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.black.withOpacity(0.8),
+                  Colors.black.withOpacity(0.2),
+                  Colors.transparent,
+                ],
+              ),
+            ),
           ),
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: 250,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.transparent,
+                    Colors.white.withOpacity(0.1),
+                    Colors.white.withOpacity(0.8),
+                    Colors.white,
+                  ],
+                ),
+              ),
+            ),
+          ),
+          // Coupon Content
+          Positioned(
+            bottom: 60,
+            left: 0,
+            right: 0,
+            child: Column(
+              children: [
+                Text(
+                  banner.title,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 28,
+                    fontWeight: FontWeight.w700,
+                    fontFamily: 'Lufga',
+
+                    shadows: [
+                      Shadow(
+                        color: Colors.black45,
+                        blurRadius: 10,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 36),
+                // Enhanced Visibility Voucher Bar with Glassmorphism
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                    child: Container(
+                      width: MediaQuery.of(context).size.width * 0.50,
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.5),
+                          width: 1,
+                        ),
+                      ),
+                      child: Stack(
+                        children: [
+                          Center(
+                            child: Text(
+                              "USECODE : ${banner.code}",
+                              style: const TextStyle(
+                                color: Colors.black,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                fontFamily: 'Lufga',
+                                shadows: [
+                                  Shadow(
+                                    color: Colors.black12,
+                                    offset: Offset(0, 1),
+                                    blurRadius: 2,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            right: -10,
+                            top: 0,
+
+                            bottom: 0,
+                            child: IconButton(
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                              icon: Icon(
+                                Icons.copy_rounded,
+                                size: 16,
+                                color: Colors.black.withOpacity(0.5),
+                              ),
+                              onPressed: () {
+                                Clipboard.setData(
+                                  ClipboardData(text: banner.code),
+                                );
+                                showToast("Code copied to clipboard!");
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBannerSkeleton() {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey[300]!,
+      highlightColor: Colors.grey[100]!,
+      child: Container(
+        width: double.infinity,
+        height: double.infinity,
+        color: Colors.white,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            // Skeleton for the main title/text area
+            Positioned(
+              bottom: 140,
+              child: Container(
+                width: MediaQuery.of(context).size.width * 0.75,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: 100,
+              child: Container(
+                width: MediaQuery.of(context).size.width * 0.6,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+            // Skeleton for the voucher bar
+            Positioned(
+              bottom: 45,
+              child: Container(
+                width: MediaQuery.of(context).size.width * 0.5,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

@@ -27,7 +27,7 @@ class BannerSection extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 5.0),
         width: double.infinity,
         decoration: BoxDecoration(
-          color: const Color(0xFFEAEAEA), // Lighter, premium gray background
+          color: const Color(0xffF5F5F5), // Lighter, premium gray background
           borderRadius: BorderRadius.circular(16),
         ),
         child: Row(

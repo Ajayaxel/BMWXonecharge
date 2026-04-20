@@ -69,18 +69,16 @@ class _BookingLocationStepState extends State<BookingLocationStep>
       children: [
         // Lottie Animation Background
         Positioned(
-          top: -40,
+          top: -20,
           left: 0,
           right: 0,
-          height: MediaQuery.of(context).size.height * 0.42,
+          height: MediaQuery.of(context).size.height * 0.38,
           child: Lottie.asset(
             "assets/issue/Dlivery Map.json",
             controller: _lottieController,
-            fit: BoxFit.cover,
+            fit: BoxFit.contain,
             onLoaded: (composition) {
-              // Optionally adjust duration based on composition if needed
-              _lottieController.duration =
-                  composition.duration * 2; // 2.5x slower
+              _lottieController.duration = composition.duration * 2;
               _lottieController.repeat();
             },
           ),
@@ -88,41 +86,40 @@ class _BookingLocationStepState extends State<BookingLocationStep>
 
         // Draggable Sheet
         DraggableScrollableSheet(
-          initialChildSize: 0.58,
-          minChildSize: 0.52,
+          initialChildSize: 0.62,
+          minChildSize: 0.55,
           maxChildSize: 0.95,
           builder: (context, scrollController) {
             return Container(
               decoration: const BoxDecoration(
-                color: Colors.white,
+                color: Color(0xffF8F9FB),
                 borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(30),
-                  topRight: Radius.circular(30),
+                  topLeft: Radius.circular(22),
+                  topRight: Radius.circular(22),
                 ),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black12,
-                    blurRadius: 15,
+                    blurRadius: 20,
                     offset: Offset(0, -5),
                   ),
                 ],
               ),
               child: Stack(
                 children: [
-                  // Location List
                   Column(
                     children: [
                       const SizedBox(height: 12),
                       // Draggable Handle
                       Container(
-                        width: 40,
-                        height: 4,
+                        width: 48,
+                        height: 5,
                         decoration: BoxDecoration(
                           color: Colors.grey.shade300,
-                          borderRadius: BorderRadius.circular(2),
+                          borderRadius: BorderRadius.circular(2.5),
                         ),
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 16),
 
                       Expanded(
                         child: BlocBuilder<LocationBloc, LocationState>(
@@ -186,33 +183,32 @@ class _BookingLocationStepState extends State<BookingLocationStep>
                     ],
                   ),
 
-                  // Fixed Footer within sheet
+                  // Fixed Footer
                   Positioned(
                     bottom: 0,
                     left: 0,
                     right: 0,
                     child: Container(
-                      padding: const EdgeInsets.fromLTRB(20, 10, 20, 30),
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Colors.white.withOpacity(0.0),
-                            Colors.white.withOpacity(0.9),
-                            Colors.white,
-                          ],
-                        ),
+                        color: Colors.white,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.03),
+                            blurRadius: 10,
+                            offset: const Offset(0, -5),
+                          ),
+                        ],
                       ),
                       child: Row(
                         children: [
                           Expanded(
                             child: OneBtn(
                               onPressed: () {
-                                final floor =
-                                    _parkingFloorController.text.trim();
-                                final number =
-                                    _parkingNumberController.text.trim();
+                                final floor = _parkingFloorController.text
+                                    .trim();
+                                final number = _parkingNumberController.text
+                                    .trim();
 
                                 if (floor.isEmpty) {
                                   HomeScreenState.activeState?.showToast(
@@ -236,10 +232,10 @@ class _BookingLocationStepState extends State<BookingLocationStep>
                               text: "Chose Location",
                               backgroundColor: Colors.black,
                               textColor: Colors.white,
-                              height: 48,
+                              height: 56,
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: 16),
                           GestureDetector(
                             onTap: () {
                               Navigator.push(
@@ -251,24 +247,24 @@ class _BookingLocationStepState extends State<BookingLocationStep>
                               );
                             },
                             child: Container(
-                              height: 48,
-                              width: 48,
+                              height: 56,
+                              width: 56,
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 shape: BoxShape.circle,
-                                border: Border.all(color: Colors.grey.shade200),
-                                boxShadow: const [
+                                border: Border.all(color: Colors.grey.shade100),
+                                boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black12,
-                                    blurRadius: 4,
-                                    offset: Offset(0, 2),
+                                    color: Colors.black.withOpacity(0.04),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 4),
                                   ),
                                 ],
                               ),
                               child: const Icon(
                                 Icons.add,
                                 color: Colors.black,
-                                size: 24,
+                                size: 28,
                               ),
                             ),
                           ),
@@ -295,47 +291,50 @@ class _BookingLocationStepState extends State<BookingLocationStep>
     required bool isOutside,
     required Function(bool) onToggleOutside,
   }) {
-    IconData displayIcon = Icons.home_outlined;
+    IconData displayIcon = Icons.home_rounded;
     if (title.toLowerCase().contains("work")) {
-      displayIcon = Icons.work_outline;
+      displayIcon = Icons.work_rounded;
     }
 
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(24),
           border: Border.all(
             color: isSelected ? Colors.transparent : Colors.grey.shade100,
             width: 1,
           ),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.08),
-                    blurRadius: 15,
-                    offset: const Offset(0, 6),
-                  ),
-                ]
-              : null,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(isSelected ? 0.06 : 0.02),
+              blurRadius: isSelected ? 20 : 10,
+              offset: Offset(0, isSelected ? 8 : 4),
+            ),
+          ],
         ),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 Container(
-                  width: 50,
-                  height: 50,
+                  width: 45,
+                  height: 45,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF7F7F7),
-                    borderRadius: BorderRadius.circular(12),
+                    color: const Color(0xFFF3F4F6),
+                    shape: BoxShape.circle,
                   ),
                   child: Center(
-                    child: Icon(displayIcon, color: Colors.black, size: 24),
+                    child: Icon(
+                      isSelected ? Icons.location_on_rounded : displayIcon,
+                      color: Colors.black,
+                      size: 22,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -347,7 +346,7 @@ class _BookingLocationStepState extends State<BookingLocationStep>
                         title,
                         style: const TextStyle(
                           fontSize: 16,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: FontWeight.w600,
                           fontFamily: 'Lufga',
                           color: Colors.black,
                         ),
@@ -356,10 +355,10 @@ class _BookingLocationStepState extends State<BookingLocationStep>
                       Text(
                         address,
                         style: TextStyle(
-                          fontSize: 13,
+                          fontSize: 12,
                           fontWeight: FontWeight.w400,
                           fontFamily: 'Lufga',
-                          color: Colors.grey.shade500,
+                          color: const Color(0xFF9CA3AF),
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -380,7 +379,7 @@ class _BookingLocationStepState extends State<BookingLocationStep>
                       hint: "e.g. B1",
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 16),
                   Expanded(
                     child: _buildSmallTextField(
                       label: "Parking Number",
@@ -391,25 +390,21 @@ class _BookingLocationStepState extends State<BookingLocationStep>
                 ],
               ),
               const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    "Parking Type",
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      fontFamily: 'Lufga',
-                      color: Colors.black,
-                    ),
-                  ),
-                  _buildToggle(
-                    value: isOutside,
-                    onChanged: onToggleOutside,
-                    leftLabel: "Inside",
-                    rightLabel: "Outside",
-                  ),
-                ],
+              const Text(
+                "Parking Type",
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'Lufga',
+                  color: Colors.black,
+                ),
+              ),
+              const SizedBox(height: 12),
+              _buildLargeToggle(
+                value: isOutside,
+                onChanged: onToggleOutside,
+                leftLabel: "Inside",
+                rightLabel: "Outside",
               ),
             ],
           ],
@@ -418,68 +413,58 @@ class _BookingLocationStepState extends State<BookingLocationStep>
     );
   }
 
-  Widget _buildToggle({
+  Widget _buildLargeToggle({
     required bool value,
     required Function(bool) onChanged,
     required String leftLabel,
     required String rightLabel,
   }) {
-    return Container(
-      height: 36,
-      padding: const EdgeInsets.all(2),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF7F7F7),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _buildToggleItem(
+    return Row(
+      children: [
+        Expanded(
+          child: _buildToggleButton(
             label: leftLabel,
             isSelected: !value,
             onTap: () => onChanged(false),
           ),
-          _buildToggleItem(
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildToggleButton(
             label: rightLabel,
             isSelected: value,
             onTap: () => onChanged(true),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
-  Widget _buildToggleItem({
+  Widget _buildToggleButton({
     required String label,
     required bool isSelected,
     required VoidCallback onTap,
   }) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        height: double.infinity,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        height: 48,
         decoration: BoxDecoration(
-          color: isSelected ? Colors.white : Colors.transparent,
+          color: isSelected ? Colors.black : const Color(0xFFF9FAFB),
           borderRadius: BorderRadius.circular(8),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 4,
-                    offset: Offset(0, 2),
-                  ),
-                ]
-              : null,
+          border: Border.all(
+            color: isSelected ? Colors.black : Colors.grey.shade100,
+          ),
         ),
         child: Center(
           child: Text(
             label,
             style: TextStyle(
-              fontSize: 13,
-              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
               fontFamily: 'Lufga',
-              color: isSelected ? Colors.black : Colors.grey.shade500,
+              color: isSelected ? Colors.white : const Color(0xFF6B7280),
             ),
           ),
         ),
@@ -498,31 +483,35 @@ class _BookingLocationStepState extends State<BookingLocationStep>
         Text(
           label,
           style: const TextStyle(
-            fontSize: 12,
+            fontSize: 14,
             fontWeight: FontWeight.w600,
             fontFamily: 'Lufga',
             color: Colors.black,
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 8),
         Container(
-          height: 44,
+          height: 48,
           decoration: BoxDecoration(
-            color: const Color(0xFFF7F7F7),
-            borderRadius: BorderRadius.circular(10),
+            color: const Color(0xFFF9FAFB),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey.shade100),
           ),
           child: TextField(
             controller: controller,
             style: const TextStyle(
-              fontSize: 14,
+              fontSize: 15,
               fontFamily: 'Lufga',
               color: Colors.black,
             ),
             decoration: InputDecoration(
               hintText: hint,
-              hintStyle: TextStyle(fontSize: 13, color: Colors.grey.shade400),
+              hintStyle: const TextStyle(
+                fontSize: 14,
+                color: Color(0xFF9CA3AF),
+              ),
               border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
             ),
           ),
         ),

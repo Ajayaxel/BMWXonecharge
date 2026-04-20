@@ -713,11 +713,12 @@ class _ProductCardState extends State<_ProductCard> {
                       softWrap: true,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        fontSize: 22,
+                        fontSize: 20,
                         fontWeight: FontWeight.w400,
                         height: 1.0,
                         fontFamily: 'Lufga',
                         color: Colors.black,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ),

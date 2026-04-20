@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:onecharge/const/onebtn.dart';
 
 class BookingOptionsSheet extends StatefulWidget {
   final VoidCallback onInstantSelected;
@@ -19,27 +20,25 @@ class _BookingOptionsSheetState extends State<BookingOptionsSheet>
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
+  int _selectedIndex = 0; // 0 for Instant, 1 for Schedule
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 600),
     );
 
     _fadeAnimation = CurvedAnimation(
       parent: _controller,
-      curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
+      curve: Curves.easeOut,
     );
 
-    _slideAnimation =
-        Tween<Offset>(begin: const Offset(0, 0.1), end: Offset.zero).animate(
-          CurvedAnimation(
-            parent: _controller,
-            curve: const Interval(0.2, 1.0, curve: Curves.easeOutCubic),
-          ),
-        );
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.1),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
 
     _controller.forward();
   }
@@ -56,24 +55,16 @@ class _BookingOptionsSheetState extends State<BookingOptionsSheet>
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(36),
-          topRight: Radius.circular(36),
+          topLeft: Radius.circular(24),
+          topRight: Radius.circular(24),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 40,
-            offset: Offset(0, -10),
-          ),
-        ],
       ),
       child: SafeArea(
         top: false,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const SizedBox(height: 8),
-            // Handle bar
+            const SizedBox(height: 12),
             Container(
               width: 48,
               height: 5,
@@ -83,51 +74,95 @@ class _BookingOptionsSheetState extends State<BookingOptionsSheet>
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 15),
               child: FadeTransition(
                 opacity: _fadeAnimation,
                 child: SlideTransition(
                   position: _slideAnimation,
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        "Booking Options",
-                        style: TextStyle(
-                          fontSize: 26,
-                          fontWeight: FontWeight.w600,
-                          fontFamily: 'Lufga',
-                          letterSpacing: -0.5,
-                          color: Color(0xFF1A1A1A),
-                        ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            "Choose booking type",
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w600,
+                              fontFamily: 'Lufga',
+                              color: Colors.black,
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () => Navigator.pop(context),
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF7F7F7),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.close, size: 20),
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 10),
-                      Text(
-                        "Select your preferred service speed",
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 15,
-                          color: Colors.grey[500],
-                          fontFamily: 'Lufga',
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 36),
-                      _buildAnimatedOption(
+
+                      const SizedBox(height: 24),
+
+                      _buildOptionCard(
                         index: 0,
-                        title: "Instant Booking",
-                        subtitle: "Get service provider immediately",
-                        icon: Icons.flash_on_rounded,
-                        primaryColor: Colors.black,
-                        onTap: widget.onInstantSelected,
+                        title: "Instant",
+                        badge: "FASTEST",
+                        subtitle: "Book ur slot instantly",
+                        detail: "~10 min away",
+                        icon: Icons.bolt_rounded,
+                        detailIcon: Icons.access_time_rounded,
                       ),
-                      const SizedBox(height: 18),
-                      _buildAnimatedOption(
+                      const SizedBox(height: 16),
+                      _buildOptionCard(
                         index: 1,
-                        title: "Schedule Booking",
-                        subtitle: "Choose a time that fits your day",
-                        icon: Icons.calendar_today_rounded,
-                        primaryColor: Colors.black,
-                        onTap: widget.onScheduledSelected,
+                        title: "Schedule",
+                        badge: "FLEXIBLE",
+                        subtitle: "Book ur slot for later",
+                        detail: "Up to 30 days ahead",
+                        icon: Icons.calendar_month_rounded,
+                        detailIcon: Icons.calendar_today_rounded,
+                      ),
+
+                      const SizedBox(height: 20),
+                      Row(
+                        children: const [
+                          Icon(
+                            Icons.verified_user_rounded,
+                            size: 18,
+                            color: Color(0xFF9CA3AF),
+                          ),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              "Free cancellation up to 2 minutes after booking",
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Color(0xFF6B7280),
+                                fontFamily: 'Lufga',
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+
+                      OneBtn(
+                        onPressed: () {
+                          if (_selectedIndex == 0) {
+                            widget.onInstantSelected();
+                          } else {
+                            widget.onScheduledSelected();
+                          }
+                        },
+                        text: "Confirm",
                       ),
                     ],
                   ),
@@ -140,138 +175,141 @@ class _BookingOptionsSheetState extends State<BookingOptionsSheet>
     );
   }
 
-  Widget _buildAnimatedOption({
+  Widget _buildOptionCard({
     required int index,
     required String title,
+    required String badge,
     required String subtitle,
+    required String detail,
     required IconData icon,
-    required Color primaryColor,
-    required VoidCallback onTap,
+    required IconData detailIcon,
   }) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        final start = 0.3 + (index * 0.15);
-        final end = (start + 0.5).clamp(0.0, 1.0);
-        final animation = CurvedAnimation(
-          parent: _controller,
-          curve: Interval(start, end, curve: Curves.easeOutCubic),
-        );
-
-        return Opacity(
-          opacity: animation.value,
-          child: Transform.translate(
-            offset: Offset(0, 30 * (1 - animation.value)),
-            child: child,
-          ),
-        );
-      },
-      child: _ModernOptionCard(
-        title: title,
-        subtitle: subtitle,
-        icon: icon,
-        primaryColor: primaryColor,
-        onTap: onTap,
-      ),
-    );
-  }
-}
-
-class _ModernOptionCard extends StatefulWidget {
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final Color primaryColor;
-  final VoidCallback onTap;
-
-  const _ModernOptionCard({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.primaryColor,
-    required this.onTap,
-  });
-
-  @override
-  State<_ModernOptionCard> createState() => _ModernOptionCardState();
-}
-
-class _ModernOptionCardState extends State<_ModernOptionCard> {
-  bool _isPressed = false;
-
-  @override
-  Widget build(BuildContext context) {
+    bool isSelected = _selectedIndex == index;
     return GestureDetector(
-      onTapDown: (_) => setState(() => _isPressed = true),
-      onTapUp: (_) => setState(() => _isPressed = false),
-      onTapCancel: () => setState(() => _isPressed = false),
-      onTap: widget.onTap,
-      child: AnimatedScale(
-        scale: _isPressed ? 0.97 : 1.0,
-        duration: const Duration(milliseconds: 150),
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: _isPressed ? widget.primaryColor : const Color(0xFFF1F1F1),
-              width: 1.5,
+      onTap: () => setState(() => _selectedIndex = index),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? Colors.black : const Color(0xFFE5E7EB),
+            width: isSelected ? 2 : 1,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.04),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: isSelected ? Colors.black : const Color(0xFFF3F4F6),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(
+                icon,
+                color: isSelected ? Colors.white : Colors.black,
+                size: 28,
+              ),
             ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.03),
-                blurRadius: 20,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: widget.primaryColor.withOpacity(0.08),
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: Icon(widget.icon, color: widget.primaryColor, size: 28),
-              ),
-              const SizedBox(width: 20),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.title,
-                      style: const TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800,
-                        fontFamily: 'Lufga',
-                        color: Color(0xFF1A1A1A),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Lufga',
+                          color: Colors.black,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      widget.subtitle,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                        fontFamily: 'Lufga',
-                        color: Colors.grey[500],
-                        letterSpacing: 0.1,
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? Colors.black
+                              : const Color(0xFFF3F4F6),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          badge,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            fontFamily: 'Lufga',
+                            color: isSelected
+                                ? Colors.white
+                                : const Color(0xFF6B7280),
+                          ),
+                        ),
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFF6B7280),
+                      fontFamily: 'Lufga',
+                      fontWeight: FontWeight.w400,
                     ),
-                  ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(
+                        detailIcon,
+                        size: 14,
+                        color: const Color(0xFF9CA3AF),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        detail,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF9CA3AF),
+                          fontFamily: 'Lufga',
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              width: 24,
+              height: 24,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isSelected ? Colors.black : const Color(0xFFD1D5DB),
+                  width: isSelected ? 7 : 2,
                 ),
               ),
-              Icon(
-                Icons.arrow_forward_ios_rounded,
-                color: Colors.grey[300],
-                size: 16,
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
