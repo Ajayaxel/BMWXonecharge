@@ -1,6 +1,14 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:fl_chart/fl_chart.dart';
+import '../../logic/blocs/carbon_emission/carbon_emission_bloc.dart';
+import '../../logic/blocs/carbon_emission/carbon_emission_event.dart';
+import '../../logic/blocs/carbon_emission/carbon_emission_state.dart';
+import '../../logic/services/carbon_emission_service.dart';
+import '../../core/network/api_client.dart';
+import '../../core/storage/secure_storage_service.dart';
+import '../../models/carbon_emission_models.dart';
 
 class CarbonEmiosn extends StatelessWidget {
   final String userName;
@@ -8,238 +16,280 @@ class CarbonEmiosn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        width: double.infinity,
-        decoration: BoxDecoration(
-          image: DecorationImage(
-            image: NetworkImage(
-              "https://images.unsplash.com/photo-1567667194029-8e7a178814ea?fm=jpg&q=60&w=3000&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NHx8Zm9yZXN0JTIwdG9wJTIwdmlld3xlbnwwfHwwfHx8MA%3D%3D",
+    return BlocProvider(
+      create: (context) => CarbonEmissionBloc(
+        CarbonEmissionService(ApiClient(SecureStorageService())),
+      )..add(FetchGridFactorsAndVehicles()),
+      child: const _CarbonEmissionScreenContent(),
+    );
+  }
+}
+
+class _CarbonEmissionScreenContent extends StatefulWidget {
+  const _CarbonEmissionScreenContent();
+
+  @override
+  State<_CarbonEmissionScreenContent> createState() =>
+      _CarbonEmissionScreenContentState();
+}
+
+class _CarbonEmissionScreenContentState
+    extends State<_CarbonEmissionScreenContent> {
+  double _displayCO2 = 15.02;
+
+  @override
+  Widget build(BuildContext context) {
+    final userName =
+        (context.findAncestorWidgetOfExactType<CarbonEmiosn>()?.userName) ??
+        "User";
+
+    return BlocListener<CarbonEmissionBloc, CarbonEmissionState>(
+      listener: (context, state) {
+        if (state is CarbonEmissionCalculated) {
+          setState(() {
+            _displayCO2 = state.result.co2Saved;
+          });
+        } else if (state is CarbonEmissionError) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(state.message)));
+        }
+      },
+      child: Scaffold(
+        body: Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            image: DecorationImage(
+              image: NetworkImage(
+                "https://images.unsplash.com/photo-1567667194029-8e7a178814ea?fm=jpg&q=60&w=3000&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NHx8Zm9yZXN0JTIwdG9wJTIwdmlld3xlbnwwfHwwfHx8MA%3D%3D",
+              ),
+              fit: BoxFit.cover,
             ),
-            fit: BoxFit.cover,
           ),
-        ),
-        child: SafeArea(
-          bottom: false,
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    GestureDetector(
-                      onTap: () {
-                        Navigator.pop(context);
-                      },
-                      child: Icon(
-                        Icons.arrow_back_ios_new_rounded,
-                        color: Colors.white,
+          child: SafeArea(
+            bottom: false,
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.pop(context);
+                        },
+                        child: Icon(
+                          Icons.arrow_back_ios_new_rounded,
+                          color: Colors.white,
+                        ),
                       ),
-                    ),
-                    Container(
-                      margin: EdgeInsets.only(right: 16),
-                      width: 150,
-                      padding: EdgeInsets.all(2),
+                      Container(
+                        margin: EdgeInsets.only(right: 16),
+                        width: 150,
+                        padding: EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            CircleAvatar(
+                              radius: 12,
+                              backgroundColor: Colors.white,
+                              child: Icon(
+                                Icons.eco,
+                                color: Colors.green,
+                                size: 18,
+                              ),
+                            ),
+                            SizedBox(width: 5),
+                            Text(
+                              "Offset 1.2 tonnes",
+                              style: TextStyle(color: Colors.white),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: 20),
+
+                // progress bar
+                ClipOval(
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+                    child: Container(
+                      width: 200,
+                      height: 200,
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(10),
+                        shape: BoxShape.circle,
+                        color: Colors.white.withValues(alpha: 0.1),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.3),
+                          width: 1.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.1),
+                            blurRadius: 20,
+                            spreadRadius: 5,
+                          ),
+                        ],
                       ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
+                      child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          CircleAvatar(
-                            radius: 12,
-                            backgroundColor: Colors.white,
-                            child: Icon(
-                              Icons.eco,
-                              color: Colors.green,
-                              size: 18,
+                          Text(
+                            _displayCO2.toStringAsFixed(2),
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 60,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: -1,
                             ),
                           ),
-                          SizedBox(width: 5),
                           Text(
-                            "Offset 1.2 tonnes",
-                            style: TextStyle(color: Colors.white),
+                            "Saved CO₂",
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.9),
+                              fontSize: 24,
+                              fontWeight: FontWeight.w400,
+                            ),
                           ),
                         ],
                       ),
                     ),
-                  ],
+                  ),
                 ),
-              ),
-              SizedBox(height: 20),
-
-              // progress bar
-              ClipOval(
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+                SizedBox(height: 20),
+                Expanded(
                   child: Container(
-                    width: 200,
-                    height: 200,
+                    padding: EdgeInsets.all(16),
+                    width: double.infinity,
                     decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white.withValues(alpha: 0.1),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.3),
-                        width: 1.5,
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(24),
+                        topRight: Radius.circular(24),
                       ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.1),
-                          blurRadius: 20,
-                          spreadRadius: 5,
-                        ),
-                      ],
+                      color: Colors.white,
                     ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          "15.02",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 60,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: -1,
-                          ),
-                        ),
-                        Text(
-                          "Tons CO₂",
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.9),
-                            fontSize: 24,
-                            fontWeight: FontWeight.w400,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              SizedBox(height: 20),
-              Expanded(
-                child: Container(
-                  padding: EdgeInsets.all(16),
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(24),
-                      topRight: Radius.circular(24),
-                    ),
-                    color: Colors.white,
-                  ),
-                  child: SingleChildScrollView(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              "Hi, $userName!",
-                              style: TextStyle(
-                                color: Colors.black,
-                                fontSize: 22,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            Container(
-                              padding: EdgeInsets.all(5),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFE8F5E9),
-                                borderRadius: BorderRadius.circular(25),
-                              ),
-                              child: const Text(
-                                "Goal: 12 CO₂",
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                "Hi, $userName!",
                                 style: TextStyle(
-                                  color: Colors.black87,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w400,
+                                  color: Colors.black,
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 5),
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.arrow_drop_down,
-                              color: Color(0xFF2E7D32),
-                              size: 20,
-                            ),
-                            Text(
-                              "-22% below your avg carbon footprint",
-                              style: TextStyle(
-                                color: const Color(0xFF2E7D32),
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        // overview cards
-                        const CarbonOverviewCard(),
-                        SizedBox(height: 16),
-
-                        // weekly progress bar
-                        const WeeklyProgressBar(),
-                        const SizedBox(height: 20),
-
-                        // offset emissions
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text(
-                              "Offset Emissions",
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black87,
-                              ),
-                            ),
-                            Row(
-                              children: [
-                                const Text(
-                                  "See more",
+                              Container(
+                                padding: EdgeInsets.all(5),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFE8F5E9),
+                                  borderRadius: BorderRadius.circular(25),
+                                ),
+                                child: const Text(
+                                  "Goal: 12 CO₂",
                                   style: TextStyle(
-                                    color: Color(0xFF1B4D3E),
-                                    fontWeight: FontWeight.w600,
+                                    color: Colors.black87,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w400,
                                   ),
                                 ),
-                                const Icon(
-                                  Icons.chevron_right,
-                                  color: Color(0xFF1B4D3E),
-                                  size: 20,
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 16),
-
-                        SizedBox(
-                          height: 230,
-                          child: ListView.builder(
-                            itemCount: 5,
-
-                            scrollDirection: Axis.horizontal,
-                            itemBuilder: (context, index) {
-                              return Blog();
-                            },
+                              ),
+                            ],
                           ),
-                        ),
-                        const SizedBox(height: 20),
-                      ],
+                          const SizedBox(height: 5),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.arrow_drop_down,
+                                color: Color(0xFF2E7D32),
+                                size: 20,
+                              ),
+                              Text(
+                                "-22% below your avg carbon footprint",
+                                style: TextStyle(
+                                  color: const Color(0xFF2E7D32),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          // overview cards
+                          const CarbonOverviewCard(),
+                          SizedBox(height: 16),
+
+                          // weekly progress bar
+                          const WeeklyProgressBar(),
+                          const SizedBox(height: 20),
+
+                          // offset emissions
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                "Offset Emissions",
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              Row(
+                                children: [
+                                  const Text(
+                                    "See more",
+                                    style: TextStyle(
+                                      color: Color(0xFF1B4D3E),
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const Icon(
+                                    Icons.chevron_right,
+                                    color: Color(0xFF1B4D3E),
+                                    size: 20,
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 16),
+                          // calculate emission section
+                          const CarbonCalculatorWidget(),
+                          const SizedBox(height: 24),
+                          SizedBox(
+                            height: 230,
+                            child: ListView.builder(
+                              itemCount: 5,
+
+                              scrollDirection: Axis.horizontal,
+                              itemBuilder: (context, index) {
+                                return Blog();
+                              },
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -774,4 +824,288 @@ class DashBentLinePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class CarbonCalculatorWidget extends StatefulWidget {
+  const CarbonCalculatorWidget({super.key});
+
+  @override
+  State<CarbonCalculatorWidget> createState() => _CarbonCalculatorWidgetState();
+}
+
+class _CarbonCalculatorWidgetState extends State<CarbonCalculatorWidget> {
+  final _distanceController = TextEditingController();
+  GridFactor? _selectedCountry;
+  VehicleData? _selectedVehicle;
+  String _comparisonType = 'petrol';
+
+  String _getFlag(String countryCode) {
+    if (countryCode.length != 2) return '🏳️';
+    return countryCode.toUpperCase().replaceAllMapped(
+        RegExp(r'[A-Z]'),
+        (match) => String.fromCharCode(match.group(0)!.codeUnitAt(0) + 127397));
+  }
+
+  @override
+  void dispose() {
+    _distanceController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocConsumer<CarbonEmissionBloc, CarbonEmissionState>(
+      listener: (context, state) {
+        if (state.gridFactors.isNotEmpty && _selectedCountry == null) {
+          setState(() => _selectedCountry = state.gridFactors.first);
+        }
+        if (state.vehicles.isNotEmpty && _selectedVehicle == null) {
+          setState(() => _selectedVehicle = state.vehicles.first);
+        }
+      },
+      builder: (context, state) {
+        final List<GridFactor> countries = state.gridFactors;
+        final List<VehicleData> vehicles = state.vehicles;
+        final bool isLoading = state is CarbonEmissionLoading;
+        final bool isCalculating = state is CarbonEmissionCalculating;
+
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF1F8E9),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: Colors.green.withValues(alpha: 0.1)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                "Calculate Savings",
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1B4D3E),
+                ),
+              ),
+              const SizedBox(height: 16),
+              if (isLoading)
+                const Center(child: CircularProgressIndicator())
+              else if (state is CarbonEmissionError)
+                Text(
+                  "Error: ${state.message}",
+                  style: const TextStyle(color: Colors.red),
+                )
+              else ...[
+                // Distance Field
+                _buildLabel("Distance (km)"),
+                TextField(
+                  controller: _distanceController,
+                  keyboardType: TextInputType.number,
+                  decoration: _inputDecoration("Enter distance in km"),
+                ),
+                const SizedBox(height: 16),
+
+                // Country Selection
+                _buildLabel("Your Location"),
+                DropdownButtonFormField<GridFactor>(
+                  value: _selectedCountry,
+                  decoration: _inputDecoration("Select Country"),
+                  dropdownColor: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  icon: const Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    color: Color(0xFF1B4D3E),
+                  ),
+                  items: countries.map((country) {
+                    return DropdownMenuItem(
+                      value: country,
+                      child: Row(
+                        children: [
+                          Text(
+                            _getFlag(country.country),
+                            style: const TextStyle(fontSize: 18),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            country.country,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (val) => setState(() => _selectedCountry = val),
+                ),
+                const SizedBox(height: 16),
+
+                // Vehicle Selection
+                _buildLabel("EV Vehicle Type"),
+                DropdownButtonFormField<VehicleData>(
+                  value: _selectedVehicle,
+                  decoration: _inputDecoration("Select Vehicle"),
+                  dropdownColor: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  icon: const Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    color: Color(0xFF1B4D3E),
+                  ),
+                  items: vehicles.map((v) {
+                    return DropdownMenuItem(
+                      value: v,
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.electric_car_rounded,
+                            size: 20,
+                            color: Color(0xFF1B4D3E),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            v.name,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),    
+                    );
+                  }).toList(),
+                  onChanged: (val) => setState(() => _selectedVehicle = val),
+                ),
+                const SizedBox(height: 16),
+
+                // Comparison Type Selection
+                _buildLabel("Compare With"),
+                Row(
+                  children: [
+                    Expanded(child: _buildComparisonToggle("Petrol", 'petrol')),
+                    const SizedBox(width: 12),
+                    Expanded(child: _buildComparisonToggle("Diesel", 'diesel')),
+                  ],
+                ),
+                const SizedBox(height: 24),
+
+                // Calculate Button
+                SizedBox(
+                  width: double.infinity,
+                  height: 55,
+                  child: ElevatedButton(
+                    onPressed: isCalculating
+                        ? null
+                        : () {
+                            if (_distanceController.text.isEmpty ||
+                                _selectedCountry == null ||
+                                _selectedVehicle == null) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text("Please fill all fields"),
+                                ),
+                              );
+                              return;
+                            }
+                            context.read<CarbonEmissionBloc>().add(
+                              CalculateEmissionEvent(
+                                distanceKm: double.parse(
+                                  _distanceController.text,
+                                ),
+                                vehicleId: _selectedVehicle!.id,
+                                location: _selectedCountry!.country,
+                                comparisonType: _comparisonType,
+                              ),
+                            );
+                          },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF1B4D3E),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: isCalculating
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text(
+                            "Calculate",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildLabel(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0, left: 4),
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          color: Colors.black54,
+        ),
+      ),
+    );
+  }
+
+  InputDecoration _inputDecoration(String hint) {
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: TextStyle(
+        color: Colors.black.withValues(alpha: 0.3),
+        fontSize: 14,
+      ),
+      filled: true,
+      fillColor: Colors.white,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide.none,
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide.none,
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: Color(0xFF1B4D3E), width: 1.5),
+      ),
+    );
+  }   
+
+  Widget _buildComparisonToggle(String label, String type) {
+    bool isSelected = _comparisonType == type;
+    return GestureDetector(
+      onTap: () => setState(() => _comparisonType = type),
+      child: Container(
+        height: 45,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF1B4D3E) : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? Colors.transparent : Colors.black12,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.white : Colors.black54,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
 }

@@ -783,7 +783,9 @@ class HomeScreenState extends State<HomeScreen> with LocationHandlerMixin {
         backgroundColor: Colors.white,
         body: Stack(
           children: [
+            // Background backing for top overscroll
             SingleChildScrollView(
+              physics: const ClampingScrollPhysics(),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -810,6 +812,7 @@ class HomeScreenState extends State<HomeScreen> with LocationHandlerMixin {
                               }
                               return PageView.builder(
                                 controller: _pageController,
+                                physics: const ClampingScrollPhysics(),
                                 onPageChanged: (int page) {
                                   setState(() {
                                     _currentPage = page;
@@ -859,7 +862,7 @@ class HomeScreenState extends State<HomeScreen> with LocationHandlerMixin {
                                       decoration: BoxDecoration(
                                         shape: BoxShape.circle,
                                         border: Border.all(
-                                          color: Colors.white.withOpacity(0.3),
+                                          color: Colors.black12,
                                         ),
                                       ),
                                       child:
@@ -1051,9 +1054,6 @@ class HomeScreenState extends State<HomeScreen> with LocationHandlerMixin {
                                 decoration: BoxDecoration(
                                   color: Colors.white.withOpacity(0.15),
                                   borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: Colors.white.withOpacity(0.1),
-                                  ),
                                 ),
                                 child: TextField(
                                   controller: searchController,
@@ -1091,94 +1091,100 @@ class HomeScreenState extends State<HomeScreen> with LocationHandlerMixin {
                     ),
                   ),
 
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // services section
-                        HomeServiceGroups(
-                          searchQuery: searchQuery,
-                          onServiceSelected: (categoryName, categoryId) {
-                            VehicleSelectionBottomSheet.show(
-                              context,
-                              category: categoryName,
-                              currentAddress: currentAddress,
-                              currentLatitude: currentLatitude,
-                              currentLongitude: currentLongitude,
-                              selectedLocationId: selectedLocationId,
-                            );
-                          },
-                        ),
-                        SizedBox(height: 16),
-                        //carbon emmision banner
-                        BlocBuilder<ProfileBloc, ProfileState>(
-                          builder: (context, state) {
-                            String? firstName;
-                            if (state is ProfileLoaded) {
-                              firstName = state.customer.name.split(' ').first;
-                            }
-                            return CarbonBanner(userName: firstName);
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        //products section
-                        HomeProductGroups(searchQuery: searchQuery),
-                        SizedBox(height: 20),
-                        BlocBuilder<ComboOfferBloc, ComboOfferState>(
-                          builder: (context, state) {
-                            final offer =
-                                state is ComboOfferLoaded &&
-                                    state.comboOffers.isNotEmpty
-                                ? state.comboOffers.firstWhere(
-                                    (o) => o.id == 2,
-                                    orElse: () => state.comboOffers.first,
-                                  )
-                                : null;
+                  Container(
+                    color: Colors.white,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // services section
+                          HomeServiceGroups(
+                            searchQuery: searchQuery,
+                            onServiceSelected: (categoryName, categoryId) {
+                              VehicleSelectionBottomSheet.show(
+                                context,
+                                category: categoryName,
+                                currentAddress: currentAddress,
+                                currentLatitude: currentLatitude,
+                                currentLongitude: currentLongitude,
+                                selectedLocationId: selectedLocationId,
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                          //carbon emmision banner
+                          BlocBuilder<ProfileBloc, ProfileState>(
+                            builder: (context, state) {
+                              String? firstName;
+                              if (state is ProfileLoaded) {
+                                firstName = state.customer.name
+                                    .split(' ')
+                                    .first;
+                              }
+                              return CarbonBanner(userName: firstName);
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                          //products section
+                          HomeProductGroups(searchQuery: searchQuery),
+                          const SizedBox(height: 20),
+                          BlocBuilder<ComboOfferBloc, ComboOfferState>(
+                            builder: (context, state) {
+                              final offer =
+                                  state is ComboOfferLoaded &&
+                                      state.comboOffers.isNotEmpty
+                                  ? state.comboOffers.firstWhere(
+                                      (o) => o.id == 2,
+                                      orElse: () => state.comboOffers.first,
+                                    )
+                                  : null;
 
-                            return BannerSection(
-                              image: offer != null
-                                  ? offer.imageUrl
-                                  : "https://static.vecteezy.com/system/resources/previews/059/007/249/non_2x/ev-charger-station-transparent-background-free-png.png",
-                              title: offer != null
-                                  ? offer.name
-                                  : "Mega Deals on EV Accessories ⚡",
-                              subtitle: offer != null
-                                  ? offer.description
-                                  : "Grab exclusive discounts on top-quality upgrades for your ride.",
-                              buttonText: "Shop Deals",
-                              comboPrice: offer?.comboPrice,
-                              originalPrice: offer?.originalPrice,
-                              onTap: () {
-                                if (offer != null) {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => ComboBuyScreen(
-                                        offer: offer,
-                                        initialAddress: currentAddress,
-                                        initialLatitude: currentLatitude,
-                                        initialLongitude: currentLongitude,
+                              return BannerSection(
+                                image: offer != null
+                                    ? offer.imageUrl
+                                    : "https://static.vecteezy.com/system/resources/previews/059/007/249/non_2x/ev-charger-station-transparent-background-free-png.png",
+                                title: offer != null
+                                    ? offer.name
+                                    : "Mega Deals on EV Accessories ⚡",
+                                subtitle: offer != null
+                                    ? offer.description
+                                    : "Grab exclusive discounts on top-quality upgrades for your ride.",
+                                buttonText: "Shop Deals",
+                                comboPrice: offer?.comboPrice,
+                                originalPrice: offer?.originalPrice,
+                                onTap: () {
+                                  if (offer != null) {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => ComboBuyScreen(
+                                          offer: offer,
+                                          initialAddress: currentAddress,
+                                          initialLatitude: currentLatitude,
+                                          initialLongitude: currentLongitude,
+                                        ),
                                       ),
-                                    ),
-                                  );
-                                } else {
-                                  showToast("Fetching latest deals...");
-                                  context.read<ComboOfferBloc>().add(
-                                    FetchComboOffers(),
-                                  );
-                                }
-                              },
-                            );
-                          },
-                        ),
+                                    );
+                                  } else {
+                                    showToast("Fetching latest deals...");
+                                    context.read<ComboOfferBloc>().add(
+                                      FetchComboOffers(),
+                                    );
+                                  }
+                                },
+                              );
+                            },
+                          ),
 
-                        const SizedBox(
-                          height: 100,
-                        ), // Bottom padding for scrolling
-                      ],
+                          const SizedBox(
+                            height: 100,
+                          ), // Bottom padding for scrolling
+                        ],
+                      ),
                     ),
                   ),
+
                   // Floating Notification Overlay (PURELY REACTIVE)
                   if (_currentServiceStage != 'none')
                     ServiceNotificationOverlay(
@@ -1286,15 +1292,15 @@ class HomeScreenState extends State<HomeScreen> with LocationHandlerMixin {
       ),
       child: Stack(
         children: [
-          // Overlay Gradients
+          // Dark top gradient for white header visibility
           Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  Colors.black.withOpacity(0.8),
-                  Colors.black.withOpacity(0.2),
+                  Colors.black.withOpacity(0.7),
+                  Colors.black.withOpacity(0.1),
                   Colors.transparent,
                 ],
               ),
@@ -1332,9 +1338,10 @@ class HomeScreenState extends State<HomeScreen> with LocationHandlerMixin {
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 28,
+                    fontSize: 26,
                     fontWeight: FontWeight.w700,
                     fontFamily: 'Lufga',
+                    overflow: TextOverflow.ellipsis,
 
                     shadows: [
                       Shadow(
@@ -1344,6 +1351,7 @@ class HomeScreenState extends State<HomeScreen> with LocationHandlerMixin {
                       ),
                     ],
                   ),
+                  maxLines: 2,
                 ),
 
                 const SizedBox(height: 36),
@@ -1353,55 +1361,51 @@ class HomeScreenState extends State<HomeScreen> with LocationHandlerMixin {
                   child: BackdropFilter(
                     filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                     child: Container(
-                      width: MediaQuery.of(context).size.width * 0.50,
-                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      width: MediaQuery.of(context).size.width * 0.70,
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 12,
+                        horizontal: 16,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.black.withOpacity(0.12),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: Colors.white.withOpacity(0.5),
-                          width: 1,
-                        ),
                       ),
-                      child: Stack(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Center(
-                            child: Text(
-                              "USECODE : ${banner.code}",
-                              style: const TextStyle(
-                                color: Colors.black,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                fontFamily: 'Lufga',
-                                shadows: [
-                                  Shadow(
-                                    color: Colors.black12,
-                                    offset: Offset(0, 1),
-                                    blurRadius: 2,
-                                  ),
-                                ],
+                          Expanded(
+                            child: Center(
+                              child: Text(
+                                "USECODE : ${banner.code}",
+                                style: const TextStyle(
+                                  color: Colors.black,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  fontFamily: 'Lufga',
+                                  shadows: [
+                                    Shadow(
+                                      color: Colors.black12,
+                                      offset: Offset(0, 1),
+                                      blurRadius: 2,
+                                    ),
+                                  ],
+                                ),
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ),
-                          Positioned(
-                            right: -10,
-                            top: 0,
-
-                            bottom: 0,
-                            child: IconButton(
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                              icon: Icon(
-                                Icons.copy_rounded,
-                                size: 16,
-                                color: Colors.black.withOpacity(0.5),
-                              ),
-                              onPressed: () {
-                                Clipboard.setData(
-                                  ClipboardData(text: banner.code),
-                                );
-                                showToast("Code copied to clipboard!");
-                              },
+                          const SizedBox(width: 8),
+                          GestureDetector(
+                            onTap: () {
+                              Clipboard.setData(
+                                ClipboardData(text: banner.code),
+                              );
+                              showToast("Code copied to clipboard!");
+                            },
+                            child: Icon(
+                              Icons.copy_rounded,
+                              size: 18,
+                              color: Colors.black.withOpacity(0.6),
                             ),
                           ),
                         ],
@@ -1418,49 +1422,52 @@ class HomeScreenState extends State<HomeScreen> with LocationHandlerMixin {
   }
 
   Widget _buildBannerSkeleton() {
-    return Shimmer.fromColors(
-      baseColor: Colors.grey[300]!,
-      highlightColor: Colors.grey[100]!,
-      child: Container(
-        width: double.infinity,
-        height: double.infinity,
-        color: Colors.white,
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      color: Colors.white, // Match the immersive background
+      child: Shimmer.fromColors(
+        baseColor: Colors.grey[300]!,
+        highlightColor: Colors.grey[200]!,
         child: Stack(
           alignment: Alignment.center,
           children: [
-            // Skeleton for the main title/text area
+            // Skeleton for the column content at bottom: 60
             Positioned(
-              bottom: 140,
-              child: Container(
-                width: MediaQuery.of(context).size.width * 0.75,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-            ),
-            Positioned(
-              bottom: 100,
-              child: Container(
-                width: MediaQuery.of(context).size.width * 0.6,
-                height: 24,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-            ),
-            // Skeleton for the voucher bar
-            Positioned(
-              bottom: 45,
-              child: Container(
-                width: MediaQuery.of(context).size.width * 0.5,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                ),
+              bottom: 60,
+              left: 0,
+              right: 0,
+              child: Column(
+                children: [
+                  // Title skeleton
+                  Container(
+                    width: MediaQuery.of(context).size.width * 0.75,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[900],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    width: MediaQuery.of(context).size.width * 0.55,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[900],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  const SizedBox(height: 36),
+                  // Voucher bar skeleton
+                  Container(
+                    width: MediaQuery.of(context).size.width * 0.5,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[900],
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],

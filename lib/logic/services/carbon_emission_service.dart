@@ -1,77 +1,60 @@
-class CarbonCalculationResult {
-  final double evEmission;
-  final double iceEmission;
-  final double co2Saved;
-  final double treesSaved;
-  final double fuelSavedLitres;
-
-  CarbonCalculationResult({
-    required this.evEmission,
-    required this.iceEmission,
-    required this.co2Saved,
-    required this.treesSaved,
-    required this.fuelSavedLitres,
-  });
-}
+import '../../core/network/api_client.dart';
+import '../../models/carbon_emission_models.dart';
 
 class CarbonEmissionService {
-  // Static Data (Mocking Database)
-  static const Map<String, double> gridFactors = {
-    'IN': 0.82, // India (High coal dependence)
-    'AE': 0.45, // UAE
-    'DE': 0.35, // Germany
-    'US': 0.38, // USA
-    'UK': 0.25, // UK
-    'NO': 0.02, // Norway (Hydropower)
-  };
+  final ApiClient _apiClient;
 
-  static const Map<String, double> iceFactors = {
-    'petrol': 0.15, // kg/km average
-    'diesel': 0.18, // kg/km average
-  };
+  CarbonEmissionService(this._apiClient);
 
-  // Modern EV Consumption Data (kWh/km)
-  static const Map<String, double> vehicleEfficiencies = {
-    'hatchback': 0.15,
-    'sedan': 0.17,
-    'suv': 0.21,
-    'luxury': 0.23,
-  };
+  Future<List<GridFactor>> getGridFactors() async {
+    try {
+      final response = await _apiClient.get('/customer/emission/grid-factor');
+      if (response.data['success'] == true) {
+        final List<dynamic> data = response.data['data'];
+        return data.map((json) => GridFactor.fromJson(json)).toList();
+      }
+      throw Exception('Failed to load grid factors');
+    } catch (e) {
+      rethrow;
+    }
+  }
 
-  static CarbonCalculationResult calculate({
+  Future<List<VehicleData>> getVehicleData() async {
+    try {
+      final response = await _apiClient.get('/customer/emission/vehicle-data');
+      if (response.data['success'] == true) {
+        final List<dynamic> data = response.data['data']['vehicles'];
+        return data.map((json) => VehicleData.fromJson(json)).toList();
+      }
+      throw Exception('Failed to load vehicle data');
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<EmissionResult> calculateEmission({
     required double distanceKm,
-    required String vehicleType, // hatchback, sedan, etc.
-    required String location, // IN, AE, etc.
+    required int vehicleId,
+    required String location,
     String comparisonType = 'petrol',
-  }) {
-    // 1. Get Factors
-    final gridFactor = gridFactors[location] ?? 0.5; // default fallback
-    final evEfficiency = vehicleEfficiencies[vehicleType] ?? 0.18;
-    final iceFactor = iceFactors[comparisonType] ?? 0.15;
-
-    // 2. Run Calculations
-    // Formula: CO2_EV = D * Ec * Gf
-    final evEmission = distanceKm * evEfficiency * gridFactor;
-
-    // Formula: CO2_ICE = D * Ef
-    final iceEmission = distanceKm * iceFactor;
-
-    // Formula: CO2_Saved = CO2_ICE - CO2_EV
-    final co2Saved = iceEmission - evEmission;
-
-    // 3. Convert into Equivalents
-    // trees = saved / 21
-    final treesSaved = co2Saved / 21.0;
-    
-    // fuel = saved / 2.31
-    final fuelSavedLitres = co2Saved / 2.31;
-
-    return CarbonCalculationResult(
-      evEmission: evEmission,
-      iceEmission: iceEmission,
-      co2Saved: co2Saved,
-      treesSaved: treesSaved,
-      fuelSavedLitres: fuelSavedLitres,
-    );
+  }) async {
+    try {
+      final response = await _apiClient.post(
+        '/customer/emission/calculate-emission',
+        data: {
+          'distance_km': distanceKm,
+          'vehicle_id': vehicleId,
+          'comparison_type': comparisonType,
+          'location': location,
+        },
+      );
+      if (response.data['success'] == true) {
+        return EmissionResult.fromJson(response.data['data']);
+      }
+      throw Exception('Failed to calculate emission');
+    } catch (e) {
+      rethrow;
+    }
   }
 }
+
